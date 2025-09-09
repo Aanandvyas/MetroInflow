@@ -1,148 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // <-- Adjust this import path
 
-// --- Supabase Configuration ---
-// These should be set in your .env file and are loaded by the React build process.
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // State for loading and error messages
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-// Initialize the Supabase client once.
-// Add a check to ensure variables are present before creating the client.
-const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  // Get the sign-in function from our context
+  const { signInUser } = useAuth();
+  const navigate = useNavigate();
 
+  // Handle form submission
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    
+    // Reset previous errors and start loading
+    setError('');
+    setLoading(true);
 
-/**
- * A custom hook to manage the user's authentication state.
- * It provides the current session and loading status.
- */
-export function useAuth() {
-    const [session, setSession] = useState(null);
-    const [loading, setLoading] = useState(true);
+    try {
+      // Call the signInUser function from the context
+      const { data, error } = await signInUser(email, password);
 
-    useEffect(() => {
-        if (!supabase) {
-            console.error("Supabase URL or Anon Key is missing. Authentication is disabled.");
-            setLoading(false);
-            return;
-        }
+      if (error) {
+        // If Supabase returns an error, display it
+        setError(error.message);
+      } else {
+        // If login is successful, redirect to a protected page
+        console.log('Login successful:', data);
+        navigate('/homepage'); // <-- Or any other route you want to protect
+      }
+    } catch (e) {
+      // Catch any other unexpected errors
+      setError('An unexpected error occurred. Please try again.');
+      console.error("Login failed:", e);
+    } finally {
+      // Stop loading regardless of outcome
+      setLoading(false);
+    }
+  };
 
-        // Check for an active session on initial load
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setLoading(false);
-        });
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="w-full max-w-md p-8 m-4 bg-white border border-gray-200 rounded-lg shadow-md">
 
-        // Listen for changes in authentication state (e.g., login, logout)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-        });
-
-        // Cleanup the subscription when the component unmounts
-        return () => subscription.unsubscribe();
-    }, []);
-
-    return { session, loading };
-}
-
-
-/**
- * The Login component renders a form for users to sign in with their email and password.
- */
-export default function Login() {
-    const [loading, setLoading] = useState(false);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
-
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setError('');
-        setMessage('');
-
-        if (!supabase) {
-            setError("Authentication is not configured. Please check your environment variables.");
-            return;
-        }
-
-        setLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password,
-        });
-
-        if (error) {
-            setError(error.message);
-        } else {
-            setMessage('Login successful!');
-            // The onAuthStateChange listener in useAuth will handle the session update
-            // and trigger the App component to re-render with the Dashboard.
-        }
-        setLoading(false);
-    };
-
-    // This component only renders the form. The session check is done in App.jsx
-    return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
-            <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
-                <div className="text-center">
-                    
-                    <h1 className="text-3xl font-bold text-gray-900">KMRL Hub Login</h1>
-                    <p className="mt-2 text-gray-600">Access your document dashboard</p>
-                </div>
-
-                {error && <div className="p-3 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">{error}</div>}
-                {message && <div className="p-3 text-sm text-green-700 bg-green-100 rounded-lg" role="alert">{message}</div>}
-
-                <form className="space-y-6" onSubmit={handleLogin}>
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                            Email address
-                        </label>
-                        <input
-                            id="email"
-                            name="email"
-                            type="email"
-                            autoComplete="email"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                            Password
-                        </label>
-                        <input
-                            id="password"
-                            name="password"
-                            type="password"
-                            autoComplete="current-password"
-                            required
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={loading || !supabase}
-                            className="relative flex justify-center w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md group hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
-                        >
-                            {loading ? 'Signing in...' : 'Sign in'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
+          <p className="mt-1 text-gray-500">Please sign in to access your account</p>
         </div>
-    );
-}
 
-// You can export the supabase client if other parts of your app need it,
-// for instance, for the logout button in App.jsx
-export { supabase };
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Email Input */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email Address
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="you@example.com"
+            />
+          </div>
 
+          {/* Password Input */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {/* Error Message Display */}
+          {error && (
+            <div className="p-3 text-sm text-center text-red-800 bg-red-100 rounded-md">
+              {error}
+            </div>
+          )}
+
+          {/* Remember Me & Forgot Password */}
+          <div className="flex items-center justify-between text-sm">
+            {/* ... existing code ... */}
+          </div>
+
+          {/* Submit Button */}
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full px-4 py-2 font-semibold text-white transition duration-200 bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing In...' : 'Sign In'}
+            </button>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <p className="mt-8 text-sm text-center text-gray-500">
+          Don't have an account?{' '}
+          <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+            Sign Up
+          </a>
+        </p>
+
+      </div>
+    </div>
+  );
+};
+
+export default Login;
