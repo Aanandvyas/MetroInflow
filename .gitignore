@@ -8,11 +8,14 @@
 
 # testing
 /coverage
+/frontend/coverage
 
 # production
+/frontend/build
 /build
 
 # Environment variables
+/frontend/.env
 .env
 
 # misc
