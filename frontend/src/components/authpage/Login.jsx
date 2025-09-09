@@ -137,9 +137,6 @@ export default function Login() {
                         </button>
                     </div>
                 </form>
-                 <p className="text-xs text-center text-gray-500">
-                    Note: For this demo, you can sign up directly through the Supabase dashboard.
-                </p>
             </div>
         </div>
     );
