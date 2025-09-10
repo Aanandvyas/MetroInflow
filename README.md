@@ -8,7 +8,15 @@ Problem Statement - Since its first commercial run in 2017, KMRL has grown into 
 
   ```bash
   git clone --branch testing https://github.com/Aanandvyas/MetroInflow
+  cd MetroInFlow
+  git config core.ignorecase false
   cd MetroInFlow/frontend
   npm i
   npm run dev
+```
+add the .env file with REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY
+
+and go to website 
+```bash
+  http://localhost:3000/login
 ```
