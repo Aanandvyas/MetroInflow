@@ -10,6 +10,7 @@ const Register = () => {
     dob: "",
     gender: "",
     address: "",
+    departmentName: "", // ✅ new field
     password: "",
     confirmPassword: "",
   });
@@ -124,6 +125,22 @@ const Register = () => {
                 required
                 value={formData.dob}
                 onChange={handleChange}
+                className="w-full px-3 py-2 mt-1 border rounded-md"
+              />
+            </div>
+
+            {/* Department */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Department Name
+              </label>
+              <input
+                type="text"
+                name="departmentName"
+                required
+                value={formData.departmentName}
+                onChange={handleChange}
+                placeholder="Enter your department"
                 className="w-full px-3 py-2 mt-1 border rounded-md"
               />
             </div>

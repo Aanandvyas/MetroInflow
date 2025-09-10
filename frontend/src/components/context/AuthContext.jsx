@@ -8,10 +8,18 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Sign up and insert user details
+
   const signUpNewUser = async (formData) => {
-    const { email, password, fullName, phoneNumber, dob, gender, address } =
-      formData;
+    const {
+      email,
+      password,
+      fullName,
+      phoneNumber,
+      dob,
+      gender,
+      address,
+      departmentName,
+    } = formData;
 
     // 1. Create account in Supabase Auth
     const { data, error } = await supabase.auth.signUp({
@@ -27,7 +35,25 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     }
 
-    // 2. Insert into your "user" table
+    let d_uuid = null;
+
+    // 2. Get department uuid from department table
+    if (departmentName) {
+      const { data: deptData, error: deptError } = await supabase
+        .from("department")
+        .select("d_uuid")
+        .ilike("d_name", departmentName) 
+        .single();
+
+      if (deptError) {
+        console.error("Department not found:", deptError.message);
+        return { success: false, error: deptError };
+      }
+
+      d_uuid = deptData?.d_uuid || null;
+    }
+
+    // 3. Insert into your "user" table
     if (data.user) {
       const { error: userError } = await supabase.from("user").insert([
         {
@@ -38,6 +64,7 @@ export const AuthProvider = ({ children }) => {
           dob,
           gender,
           address,
+          d_uuid, // ✅ new field
           age: dob
             ? new Date().getFullYear() - new Date(dob).getFullYear()
             : null,

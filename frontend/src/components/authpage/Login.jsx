@@ -1,45 +1,35 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // <-- Adjust this import path
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // State for loading and error messages
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Get the sign-in function from our context
   const { signInUser } = useAuth();
   const navigate = useNavigate();
 
-  // Handle form submission
   const handleSubmit = async (event) => {
     event.preventDefault();
-    
-    // Reset previous errors and start loading
     setError('');
     setLoading(true);
 
     try {
-      // Call the signInUser function from the context
-      const { data, error } = await signInUser(email, password);
+      const { data, error: signInError } = await signInUser(email, password);
 
-      if (error) {
-        // If Supabase returns an error, display it
-        setError(error.message);
+      if (signInError) {
+        setError(signInError.message);
       } else {
-        // If login is successful, redirect to a protected page
         console.log('Login successful:', data);
-        navigate('/homepage'); // <-- Or any other route you want to protect
+        navigate('/'); // Correctly navigate to the root protected route
       }
     } catch (e) {
-      // Catch any other unexpected errors
       setError('An unexpected error occurred. Please try again.');
       console.error("Login failed:", e);
     } finally {
-      // Stop loading regardless of outcome
       setLoading(false);
     }
   };
@@ -56,6 +46,7 @@ const Login = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
+          
           {/* Email Input */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -99,9 +90,24 @@ const Login = () => {
             </div>
           )}
 
-          {/* Remember Me & Forgot Password */}
+          {/* Remember Me & Forgot Password (UI only) */}
           <div className="flex items-center justify-between text-sm">
-            {/* ... existing code ... */}
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                name="remember-me"
+                type="checkbox"
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="remember-me" className="ml-2 text-gray-600">
+                Remember me
+              </label>
+            </div>
+            <div>
+              <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+                Forgot password?
+              </a>
+            </div>
           </div>
 
           {/* Submit Button */}
@@ -119,9 +125,9 @@ const Login = () => {
         {/* Footer */}
         <p className="mt-8 text-sm text-center text-gray-500">
           Don't have an account?{' '}
-          <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
             Sign Up
-          </a>
+          </Link>
         </p>
 
       </div>
