@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import SearchableDropdown from "./SearchableDropdown";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -10,9 +11,10 @@ const Register = () => {
     dob: "",
     gender: "",
     address: "",
-    departmentName: "", // ✅ new field
+    departmentName: "",
     password: "",
     confirmPassword: "",
+    departmentName: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -129,21 +131,12 @@ const Register = () => {
               />
             </div>
 
-            {/* Department */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Department Name
-              </label>
-              <input
-                type="text"
-                name="departmentName"
-                required
-                value={formData.departmentName}
-                onChange={handleChange}
-                placeholder="Enter your department"
-                className="w-full px-3 py-2 mt-1 border rounded-md"
-              />
-            </div>
+
+            <SearchableDropdown
+              value={formData.departmentName}
+              onChange={handleChange}
+            />
+
 
             {/* Password */}
             <div>
