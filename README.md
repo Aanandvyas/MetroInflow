@@ -7,7 +7,7 @@ Problem Statement - Since its first commercial run in 2017, KMRL has grown into 
 # How to run
 
   ```bash
-  git clone https://github.com/Aanandvyas/MetroInflow
+  git clone --branch testing https://github.com/Aanandvyas/MetroInflow
   cd MetroInFlow/frontend
   npm i
   npm run dev
