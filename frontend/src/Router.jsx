@@ -4,6 +4,7 @@ import Login from "./components/authpage/Login";
 import Register from "./components/authpage/Register";
 import HomePage from "./components/main/HomePage";
 import ProtectedRoute from "./ProtectedRoute";
+import Profile from "./components/authpage/Profile"; 
 
 export const Router = createBrowserRouter([
     {
@@ -17,6 +18,9 @@ export const Router = createBrowserRouter([
             {
                 path: "/",
                 element: <HomePage />,
+            },
+            { path: "/profile",
+              element: <Profile /> 
             },
         ],
     },

@@ -8,7 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-
+  // ✅ Sign up a new user
   const signUpNewUser = async (formData) => {
     const {
       email,
@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
       const { data: deptData, error: deptError } = await supabase
         .from("department")
         .select("d_uuid")
-        .ilike("d_name", departmentName) 
+        .ilike("d_name", departmentName)
         .single();
 
       if (deptError) {
@@ -55,25 +55,28 @@ export const AuthProvider = ({ children }) => {
 
     // 3. Insert into your "user" table
     if (data.user) {
-      const { error: userError } = await supabase.from("user").insert([
+      const { error: userError } = await supabase.from("users").insert([
         {
-          u_id: data.user.id, // uuid from auth.users
+          uuid: data.user.id,   // <-- FIXED
           email,
           name: fullName,
           phone_number: phoneNumber,
           dob,
           gender,
           address,
-          d_uuid, // ✅ new field
+          d_uuid,
           age: dob
             ? new Date().getFullYear() - new Date(dob).getFullYear()
             : null,
         },
       ]);
 
+
       if (userError) {
-        console.error("Error inserting user details:", userError.message);
+        console.error("❌ Error inserting user details:", userError);
         return { success: false, error: userError };
+      } else {
+        console.log("✅ User profile inserted into DB!");
       }
     }
 
@@ -103,16 +106,47 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ✅ Get profile from user table
-  const getUserProfile = async (u_id) => {
+  const getUserProfile = async (uuid) => {
     const { data, error } = await supabase
-      .from("user")
-      .select("*")
-      .eq("u_id", u_id)
-      .single();
+      .from("users")
+      .select("*, department(d_name)")
+      .eq("uuid", uuid)   // <-- use "uuid" instead of "u_id"
+      .maybeSingle();
+
+    console.log("Fetching profile for:", uuid, "result:", data, "error:", error);
 
     if (error) {
       console.error("Error fetching user profile:", error.message);
       return null;
+    }
+    return data;
+  };
+
+  // ✅ Update user role
+  const updateUserRole = async (uuid, r_uuid) => {
+    const { error } = await supabase
+      .from("users")
+      .update({ r_uuid })
+      .eq("uuid", uuid);   // <-- also here
+
+    if (error) {
+      console.error("Error updating role:", error.message);
+      return { success: false, error };
+    }
+
+    return { success: true };
+  };
+
+
+  // ✅ Fetch available roles
+  const getRoles = async () => {
+    const { data, error } = await supabase
+      .from("role")
+      .select("r_uuid, r_name");
+
+    if (error) {
+      console.error("Error fetching roles:", error.message);
+      return [];
     }
     return data;
   };
@@ -153,6 +187,8 @@ export const AuthProvider = ({ children }) => {
     signInUser,
     signOutUser,
     getUserProfile,
+    updateUserRole,
+    getRoles,
   };
 
   return (
