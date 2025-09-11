@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pillow
+paddleocr
+paddlepaddle
+python-multipart
+pydantic
+
+flask
+gunicorn
+requests
+python-dotenv
+nltk
+gevent
