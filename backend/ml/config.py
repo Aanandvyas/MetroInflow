@@ -1,7 +1,7 @@
 
 
 # --- API and Model Configuration ---
-MODEL_API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn" 
+MODEL_API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
 MAX_CHUNK_CHAR_LENGTH = 1000 # Max character length for each chunk
 MIN_TEXT_LENGTH = 200      # Minimum character length to attempt summarization
 
