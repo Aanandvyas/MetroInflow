@@ -13,22 +13,18 @@ import (
 	"time"
 )
 
-// const (
-// pythonServiceURL = "http://python-ocr:8000/ocr"
-// pythonServiceURL = "http://localhost:8000/ocr"
-//
-// )
-// 20MB
 const maxUploadSize = 20 << 20
 const pythonServiceURL = "http://localhost:8000/ocr"
 
+// OCRResult matches the Python OCR service response
+type Page struct {
+	PageIndex     int     `json:"page_index"`
+	Text          string  `json:"text"`
+	AvgConfidence float64 `json:"avg_confidence"`
+}
+
 type OCRResult struct {
-	// Matches what python service returns
-	Lines []struct {
-		Text       string  `json:"text"`
-		Confidence float64 `json:"confidence"`
-		Box        [][]int `json:"box"`
-	} `json:"lines"`
+	Pages []Page `json:"pages"`
 }
 
 func main() {
@@ -62,22 +58,20 @@ func ocrHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to parse form: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	file, fileHeader, err := r.FormFile("image")
+	file, fileHeader, err := r.FormFile("file") // changed to 'file' for consistency
 	if err != nil {
-		http.Error(w, "image field required: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "file field required: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 	log.Printf("received file: %s (%d bytes)", fileHeader.Filename, fileHeader.Size)
 
-	// reading the files
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, file); err != nil {
 		http.Error(w, "failed to read file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// calling python
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
@@ -88,7 +82,6 @@ func ocrHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For demo, return OCR JSON directly
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
 }
@@ -96,7 +89,7 @@ func ocrHandler(w http.ResponseWriter, r *http.Request) {
 func callPythonOCR(ctx context.Context, imageBytes []byte, filename string) (*OCRResult, error) {
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
-	fw, err := w.CreateFormFile("image", filename)
+	fw, err := w.CreateFormFile("file", filename) // changed to 'file' for consistency
 	if err != nil {
 		return nil, err
 	}

@@ -18,7 +18,7 @@ def run_ocr_on_image(img: Image.Image):
     arr = np.array(img)
     result = ocr.ocr(arr)  # use default doc mode
 
-    print("RAW OCR RESULT:", result)  # DEBUG
+    # For production, use logging instead of print if needed
 
     texts = []
     confidences = []
