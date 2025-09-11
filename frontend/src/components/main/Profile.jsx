@@ -6,7 +6,6 @@ import { UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/o
 const Profile = () => {
     const { user, getUserProfile, getRoles, updateUserRole, signOutUser } = useAuth();
     const navigate = useNavigate();
-
     const [profile, setProfile] = useState(null);
     const [roles, setRoles] = useState([]);
     const [selectedRole, setSelectedRole] = useState("");

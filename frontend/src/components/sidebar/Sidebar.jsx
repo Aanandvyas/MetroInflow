@@ -15,13 +15,9 @@ import {
 // ✅ Added a 'path' property to each navigation item
 const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon },
-  { name: 'Shared with me', path: '/shared', icon: UsersIcon },
-  { name: 'Recent', path: '/recent', icon: ClockIcon },
+  { name: 'Assigned to me', path: '/shared', icon: UsersIcon },
   { name: 'Correspondant', path: '/correspondant', icon: PaperAirplaneIcon },
-  { name: 'Tags', path: '/tags', icon: TagIcon },
   { name: 'Mails', path: '/mails', icon: EnvelopeIcon },
-  { name: 'Custom Fields', path: '/custom-fields', icon: CogIcon },
-  { name: 'Document Types', path: '/document-types', icon: DocumentDuplicateIcon },
   { name: 'Archive', path: '/archive', icon: ArchiveBoxIcon },
 ];
 
