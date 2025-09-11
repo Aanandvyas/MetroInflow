@@ -3,10 +3,11 @@ import App from "./App";
 import Login from "./components/authpage/Login";
 import Register from "./components/authpage/Register";
 import HomePage from "./components/main/HomePage";
-import Profile from "./components/main/Profile"; // ✅ Corrected path from 'authpage' to 'main'
+import Profile from "./components/main/Profile"; 
 import DocumentUpload from "./components/main/DocumentUpload";
 import ProtectedRoute from "./ProtectedRoute";
 import DepartmentFiles from "./components/main/DepartmentFiles";
+import AssignToMe from "./components/main/AssignToMe";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -27,7 +28,6 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/department/:d_uuid", element: <DepartmentFiles /> },
             
             // ✅ Added new routes for the sidebar links
-            { path: "/shared", element: <Placeholder title="Shared With Me" /> },
             { path: "/recent", element: <Placeholder title="Recent" /> },
             { path: "/correspondant", element: <Placeholder title="Correspondant" /> },
             { path: "/tags", element: <Placeholder title="Tags" /> },
@@ -35,6 +35,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/custom-fields", element: <Placeholder title="Custom Fields" /> },
             { path: "/document-types", element: <Placeholder title="Document Types" /> },
             { path: "/archive", element: <Placeholder title="Archive" /> },
+            { path: "/assigned-to-me", element: <AssignToMe /> }, 
         ],
     },
     { path: "/login", element: <Login /> },
