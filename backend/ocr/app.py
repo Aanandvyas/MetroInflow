@@ -1,56 +1,88 @@
+import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from starlette.responses import JSONResponse
 from paddleocr import PaddleOCR
-import numpy as np
-from typing import List
 from PIL import Image
 import io
-import uvicorn
+import numpy as np
+import fitz  # PyMuPDF
 
-app = FastAPI(title="PaddleOCR Service")
+app = FastAPI(title="OCR Service")
 
-# Initialize once (this can be slow the first time)
-ocr = PaddleOCR(use_angle_cls=True, lang='en')  # adjust lang as needed
+# Initialize OCR once
+ocr = PaddleOCR(use_angle_cls=True, lang='en')
+
+
+def run_ocr_on_image(img: Image.Image):
+    """Run OCR on an image and return combined text + avg confidence (PaddleOCR document mode)."""
+    arr = np.array(img)
+    result = ocr.ocr(arr)  # use default doc mode
+
+    print("RAW OCR RESULT:", result)  # DEBUG
+
+    texts = []
+    confidences = []
+
+    # PaddleOCR document mode returns a list of dicts
+    if isinstance(result, list):
+        for item in result:
+            rec_texts = item.get("rec_texts", [])
+            rec_scores = item.get("rec_scores", [])
+            for t, c in zip(rec_texts, rec_scores):
+                t = t.strip()
+                if t:
+                    texts.append(t)
+                    confidences.append(float(c))
+
+    page_text = " ".join(texts)
+    avg_conf = sum(confidences)/len(confidences) if confidences else 0.0
+    return page_text, avg_conf
+
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+
 @app.post("/ocr")
-async def ocr_endpoint(image: UploadFile = File(...)):
-    content = await image.read()
+async def ocr_endpoint(file: UploadFile = File(...)):
+    content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="empty file")
+
+    filename = file.filename.lower()
+
     try:
-        img = Image.open(io.BytesIO(content)).convert("RGB")
-        arr = np.array(img)
+        if filename.endswith(".pdf"):
+            pdf_document = fitz.open(stream=content, filetype="pdf")
+            pages_output = []
 
-        result = ocr.ocr(arr)
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                pix = page.get_pixmap(dpi=150)  # adjust DPI
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-        if not result or not result[0]:
-            # No text found
-            return JSONResponse({"lines": []})
-
-        lines = []
-        for line in result[0]:  # safe: loop only if list has items
-            try:
-                box = [[int(x), int(y)] for x, y in line[0]]
-                text, conf = line[1]
-                lines.append({
+                text, avg_conf = run_ocr_on_image(img)
+                pages_output.append({
+                    "page_index": page_num,
                     "text": text,
-                    "confidence": float(conf),
-                    "box": box
+                    "avg_confidence": avg_conf
                 })
-            except Exception as e:
-                # Skip malformed line instead of crashing
-                continue
-        
-        result = ocr.ocr(arr)
-        print("RAW OCR RESULT:", result)
-        return JSONResponse({"lines": lines})
+
+            return JSONResponse({"pages": pages_output})
+
+        else:
+            img = Image.open(io.BytesIO(content)).convert("RGB")
+            text, avg_conf = run_ocr_on_image(img)
+            return JSONResponse({
+                "pages": [
+                    {"page_index": 0, "text": text, "avg_confidence": avg_conf}
+                ]
+            })
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 if __name__ == "__main__":
