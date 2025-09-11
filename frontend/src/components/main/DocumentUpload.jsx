@@ -112,7 +112,7 @@ const DocumentUpload = () => {
         f_name: title,
         language: language,
         d_uuid: departmentId,
-        uuid: userData.uuid, // Use the UUID fetched from the 'users' table
+        f_uuid: userData.uuid, // Correctly uses the 'f_uuid' column for the user's ID
       });
       if (insertError) throw insertError;
 

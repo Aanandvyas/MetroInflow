@@ -1,161 +1,93 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card";
-import { Calendar } from "../ui/Calender"; 
-import { DocumentTextIcon, BellIcon } from "@heroicons/react/24/outline";
-import { supabase } from "../../supabaseClient."; // <-- update path as per your project
+import React, { useState, useEffect, useMemo } from "react";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../../supabaseClient.";
 
-// Mock assigned documents
-const mockDocuments = {
-  "2025-09-04": [{ title: "Q2 Financial Report Review", from: "Finance Dept.", status: "seen" }],
-  "2025-09-08": [{ title: "Engineering Blueprints v3", from: "Engineering Dept.", status: "today" }],
-  "2025-09-15": [{ title: "New Remote Work Policy", from: "HR Department", status: "overdue" }],
-  "2025-09-23": [{ title: "Vendor Contract #V-291", from: "Legal Department", status: "seen" }],
+// Import the new smaller components
+import CalendarCard from "../assign-to-me/CalenderCard";
+import AssignmentsCard from "../assign-to-me/AssignmentCard";
+import UploadedDocsCard from "../assign-to-me/UploadedDocsCard";
+
+const formatDateKey = (date) => {
+  if (!date) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
 };
 
-const statusColors = {
-  seen: "bg-green-500",
-  today: "bg-yellow-500",
-  overdue: "bg-red-500",
-};
-
-const AssignToMe = ({ userId }) => {
+const AssignToMe = () => {
+  const { user } = useAuth();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [uploadedDocs, setUploadedDocs] = useState([]);
+  const [allDocs, setAllDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatDateKey = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const selectedKey = formatDateKey(selectedDate);
-  const assignedDocs = mockDocuments[selectedKey] || [];
-
-  // 🔹 Fetch user’s uploaded docs from Supabase
+  // Fetch all user-related documents once
   useEffect(() => {
-    const fetchDocs = async () => {
-      if (!userId) return;
-      const { data, error } = await supabase
-        .from("file") // table name in Supabase
-        .select("*")
-        .eq("user_uuid", userId);
-
-      if (!error) {
-        setUploadedDocs(data);
+    const fetchUserDocuments = async () => {
+      if (!user) {
+        setAllDocs([]);
+        setLoading(false);
+        return;
       }
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("file")
+        .select("f_name, language, file_path, created_at, f_uuid, d_uuid, department:d_uuid(d_name)")
+        .eq("f_uuid", user.id);
+
+      if (error) {
+        console.error("Error fetching documents:", error);
+        setAllDocs([]);
+      } else {
+        const filesWithUrls = data.map((file) => ({
+          ...file,
+          publicUrl: file.file_path
+            ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
+            : null, // fallback if file_path missing
+        }));
+        setAllDocs(filesWithUrls);
+      }
+      setLoading(false);
     };
-    fetchDocs();
-  }, [userId]);
+    fetchUserDocuments();
+  }, [user]);
+
+  // Process the fetched documents to be used by child components
+  const docsByDate = useMemo(() => {
+    const mappedDocs = {};
+    allDocs.forEach((doc) => {
+      const dateKey = formatDateKey(new Date(doc.created_at));
+      if (!mappedDocs[dateKey]) {
+        mappedDocs[dateKey] = [];
+      }
+      mappedDocs[dateKey].push({
+        title: doc.f_name,
+        from: doc.department?.d_name || "Unassigned",
+      });
+    });
+    return mappedDocs;
+  }, [allDocs]);
+
+  const docsForSelectedDate = docsByDate[formatDateKey(selectedDate)] || [];
 
   return (
-    <div className="space-y-6">
-      {/* Top Section: Calendar + Notifications */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Calendar Side */}
-        <Card>
-          <CardHeader>
-            <CardTitle>My Calendar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              defaultMonth={new Date()}
-              className="rounded-md border"
-              // Custom day render
-              components={{
-                DayContent: ({ date }) => {
-                  const docs = mockDocuments[formatDateKey(date)];
-                  return (
-                    <div className="flex flex-col items-center">
-                      <span
-                        className={`text-xs ${
-                          date.toDateString() === new Date().toDateString()
-                            ? "font-bold text-blue-600"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {date.getDate()}
-                      </span>
-                      <div className="flex gap-0.5 mt-0.5">
-                        {docs?.map((doc, i) => (
-                          <span
-                            key={i}
-                            className={`w-1.5 h-1.5 rounded-full ${statusColors[doc.status]}`}
-                          ></span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                },
-              }}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Notifications / Assigned Docs */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BellIcon className="h-5 w-5 text-blue-500" />
-              Notifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {assignedDocs.length > 0 ? (
-              <div className="space-y-3">
-                {assignedDocs.map((doc, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-3 p-3 border rounded-lg bg-gray-50"
-                  >
-                    <DocumentTextIcon className="h-6 w-6 text-blue-500" />
-                    <div>
-                      <p className="font-semibold">{doc.title}</p>
-                      <p className="text-sm text-gray-600">From: {doc.from}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No documents assigned on this date.</p>
-            )}
-          </CardContent>
-        </Card>
+    <div className="p-6 bg-gradient-to-b from-gray-50 to-gray-100 min-h-screen">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <CalendarCard
+          currentMonth={currentMonth}
+          setCurrentMonth={setCurrentMonth}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          docsByDate={docsByDate}
+        />
+        <AssignmentsCard
+          selectedDate={selectedDate}
+          assignments={docsForSelectedDate}
+          loading={loading}
+        />
       </div>
-
-      {/* Bottom Section: Uploaded Documents */}
-      <Card>
-        <CardHeader>
-          <CardTitle>My Uploaded Documents</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {uploadedDocs.length > 0 ? (
-            <ul className="divide-y divide-gray-200">
-              {uploadedDocs.map((file) => (
-                <li key={file.id} className="py-2 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{file.file_name}</p>
-                    <p className="text-xs text-gray-500">{file.file_path}</p>
-                  </div>
-                  <a
-                    href={file.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    View
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-500 text-sm">No documents uploaded yet.</p>
-          )}
-        </CardContent>
-      </Card>
+      <UploadedDocsCard uploadedDocs={allDocs} loading={loading} />
     </div>
   );
 };
