@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import SearchableDropdown from "./SearchableDropdown";
+import { supabase } from "../../supabaseClient.";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -18,9 +19,26 @@ const Register = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [departments, setDepartments] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
 
   const { signUpNewUser } = useAuth();
   const navigate = useNavigate();
+
+  // Fetch department names for dropdown
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      const { data, error } = await supabase.from("department").select("d_name");
+      if (error) {
+        console.error("Error loading departments:", error);
+        setDepartments([]);
+      } else {
+        setDepartments(data.map((d) => d.d_name));
+      }
+      setLoadingDepartments(false);
+    };
+    fetchDepartments();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -130,12 +148,13 @@ const Register = () => {
               />
             </div>
 
-
+            {/* Department Searchable Dropdown */}
             <SearchableDropdown
               value={formData.departmentName}
               onChange={handleChange}
+              options={departments}
+              loading={loadingDepartments}
             />
-
 
             {/* Password */}
             <div>

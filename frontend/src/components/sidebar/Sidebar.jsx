@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
   UsersIcon,
@@ -11,43 +12,52 @@ import {
   ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 
+// ✅ Added a 'path' property to each navigation item
 const navItems = [
-  { name: 'Dashboard', icon: HomeIcon, current: true },
-  { name: 'Shared with me', icon: UsersIcon, current: false },
-  { name: 'Recent', icon: ClockIcon, current: false },
-  { name: 'Correspondant', icon: PaperAirplaneIcon, current: false },
-  { name: 'Tags', icon: TagIcon, current: false },
-  { name: 'Mails', icon: EnvelopeIcon, current: false },
-  { name: 'Custom Fields', icon: CogIcon, current: false },
-  { name: 'Document Types', icon: DocumentDuplicateIcon, current: false },
-  { name: 'Archive', icon: ArchiveBoxIcon, current: false },
+  { name: 'Dashboard', path: '/', icon: HomeIcon },
+  { name: 'Shared with me', path: '/shared', icon: UsersIcon },
+  { name: 'Recent', path: '/recent', icon: ClockIcon },
+  { name: 'Correspondant', path: '/correspondant', icon: PaperAirplaneIcon },
+  { name: 'Tags', path: '/tags', icon: TagIcon },
+  { name: 'Mails', path: '/mails', icon: EnvelopeIcon },
+  { name: 'Custom Fields', path: '/custom-fields', icon: CogIcon },
+  { name: 'Document Types', path: '/document-types', icon: DocumentDuplicateIcon },
+  { name: 'Archive', path: '/archive', icon: ArchiveBoxIcon },
 ];
 
 const Sidebar = () => {
+  const location = useLocation(); // ✅ Hook to get the current URL path
+
   return (
     <aside className="w-64 bg-white p-5 border-r border-gray-200 overflow-y-auto">
       <nav>
         <ul>
-          {navItems.map((item) => (
-            <li key={item.name} className="mb-2">
-              <a
-                href="#"
-                className={`flex items-center p-2 rounded-lg text-sm font-medium transition-colors ${
-                  item.current
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <item.icon
-                  className={`h-6 w-6 mr-3 ${
-                    item.current ? 'text-blue-600' : 'text-gray-500'
+          {navItems.map((item) => {
+            // ✅ Determine if the link is active by comparing its path to the current URL
+            const isActive = location.pathname === item.path;
+
+            return (
+              <li key={item.name} className="mb-2">
+                {/* ✅ Replaced <a> with <Link> */}
+                <Link
+                  to={item.path}
+                  className={`flex items-center p-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
-                  aria-hidden="true"
-                />
-                {item.name}
-              </a>
-            </li>
-          ))}
+                >
+                  <item.icon
+                    className={`h-6 w-6 mr-3 ${
+                      isActive ? 'text-blue-600' : 'text-gray-500'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  {item.name}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </aside>

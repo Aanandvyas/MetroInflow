@@ -3,12 +3,20 @@ import App from "./App";
 import Login from "./components/authpage/Login";
 import Register from "./components/authpage/Register";
 import HomePage from "./components/main/HomePage";
-import Profile from "./components/authpage/Profile";
+import Profile from "./components/main/Profile"; // ✅ Corrected path from 'authpage' to 'main'
 import DocumentUpload from "./components/main/DocumentUpload";
 import ProtectedRoute from "./ProtectedRoute";
-import DepartmentFiles from "./components/main/DepartmentFiles"; // ✅ 1. Import the new component
+import DepartmentFiles from "./components/main/DepartmentFiles";
 
-export const Router = createBrowserRouter([
+// ✅ Simple placeholder component for pages that are not yet built
+const Placeholder = ({ title }) => (
+    <div className="p-8">
+        <h1 className="text-3xl font-bold">{title}</h1>
+        <p className="mt-4 text-gray-600">This page is under construction.</p>
+    </div>
+);
+
+export const Router = createBrowserRouter([ // Corrected export name
     {
         path: "/",
         element: <ProtectedRoute><App /></ProtectedRoute>,
@@ -16,8 +24,17 @@ export const Router = createBrowserRouter([
             { path: "/", element: <HomePage /> },
             { path: "/profile", element: <Profile /> },
             { path: "/upload-document", element: <DocumentUpload /> },
-            // ✅ 2. Add the new dynamic route for departments
             { path: "/department/:d_uuid", element: <DepartmentFiles /> },
+            
+            // ✅ Added new routes for the sidebar links
+            { path: "/shared", element: <Placeholder title="Shared With Me" /> },
+            { path: "/recent", element: <Placeholder title="Recent" /> },
+            { path: "/correspondant", element: <Placeholder title="Correspondant" /> },
+            { path: "/tags", element: <Placeholder title="Tags" /> },
+            { path: "/mails", element: <Placeholder title="Mails" /> },
+            { path: "/custom-fields", element: <Placeholder title="Custom Fields" /> },
+            { path: "/document-types", element: <Placeholder title="Document Types" /> },
+            { path: "/archive", element: <Placeholder title="Archive" /> },
         ],
     },
     { path: "/login", element: <Login /> },
