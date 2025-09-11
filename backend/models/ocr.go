@@ -1,5 +1,10 @@
 package models
 
+import (
+	"net/http"
+	"time"
+)
+
 // Page represents OCR output per page
 type Page struct {
 	PageIndex     int     `json:"page_index"`
@@ -11,3 +16,5 @@ type Page struct {
 type OCRResponse struct {
 	Pages []Page `json:"pages"`
 }
+
+var client = &http.Client{Timeout: 5 * time.Minute}

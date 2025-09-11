@@ -1,6 +1,0 @@
-flask
-gunicorn
-requests
-python-dotenv
-nltk
-gevent
