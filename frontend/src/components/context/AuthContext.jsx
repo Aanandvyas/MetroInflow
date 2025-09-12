@@ -12,6 +12,12 @@ export const AuthProvider = ({ children }) => {
   const [phoneNumber, setPhoneNumber] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper: redirect to login
+  const redirectToLogin = () => {
+    // Replace so the user can't navigate back into an expired session
+    window.location.replace("/login");
+  };
+
   // ✅ Sign up a new user
   const signUpNewUser = async (formData) => {
     const {
@@ -107,6 +113,14 @@ export const AuthProvider = ({ children }) => {
     if (error) {
       console.error("Error signing out:", error.message);
     }
+    // Clear local state and redirect to login
+    setSession(null);
+    setUser(null);
+    setDUuid(null);
+    setDepartmentName(null);
+    setRUuid(null);
+    setPhoneNumber(null);
+    redirectToLogin();
   };
 
   // ✅ Get profile from user table
@@ -160,6 +174,16 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     let logoutTimeout = null;
 
+    const clearAuthStateAndRedirect = () => {
+      setSession(null);
+      setUser(null);
+      setDUuid(null);
+      setDepartmentName(null);
+      setRUuid(null);
+      setPhoneNumber(null);
+      redirectToLogin();
+    };
+
     const fetchUserDetails = async (uuid) => {
       if (!uuid) {
         setDUuid(null);
@@ -196,6 +220,22 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
+    const startLogoutTimer = (session) => {
+      if (logoutTimeout) clearTimeout(logoutTimeout);
+      if (session && session.expires_at) {
+        const now = Math.floor(Date.now() / 1000);
+        const expiresIn = session.expires_at - now;
+        if (expiresIn > 0) {
+          logoutTimeout = setTimeout(() => {
+            clearAuthStateAndRedirect();
+          }, expiresIn * 1000);
+        } else {
+          // Already expired, logout immediately
+          clearAuthStateAndRedirect();
+        }
+      }
+    };
+
     const getSession = async () => {
       const {
         data: { session },
@@ -203,21 +243,7 @@ export const AuthProvider = ({ children }) => {
       setSession(session);
       setUser(session?.user ?? null);
       await fetchUserDetails(session?.user?.id);
-      // Set logout timer if session exists
-      if (session && session.expires_at) {
-        const now = Math.floor(Date.now() / 1000);
-        const expiresIn = session.expires_at - now;
-        if (expiresIn > 0) {
-          logoutTimeout = setTimeout(() => {
-            setSession(null);
-            setUser(null);
-            setDUuid(null);
-            setDepartmentName(null);
-            setRUuid(null);
-            setPhoneNumber(null);
-          }, expiresIn * 1000);
-        }
-      }
+      startLogoutTimer(session);
       setLoading(false);
     };
 
@@ -229,22 +255,12 @@ export const AuthProvider = ({ children }) => {
       setSession(session);
       setUser(session?.user ?? null);
       await fetchUserDetails(session?.user?.id);
-      // Reset logout timer
-      if (logoutTimeout) clearTimeout(logoutTimeout);
-      if (session && session.expires_at) {
-        const now = Math.floor(Date.now() / 1000);
-        const expiresIn = session.expires_at - now;
-        if (expiresIn > 0) {
-          logoutTimeout = setTimeout(() => {
-            setSession(null);
-            setUser(null);
-            setDUuid(null);
-            setDepartmentName(null);
-            setRUuid(null);
-            setPhoneNumber(null);
-          }, expiresIn * 1000);
-        }
+      if (!session) {
+        // If session becomes null (sign out or expiry), redirect
+        clearAuthStateAndRedirect();
+        return;
       }
+      startLogoutTimer(session);
     });
 
     return () => {
