@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient.";
-
-// Import the new smaller components
-import CalendarCard from "../assign-to-me/CalenderCard";
-import AssignmentsCard from "../assign-to-me/AssignmentCard";
+import CalendarCard from "../assign-to-me/CalendarCard";
+import AssignmentsCard from "../assign-to-me/AssignmentsCard";
 import UploadedDocsCard from "../assign-to-me/UploadedDocsCard";
 
 const formatDateKey = (date) => {
@@ -18,10 +16,9 @@ const AssignToMe = () => {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [allDocs, setAllDocs] = useState([]);
+  const [allDocs, setAllDocs] = useState([]); 
   const [loading, setLoading] = useState(true);
 
-  // Fetch all user-related documents once
   useEffect(() => {
     const fetchUserDocuments = async () => {
       if (!user) {
@@ -33,7 +30,7 @@ const AssignToMe = () => {
 
       const { data, error } = await supabase
         .from("file")
-        .select("f_name, language, file_path, created_at, f_uuid, d_uuid, department:d_uuid(d_name)")
+        .select("uuid, f_name, language, file_path, created_at, f_uuid, d_uuid, department:d_uuid(d_name)")
         .eq("f_uuid", user.id);
 
       if (error) {
@@ -44,7 +41,7 @@ const AssignToMe = () => {
           ...file,
           publicUrl: file.file_path
             ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
-            : null, // fallback if file_path missing
+            : null,
         }));
         setAllDocs(filesWithUrls);
       }
@@ -53,10 +50,10 @@ const AssignToMe = () => {
     fetchUserDocuments();
   }, [user]);
 
-  // Process the fetched documents to be used by child components
+  // Provide a fallback to prevent 'docsByDate' from being undefined
   const docsByDate = useMemo(() => {
     const mappedDocs = {};
-    allDocs.forEach((doc) => {
+    (allDocs || []).forEach((doc) => {
       const dateKey = formatDateKey(new Date(doc.created_at));
       if (!mappedDocs[dateKey]) {
         mappedDocs[dateKey] = [];

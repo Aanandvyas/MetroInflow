@@ -1,7 +1,9 @@
+// Inside src/components/assign-to-me/AssignmentsCard.jsx
 import React from "react";
 import { DocumentTextIcon, BellIcon } from "@heroicons/react/24/outline";
 
-const AssignmentsCard = ({ selectedDate, assignments, loading }) => {
+// ✅ FIX: Provide a default empty array for the assignments prop
+const AssignmentsCard = ({ selectedDate, assignments = [], loading }) => {
   return (
     <div className="lg:col-span-1 bg-white/90 backdrop-blur rounded-2xl shadow-md border border-gray-200 p-5">
       <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-4">

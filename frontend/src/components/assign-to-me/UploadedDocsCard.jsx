@@ -1,47 +1,33 @@
 import React from "react";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 
 const UploadedDocsCard = ({ uploadedDocs, loading }) => {
-  if (loading) {
-    return (
-      <div className="p-4 bg-white shadow-md rounded-lg">
-        <p className="text-gray-500">Loading documents...</p>
-      </div>
-    );
-  }
-
-  if (!uploadedDocs || uploadedDocs.length === 0) {
-    return (
-      <div className="p-4 bg-white shadow-md rounded-lg">
-        <p className="text-gray-500">No documents uploaded yet.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 bg-white shadow-md rounded-lg">
-      <h2 className="text-lg font-semibold mb-4">Uploaded Documents</h2>
-      <ul className="space-y-2">
-        {uploadedDocs.map((doc) => (
-          <li
-            key={doc.id || doc.file_path || doc.created_at} // ✅ unique key
-            className="flex items-center justify-between p-2 border rounded-md"
-          >
-            <span className="text-gray-700 font-medium">{doc.f_name}</span>
-            {doc.publicUrl ? (
-              <a
-                href={doc.publicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline text-sm"
-              >
-                View
-              </a>
-            ) : (
-              <span className="text-gray-400 text-sm">No file</span>
-            )}
-          </li>
-        ))}
-      </ul>
+    <div className="bg-white/90 backdrop-blur rounded-2xl shadow-md border border-gray-200 p-5">
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">My Uploaded Documents</h2>
+      <div className="max-h-80 overflow-y-auto pr-2">
+        {loading ? (
+          <p className="text-gray-500 text-sm py-6">Loading your documents...</p>
+        ) : uploadedDocs.length > 0 ? (
+          <ul className="divide-y divide-gray-100">
+            {uploadedDocs.map((file) => (
+              <li key={file.u_id} className="py-3 flex justify-between items-center hover:bg-gray-50 px-2 rounded-lg transition">
+                <div className="flex items-center gap-3">
+                  <DocumentTextIcon className="h-6 w-6 text-gray-400" />
+                  <p className="font-medium text-gray-800 text-sm">{file.name}</p>
+                </div>
+                {file.publicUrl && (
+                  <a href={file.publicUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline font-medium">
+                    View
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-500 text-sm text-center py-6">You haven't uploaded any documents yet.</p>
+        )}
+      </div>
     </div>
   );
 };

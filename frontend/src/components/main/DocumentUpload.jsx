@@ -107,16 +107,17 @@ const DocumentUpload = () => {
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      // Step 3: Insert metadata into the 'file' table
-      // Step 3: Insert metadata into the 'file' table
+// Step 3: Insert metadata into the 'file' table
 const { error: insertError } = await supabase.from("file").insert({
   f_name: title,
   language,
-  d_uuid: departmentId,
-  uuid: userData.uuid,          // ✅ foreign key → user id
-  file_path: filePath,          // ✅ save the storage path
-  created_at: new Date().toISOString(), // ✅ store timestamp
+  d_uuid: departmentId,      // department foreign key
+  uuid: userData.uuid,       // user foreign key
+  file_path: filePath,       // storage path
+  created_at: new Date().toISOString(),
+  // f_uuid will be auto-generated in DB if column has default gen_random_uuid()
 });
+
 
       if (insertError) throw insertError;
 

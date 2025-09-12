@@ -1,12 +1,12 @@
 import React, { useMemo } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 
-// Helper functions can be moved to a separate utils file
+// Helper functions (it's best to move these to a separate utils file)
 const getCalendarDays = (year, month) => {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysArray = [];
-  for (let i = 0; i < firstDay; i++) daysArray.push(null);
+  for (let i = 0; i < firstDay; i++) daysArray.push(null); // Padding days are null
   for (let i = 1; i <= daysInMonth; i++) daysArray.push(new Date(year, month, i));
   return daysArray;
 };
@@ -37,18 +37,22 @@ const CalendarCard = ({ currentMonth, setCurrentMonth, selectedDate, setSelected
       </div>
       <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((day, index) => {
-          const dateKey = day ? formatDateKey(day) : "";
-          const isSelected = day && isSameDay(day, selectedDate);
+          // ✅ FIX: Handle the case where 'day' is null
+          if (!day) {
+            return <div key={index} />; // Render an empty div for padding days
+          }
+
+          const dateKey = formatDateKey(day);
+          const isSelected = isSameDay(day, selectedDate);
           const hasDocs = !!docsByDate[dateKey];
+          
           return (
-            <div key={index} onClick={() => day && setSelectedDate(day)}
-              className={`relative p-1 text-center text-xs h-16 flex flex-col items-center justify-start rounded-lg cursor-pointer transition-all ${day && day.getMonth() !== currentMonth.getMonth() ? "text-gray-300" : "text-gray-700"} ${isSelected ? "bg-blue-100 ring-2 ring-blue-400" : "hover:bg-gray-50"}`}>
-              {day && (
-                <>
-                  <span className={`h-6 w-6 flex items-center justify-center rounded-full transition ${isSelected ? "bg-blue-600 text-white font-bold" : ""}`}>{day.getDate()}</span>
-                  {hasDocs && <div className="flex gap-1 mt-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" /></div>}
-                </>
-              )}
+            <div key={index} onClick={() => setSelectedDate(day)}
+              className={`relative p-1 text-center text-xs h-16 flex flex-col items-center justify-start rounded-lg cursor-pointer transition-all ${day.getMonth() !== currentMonth.getMonth() ? "text-gray-300" : "text-gray-700"} ${isSelected ? "bg-blue-100 ring-2 ring-blue-400" : "hover:bg-gray-50"}`}>
+              <span className={`h-6 w-6 flex items-center justify-center rounded-full transition ${isSelected ? "bg-blue-600 text-white font-bold" : ""}`}>
+                {day.getDate()}
+              </span>
+              {hasDocs && <div className="flex gap-1 mt-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" /></div>}
             </div>
           );
         })}
