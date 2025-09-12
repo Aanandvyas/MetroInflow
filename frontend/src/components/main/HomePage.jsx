@@ -11,9 +11,52 @@ const recentNotifications = [
 ];
 
 const HomePage = () => {
-    const navigate = useNavigate();
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [recentFiles, setRecentFiles] = useState([]);
+    const [filesLoading, setFilesLoading] = useState(true);
+    const [selectedDepartment, setSelectedDepartment] = useState('');
+    const [selectedLanguage, setSelectedLanguage] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchRecentFiles = async () => {
+            setFilesLoading(true);
+            let query = supabase
+                .from('file')
+                .select(`
+                    uuid,
+                    f_name,
+                    language,
+                    department:d_uuid(
+                        d_name
+                    )
+                `)
+                .order('uuid', { ascending: true })
+                .limit(20);
+
+            if (selectedDepartment) {
+                query = query.eq('d_uuid', selectedDepartment);
+            }
+            if (selectedLanguage) {
+                query = query.eq('language', selectedLanguage);
+            }
+            if (searchTerm) {
+                query = query.ilike('f_name', `%${searchTerm}%`);
+            }
+
+            const { data, error } = await query;
+            if (error) {
+                console.error('Error fetching recent files:', error);
+                setRecentFiles([]);
+            } else {
+                setRecentFiles(data || []);
+            }
+            setFilesLoading(false);
+        };
+        fetchRecentFiles();
+    }, [selectedDepartment, selectedLanguage, searchTerm]);
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -21,7 +64,6 @@ const HomePage = () => {
             const { data, error } = await supabase
                 .from('department')
                 .select('d_uuid, d_name');
-            
             if (error) {
                 console.error("Error fetching departments:", error);
             } else {
@@ -44,7 +86,6 @@ const HomePage = () => {
                     New
                 </button>
             </div>
-            
             <section>
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">Departments</h2>
                 {loading ? (
@@ -56,7 +97,6 @@ const HomePage = () => {
                                 <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-500 transition cursor-pointer group h-full">
                                     <div className="flex items-center justify-between">
                                         <FolderIcon className="h-8 w-8 text-blue-500 group-hover:text-blue-600" />
-                                        {/* Notification count would require a more complex query, so it's removed for now */}
                                     </div>
                                     <h3 className="mt-4 text-lg font-semibold text-gray-800">{dept.d_name}</h3>
                                 </div>
@@ -65,7 +105,62 @@ const HomePage = () => {
                     </div>
                 )}
             </section>
-
+            <section className="mt-12">
+                <h2 className="text-xl font-semibold text-gray-700 mb-4">Recent Files</h2>
+                {/* Filters and Search */}
+                <div className="flex flex-wrap gap-4 mb-4">
+                    <select
+                        className="border rounded px-3 py-2"
+                        value={selectedDepartment}
+                        onChange={e => setSelectedDepartment(e.target.value)}
+                    >
+                        <option value="">All Departments</option>
+                        {departments.map(dept => (
+                            <option key={dept.d_uuid} value={dept.d_uuid}>{dept.d_name}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="border rounded px-3 py-2"
+                        value={selectedLanguage}
+                        onChange={e => setSelectedLanguage(e.target.value)}
+                    >
+                        <option value="">All Languages</option>
+                        {/* Unique language options from files */}
+                        {[...new Set(recentFiles.map(f => f.language).filter(Boolean))].map(lang => (
+                            <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                    </select>
+                    <input
+                        className="border rounded px-3 py-2"
+                        type="text"
+                        placeholder="Search files by name..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    {filesLoading ? (
+                        <div>Loading recent files...</div>
+                    ) : recentFiles.length === 0 ? (
+                        <div>No recent files found.</div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            {recentFiles.map((file, idx) => (
+                                <div key={file.uuid + '-' + idx} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <DocumentTextIcon className="h-8 w-8 text-blue-400 mb-2" />
+                                    <h3 className="font-semibold text-gray-800 truncate" title={file.f_name}>{file.f_name}</h3>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Department: {file.department?.d_name || 'Unknown'}
+                                    </p>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Language: {file.language || 'Unknown'}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </section>
             <section className="mt-12">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">Recent Notifications</h2>
                 <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -86,6 +181,6 @@ const HomePage = () => {
             </section>
         </div>
     );
-};
+}
 
 export default HomePage;
