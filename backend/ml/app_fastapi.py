@@ -1,3 +1,17 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
+# --- Application Setup ---
+app_fastapi = FastAPI()
+# --- FastAPI Summarization Endpoint ---
+class SummarizeRequest(BaseModel):
+    text: str
+    prompt: str = ""
+
+@app_fastapi.post("/summarize")
+async def summarize_endpoint(req: SummarizeRequest):
+    summary = summarize_large_document(req.text, req.prompt)
+    return {"summary": summary}
 import os
 import requests
 import time
@@ -150,4 +164,11 @@ def index():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    import threading
+    # Run Flask and FastAPI together for dev
+    def run_flask():
+        app.run(debug=True, port=5000)
+    def run_fastapi():
+        uvicorn.run(app_fastapi, host="0.0.0.0", port=9000)
+    threading.Thread(target=run_flask).start()
+    run_fastapi()
