@@ -6,6 +6,10 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
+  const [dUuid, setDUuid] = useState(null);
+  const [departmentName, setDepartmentName] = useState(null);
+  const [rUuid, setRUuid] = useState(null);
+  const [phoneNumber, setPhoneNumber] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // ✅ Sign up a new user
@@ -154,14 +158,66 @@ export const AuthProvider = ({ children }) => {
   // ✅ Session management
   useEffect(() => {
     setLoading(true);
+    let logoutTimeout = null;
+
+    const fetchUserDetails = async (uuid) => {
+      if (!uuid) {
+        setDUuid(null);
+        setDepartmentName(null);
+        setRUuid(null);
+        setPhoneNumber(null);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("users")
+        .select("d_uuid, r_uuid, phone_number")
+        .eq("uuid", uuid)
+        .maybeSingle();
+      if (error || !data) {
+        setDUuid(null);
+        setDepartmentName(null);
+        setRUuid(null);
+        setPhoneNumber(null);
+      } else {
+        setDUuid(data.d_uuid || null);
+        setRUuid(data.r_uuid || null);
+        setPhoneNumber(data.phone_number || null);
+        // Fetch department name from department table
+        if (data.d_uuid) {
+          const { data: dept, error: deptError } = await supabase
+            .from("department")
+            .select("d_name")
+            .eq("d_uuid", data.d_uuid)
+            .maybeSingle();
+          setDepartmentName(dept?.d_name || null);
+        } else {
+          setDepartmentName(null);
+        }
+      }
+    };
 
     const getSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
       setSession(session);
       setUser(session?.user ?? null);
+      await fetchUserDetails(session?.user?.id);
+      // Set logout timer if session exists
+      if (session && session.expires_at) {
+        const now = Math.floor(Date.now() / 1000);
+        const expiresIn = session.expires_at - now;
+        if (expiresIn > 0) {
+          logoutTimeout = setTimeout(() => {
+            setSession(null);
+            setUser(null);
+            setDUuid(null);
+            setDepartmentName(null);
+            setRUuid(null);
+            setPhoneNumber(null);
+          }, expiresIn * 1000);
+        }
+      }
       setLoading(false);
     };
 
@@ -169,19 +225,45 @@ export const AuthProvider = ({ children }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      await fetchUserDetails(session?.user?.id);
+      // Reset logout timer
+      if (logoutTimeout) clearTimeout(logoutTimeout);
+      if (session && session.expires_at) {
+        const now = Math.floor(Date.now() / 1000);
+        const expiresIn = session.expires_at - now;
+        if (expiresIn > 0) {
+          logoutTimeout = setTimeout(() => {
+            setSession(null);
+            setUser(null);
+            setDUuid(null);
+            setDepartmentName(null);
+            setRUuid(null);
+            setPhoneNumber(null);
+          }, expiresIn * 1000);
+        }
+      }
     });
 
     return () => {
       subscription?.unsubscribe();
+      if (logoutTimeout) clearTimeout(logoutTimeout);
     };
   }, []);
+
+
+  // Helper to get the current session's access token (JWT)
+  const getAccessToken = () => session?.access_token || null;
 
   const value = {
     session,
     user,
+    dUuid,
+    departmentName,
+    rUuid,
+    phoneNumber,
     loading,
     signUpNewUser,
     signInUser,
@@ -189,6 +271,7 @@ export const AuthProvider = ({ children }) => {
     getUserProfile,
     updateUserRole,
     getRoles,
+    getAccessToken,
   };
 
   return (
