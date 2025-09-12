@@ -8,6 +8,7 @@ import DocumentUpload from "./components/main/DocumentUpload";
 import ProtectedRoute from "./ProtectedRoute";
 import DepartmentFiles from "./components/main/DepartmentFiles";
 import AssignToMe from "./components/main/AssignToMe";
+import FileViewer from './components/main/FileViewer';
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -36,6 +37,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/document-types", element: <Placeholder title="Document Types" /> },
             { path: "/archive", element: <Placeholder title="Archive" /> },
             { path: "/assigned-to-me", element: <AssignToMe /> }, 
+            { path: "/file/:uuid", element: <FileViewer /> },
         ],
     },
     { path: "/login", element: <Login /> },

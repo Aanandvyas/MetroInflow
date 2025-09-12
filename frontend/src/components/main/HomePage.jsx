@@ -26,14 +26,14 @@ const HomePage = () => {
             let query = supabase
                 .from('file')
                 .select(`
-                    uuid,
+                    f_uuid,
                     f_name,
                     language,
                     department:d_uuid(
                         d_name
                     )
                 `)
-                .order('uuid', { ascending: true })
+                .order('f_uuid', { ascending: true })
                 .limit(20);
 
             if (selectedDepartment) {
@@ -156,7 +156,7 @@ const HomePage = () => {
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {recentFiles.map((file, idx) => (
-                                        <tr key={file.uuid + '-' + idx} className="hover:bg-gray-50 transition">
+                                        <tr key={file.f_uuid + '-' + idx} className="hover:bg-gray-50 transition">
                                             <td className="px-6 py-4 whitespace-nowrap flex items-center gap-3">
                                                 <DocumentTextIcon className="h-6 w-6 text-blue-400 flex-shrink-0" />
                                                 <span className="font-medium text-gray-800 truncate max-w-xs" title={file.f_name}>{file.f_name}</span>
@@ -165,9 +165,14 @@ const HomePage = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.language || 'Unknown'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {/* Example action: View file (customize as needed) */}
-                                                <button className="text-blue-600 hover:underline text-sm font-medium" onClick={() => navigate(`/file/${file.uuid}`)}>
+                                                <a
+                                                    className="text-blue-600 hover:underline text-sm font-medium"
+                                                    href={`/file/${file.f_uuid}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
                                                     View
-                                                </button>
+                                                </a>
                                             </td>
                                         </tr>
                                     ))}
