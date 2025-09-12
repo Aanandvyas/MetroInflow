@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '../../supabaseClient.';
+import { supabase } from '../../supabaseClient';
 import { DocumentTextIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 const DepartmentFiles = () => {
