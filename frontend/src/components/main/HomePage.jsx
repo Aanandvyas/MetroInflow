@@ -144,19 +144,35 @@ const HomePage = () => {
                     ) : recentFiles.length === 0 ? (
                         <div>No recent files found.</div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {recentFiles.map((file, idx) => (
-                                <div key={file.uuid + '-' + idx} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <DocumentTextIcon className="h-8 w-8 text-blue-400 mb-2" />
-                                    <h3 className="font-semibold text-gray-800 truncate" title={file.f_name}>{file.f_name}</h3>
-                                    <p className="text-sm text-gray-500 mt-1">
-                                        Department: {file.department?.d_name || 'Unknown'}
-                                    </p>
-                                    <p className="text-sm text-gray-500 mt-1">
-                                        Language: {file.language || 'Unknown'}
-                                    </p>
-                                </div>
-                            ))}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {recentFiles.map((file, idx) => (
+                                        <tr key={file.uuid + '-' + idx} className="hover:bg-gray-50 transition">
+                                            <td className="px-6 py-4 whitespace-nowrap flex items-center gap-3">
+                                                <DocumentTextIcon className="h-6 w-6 text-blue-400 flex-shrink-0" />
+                                                <span className="font-medium text-gray-800 truncate max-w-xs" title={file.f_name}>{file.f_name}</span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.department?.d_name || 'Unknown'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.language || 'Unknown'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {/* Example action: View file (customize as needed) */}
+                                                <button className="text-blue-600 hover:underline text-sm font-medium" onClick={() => navigate(`/file/${file.uuid}`)}>
+                                                    View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
