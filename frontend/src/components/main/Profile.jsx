@@ -4,25 +4,29 @@ import { useNavigate } from "react-router-dom";
 import { UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 
 const Profile = () => {
-    const { user, departmentName, phoneNumber, rUuid, getRoles, updateUserRole, signOutUser } = useAuth();
+    const { user, getUserProfile, getRoles, updateUserRole, signOutUser } = useAuth();
     const navigate = useNavigate();
-    // Profile info is now derived from user and dUuid
+    const [profile, setProfile] = useState(null);
     const [roles, setRoles] = useState([]);
-    const [selectedRole, setSelectedRole] = useState(rUuid || "");
+    const [selectedRole, setSelectedRole] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
 
     useEffect(() => {
-        const fetchRoles = async () => {
+        const fetchData = async () => {
             if (user) {
+                const profileData = await getUserProfile(user.id);
+                setProfile(profileData);
+                setSelectedRole(profileData?.r_uuid || "");
+
                 const rolesData = await getRoles();
                 setRoles(rolesData || []);
             }
             setLoading(false);
         };
-        fetchRoles();
-    }, [user, getRoles]);
+        fetchData();
+    }, [user, getUserProfile, getRoles]);
 
     const handleSaveChanges = async () => {
         if (!selectedRole) {
@@ -34,6 +38,8 @@ const Profile = () => {
         const result = await updateUserRole(user.id, selectedRole);
 
         if (result.success) {
+            const updatedProfile = await getUserProfile(user.id);
+            setProfile(updatedProfile);
             setStatusMessage({ text: 'Profile updated successfully!', type: 'success' });
         } else {
             setStatusMessage({ text: 'Failed to update role. Please try again.', type: 'error' });
@@ -52,19 +58,9 @@ const Profile = () => {
         return <p className="text-center p-10">Loading profile...</p>;
     }
     
-
-    if (!user) {
+    if (!profile) {
         return <p className="text-center p-10">Could not load profile data.</p>;
     }
-
-    // Compose profile info from user and context
-    const profile = {
-        name: user.user_metadata?.name || user.email,
-        email: user.email,
-        phone_number: phoneNumber || user.user_metadata?.phone_number || '',
-        department: departmentName || '',
-        r_uuid: rUuid || '',
-    };
 
     return (
         <div className="p-8 max-w-5xl mx-auto bg-gray-50 min-h-full">
@@ -99,13 +95,13 @@ const Profile = () => {
                     {/* Department */}
                     <div className="col-span-1">
                         <label className="block text-sm font-medium text-gray-600">Department</label>
-                        <input type="text" value={profile.department || 'N/A'} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                         <input type="text" value={profile.department?.d_name || 'N/A'} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
                     </div>
 
                     {/* Phone Number */}
                     <div className="col-span-1">
                         <label className="block text-sm font-medium text-gray-600">Phone Number</label>
-                        <input type="text" value={profile.phone_number || 'N/A'} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                        <input type="text" value={profile.phone_number} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
                     </div>
                     
                     {/* Role */}
@@ -117,7 +113,7 @@ const Profile = () => {
                             disabled={!isEditing}
                             className={`mt-1 w-full p-3 border rounded-lg ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                         >
-                            <option value="">{roles.find(r => r.r_uuid === profile.r_uuid)?.r_name || 'Not Assigned'}</option>
+                            <option value="">{profile.role ? profile.role.r_name : 'Not Assigned'}</option>
                             {roles.map((role) => (
                                 <option key={role.r_uuid} value={role.r_uuid}>
                                     {role.r_name}
