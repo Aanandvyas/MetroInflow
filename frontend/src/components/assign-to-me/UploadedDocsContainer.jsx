@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient.";
 import UploadedDocsCard from "./UploadedDocsCard";
@@ -10,32 +11,31 @@ const UploadedDocsContainer = () => {
 
   useEffect(() => {
     const fetchDocs = async () => {
-      if (!user) {
+      if (!user || !user.d_uuid) {
         setLoading(false);
         return;
       }
-      
-      // ✅ FIX: Corrected select query to match your schema
+      // Fetch all files for the user's department
       const { data, error } = await supabase
         .from("file")
-        .select(`
-          u_id,
-          name,
-          language
-        `)
-        .eq('f_uuid', users.id) // Assuming 'f_uuid' also identifies the uploader
-        .order("name", { ascending: true });
+        .select(`f_uuid, f_name, file_path, language, d_uuid`)
+        .eq('d_uuid', user.d_uuid)
+        .order("f_name", { ascending: true });
 
       if (error) {
         console.error("Error fetching documents:", error.message);
       } else {
-        // NOTE: Your schema doesn't show a 'file_path'. If you need public URLs,
-        // you must add a 'file_path' column to your 'file' table.
-        setDocs(data);
+        // Generate publicUrl for each file (works for public buckets)
+        const filesWithUrls = (data || []).map((file) => ({
+          ...file,
+          publicUrl: file.file_path
+            ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
+            : null,
+        }));
+        setDocs(filesWithUrls);
       }
       setLoading(false);
     };
-
     fetchDocs();
   }, [user]);
 
