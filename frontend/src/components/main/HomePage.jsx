@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient.';
+import { supabase } from '../../supabaseClient';
 import { FolderIcon, PlusIcon, DocumentTextIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 
 // Mock data for notifications can remain for now

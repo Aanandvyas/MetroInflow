@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../../supabaseClient.";
+import { supabase } from "../../supabaseClient";
 import {
   ArrowUpTrayIcon,
   DocumentCheckIcon,

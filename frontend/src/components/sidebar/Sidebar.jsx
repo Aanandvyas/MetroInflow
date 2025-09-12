@@ -16,7 +16,7 @@ import {
 const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon },
   { name: 'Assigned to me', path: '/assigned-to-me', icon: UsersIcon },
-  { name: 'Correspondant', path: '/correspondant', icon: PaperAirplaneIcon },
+  { name: 'All Files', path: '/all-files', icon: PaperAirplaneIcon },
   { name: 'Mails', path: '/mails', icon: EnvelopeIcon },
   { name: 'Archive', path: '/archive', icon: ArchiveBoxIcon },
 ];

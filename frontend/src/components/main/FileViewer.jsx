@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '../../supabaseClient.';
+import { supabase } from '../../supabaseClient';
 
 const BUCKET_NAME = 'file_storage';
 

@@ -9,6 +9,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import DepartmentFiles from "./components/main/DepartmentFiles";
 import AssignToMe from "./components/main/AssignToMe";
 import FileViewer from './components/main/FileViewer';
+import AllFiles from "./components/main/AllFiles";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -30,7 +31,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             
             // ✅ Added new routes for the sidebar links
             { path: "/recent", element: <Placeholder title="Recent" /> },
-            { path: "/correspondant", element: <Placeholder title="Correspondant" /> },
+            { path: "/all-files", element: <AllFiles /> },
             { path: "/tags", element: <Placeholder title="Tags" /> },
             { path: "/mails", element: <Placeholder title="Mails" /> },
             { path: "/custom-fields", element: <Placeholder title="Custom Fields" /> },
