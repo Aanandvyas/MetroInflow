@@ -14,8 +14,9 @@ export const AuthProvider = ({ children }) => {
 
   // Helper: redirect to login
   const redirectToLogin = () => {
-    // Replace so the user can't navigate back into an expired session
-    window.location.replace("/login");
+    if (window.location.pathname !== "/login") {
+      window.location.replace("/login");
+    }
   };
 
   // ✅ Sign up a new user
