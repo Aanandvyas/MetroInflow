@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
-        emailRedirectTo: process.env.REACT_APP_REDIRECT_URL || 'http://localhost:3000/login',
+        emailRedirectTo: "http://localhost:3000/login", // change for production
       },
     });
 
@@ -107,49 +107,19 @@ export const AuthProvider = ({ children }) => {
 
   // ✅ Get profile from user table
   const getUserProfile = async (uuid) => {
-    // Try to load enriched profile (department, role) if you already join them
     const { data, error } = await supabase
       .from("users")
-      .select(`
-        uuid, email, name, phone_number, address, dob, age, r_uuid, d_uuid,
-        department:d_uuid ( d_uuid, d_name ),
-        role:r_uuid ( r_uuid, r_name )
-      `)
-      .eq("uuid", uuid)
+      .select("*, department(d_name)")
+      .eq("uuid", uuid)   // <-- use "uuid" instead of "u_id"
       .maybeSingle();
 
+    console.log("Fetching profile for:", uuid, "result:", data, "error:", error);
+
     if (error) {
-      console.error("getUserProfile error:", error);
+      console.error("Error fetching user profile:", error.message);
       return null;
     }
-
-    if (data) return data;
-
-    // If not found, create a minimal profile
-    const { data: authUser } = await supabase.auth.getUser();
-    const fallback = {
-      uuid,
-      email: authUser?.user?.email || "",
-      name:
-        authUser?.user?.user_metadata?.name ||
-        (authUser?.user?.email ? authUser.user.email.split("@")[0] : "User"),
-    };
-
-    const { data: inserted, error: insertErr } = await supabase
-      .from("users")
-      .insert(fallback)
-      .select(
-        `uuid, email, name, phone_number, address, dob, age, r_uuid, d_uuid,
-         department:d_uuid ( d_uuid, d_name ),
-         role:r_uuid ( r_uuid, r_name )`
-      )
-      .single();
-
-    if (insertErr) {
-      console.error("create missing profile failed:", insertErr);
-      return null;
-    }
-    return inserted;
+    return data;
   };
 
   // ✅ Update user role
