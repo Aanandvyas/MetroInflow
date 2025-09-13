@@ -8,6 +8,8 @@ import {
 import { useNavigate } from "react-router-dom";
 
 const DocumentUpload = () => {
+  // Replace single file with an array
+  const [files, setFiles] = useState([]); // was: const [file, setFile] = useState(null);
   // Replace single departmentId with array
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   
@@ -21,7 +23,6 @@ const DocumentUpload = () => {
   const [status, setStatus] = useState({ message: "", type: "" });
 
   // Form state
-  const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -48,11 +49,21 @@ const DocumentUpload = () => {
     fetchDepartments();
   }, []);
 
+  // Helper to merge new files and avoid duplicates (by name+size+lastModified)
+  const mergeFiles = (current, incoming) => {
+    const key = (f) => `${f.name}|${f.size}|${f.lastModified}`;
+    const map = new Map(current.map((f) => [key(f), f]));
+    incoming.forEach((f) => map.set(key(f), f));
+    return Array.from(map.values());
+  };
+
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
-      setStatus({ message: "", type: "" });
-    }
+    const list = Array.from(e.target.files || []);
+    if (list.length === 0) return;
+    setFiles((prev) => mergeFiles(prev, list));
+    setStatus({ message: "", type: "" });
+    // reset input so the same file can be picked again if needed
+    e.target.value = "";
   };
 
   const handleDragEnter = (e) => {
@@ -66,11 +77,16 @@ const DocumentUpload = () => {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
+    const list = Array.from(e.dataTransfer.files || []);
+    if (list.length > 0) {
+      setFiles((prev) => mergeFiles(prev, list));
       setStatus({ message: "", type: "" });
       e.dataTransfer.clearData();
     }
+  };
+
+  const removeFileAt = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Filter departments based on search
@@ -98,60 +114,75 @@ const DocumentUpload = () => {
       setStatus({ message: "You must be logged in to upload.", type: "error" });
       return;
     }
-    if (!file || !title || selectedDepartments.length === 0 || !language) {
+    if (files.length === 0 || selectedDepartments.length === 0 || !language) {
       setStatus({
-        message: "Please fill out all required fields.",
+        message: "Please choose file(s), language and at least one department.",
         type: "error",
       });
       return;
     }
 
     setUploading(true);
-    setStatus({ message: "Uploading document...", type: "loading" });
+    setStatus({ message: "Uploading document(s)...", type: "loading" });
 
     try {
-      // Step 1: Fetch the user's profile from the 'users' table
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("uuid")
         .eq("uuid", user.id)
         .single();
-
       if (userError || !userData) {
         throw new Error(userError?.message || "Could not find user profile.");
       }
 
-      const fileName = `${Date.now()}_${file.name}`;
-      const filePath = `shared/${fileName}`; // Store in shared folder since multiple departments
+      // Upload and insert for each selected file
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const fileName = `${Date.now()}_${i}_${f.name}`;
+        const filePath = `shared/${fileName}`;
 
-      // Step 2: Upload file to storage
-      const { error: uploadError } = await supabase.storage
-        .from("file_storage")
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase
+          .storage
+          .from("file_storage")
+          .upload(filePath, f, {
+            upsert: false, // set true to overwrite if same path exists
+            contentType: f.type || undefined,
+          });
+        if (uploadError) throw uploadError;
 
-      // Insert file entries for each department
-      const fileEntries = selectedDepartments.map(dept => ({
-        f_name: title,
-        language,
-        d_uuid: dept.d_uuid,
-        uuid: userData.uuid,
-        file_path: filePath,
-        created_at: new Date().toISOString(),
-      }));
+        const displayName =
+          files.length === 1 && title.trim().length > 0 ? title.trim() : f.name;
 
-      // Step 3: Insert metadata into the 'file' table
-      const { error: insertError } = await supabase
-        .from("file")
-        .insert(fileEntries);
+        const { data: insertedFile, error: insertFileError } = await supabase
+          .from("file")
+          .insert({
+            f_name: displayName,
+            language,
+            uuid: userData.uuid,
+            file_path: filePath,
+            created_at: new Date().toISOString(),
+          })
+          .select("f_uuid")
+          .single();
+        if (insertFileError) throw insertFileError;
 
-      if (insertError) throw insertError;
+        // Link this file to all selected departments
+        const joinRows = selectedDepartments.map((dept) => ({
+          f_uuid: insertedFile.f_uuid,
+          d_uuid: dept.d_uuid,
+          created_at: new Date().toISOString(),
+        }));
+        const { error: joinError } = await supabase
+          .from("file_department")
+          .insert(joinRows);
+        if (joinError) throw joinError;
+      }
 
       setStatus({
-        message: "Document uploaded successfully! Redirecting...",
+        message: "Upload successful! Redirecting...",
         type: "success",
       });
-      setTimeout(() => navigate("/"), 2000);
+      setTimeout(() => navigate("/"), 1200);
     } catch (error) {
       setStatus({ message: `Upload failed: ${error.message}`, type: "error" });
     } finally {
@@ -214,6 +245,8 @@ const DocumentUpload = () => {
     </div>
   );
 
+  const isMultiFile = files.length > 1;
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-800 mb-8">
@@ -226,8 +259,9 @@ const DocumentUpload = () => {
         {/* File Input Area */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Document File
+            Document File(s)
           </label>
+
           <div
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
@@ -237,50 +271,84 @@ const DocumentUpload = () => {
               isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
             }`}
           >
-            <div className="space-y-2 text-center">
-              {file ? (
-                <>
-                  <DocumentCheckIcon className="mx-auto h-12 w-12 text-green-500" />
-                  <p className="font-semibold text-gray-700">{file.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {(file.size / 1024).toFixed(2)} KB
-                  </p>
-                </>
-              ) : (
-                <>
+            <div className="space-y-3 w-full max-w-xl">
+              {/* Hidden input used by both "Click to upload" and the + button */}
+              <input
+                id="hidden-file-input"
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {files.length === 0 ? (
+                <div className="text-center">
                   <ArrowUpTrayIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
+                  <div className="flex justify-center text-sm text-gray-600">
                     <label
-                      htmlFor="file-upload"
-                      className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500"
+                      htmlFor="hidden-file-input"
+                      className="cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500"
                     >
                       <span>Click to upload</span>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        onChange={handleFileChange}
-                      />
                     </label>
                     <p className="pl-1">or drag and drop</p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    PDF, DOCX, PNG, etc.
-                  </p>
+                  <p className="text-xs text-gray-500">PDF, DOCX, PNG, etc.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-gray-700">
+                      {files.length} file{files.length > 1 ? "s" : ""} selected
+                    </div>
+                    {/* Plus button to add more files */}
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("hidden-file-input")?.click()}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      title="Add more files"
+                    >
+                      +
+                      <span className="sr-only">Add file</span>
+                    </button>
+                  </div>
+
+                  {/* Selected files list with delete (cross) buttons */}
+                  <ul className="mt-2 space-y-2 max-h-40 overflow-auto">
+                    {files.map((f, idx) => (
+                      <li
+                        key={`${f.name}-${f.size}-${f.lastModified}-${idx}`}
+                        className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-gray-800" title={f.name}>
+                            {f.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(f.size / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFileAt(idx)}
+                          className="ml-3 rounded-md px-2 py-1 text-red-600 hover:bg-red-50"
+                          title="Remove file"
+                          aria-label={`Remove ${f.name}`}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Metadata Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
           <div>
-            <label
-              htmlFor="title"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
               Document Title
             </label>
             <input
@@ -288,26 +356,38 @@ const DocumentUpload = () => {
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              required
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+              disabled={isMultiFile}
+              className={`mt-1 w-full p-3 border border-gray-300 rounded-lg ${
+                isMultiFile ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              placeholder={
+                isMultiFile
+                  ? "Using each file name as the document title"
+                  : "Optional: enter a title (default is filename)"
+              }
             />
+            {isMultiFile && (
+              <p className="mt-1 text-xs text-gray-500">
+                Multiple files selected — each document will use its filename as the title.
+              </p>
+            )}
           </div>
           <div>
-            <label
-              htmlFor="language"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="language" className="block text-sm font-medium text-gray-700">
               Language
             </label>
-            <input
-              type="text"
+            <select
               id="language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               required
               className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              placeholder="e.g., English"
-            />
+            >
+              <option value="" disabled>Select a language</option>
+              <option value="English">English</option>
+              <option value="Hindi">Hindi</option>
+              <option value="Malayalam">Malayalam</option>
+            </select>
           </div>
           {/* Replace department select with new component */}
           {renderDepartmentSelect()}

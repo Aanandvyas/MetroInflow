@@ -40,46 +40,55 @@ const AllFiles = () => {
 
   // ✅ Load files with filters (same pattern as HomePage)
   useEffect(() => {
-    const fetchFiles = async () => {
+    const run = async () => {
       setLoading(true);
 
-      // Modify the query to include uploader information
-      let query = supabase
-        .from("file")
-        .select(`
-          f_uuid,
-          f_name,
-          language,
+      const baseSelect = `
+        f_uuid, f_name, language, file_path, created_at, uuid,
+        uploader:uuid(name),
+        file_department (
           d_uuid,
-          created_at,
-          department:d_uuid(d_name),
-          uploader:uuid(name)  // Add this line to get uploader name
-        `)
-        .order("created_at", { ascending: false });
+          department:d_uuid ( d_uuid, d_name )
+        )
+      `;
+
+      let query = supabase.from("file").select(baseSelect).order("created_at", { ascending: false });
 
       if (selectedDepartment) {
-        query = query.eq("d_uuid", selectedDepartment);
-      }
-      if (selectedLanguage) {
-        query = query.eq("language", selectedLanguage);
-      }
-      const effectiveSearch = searchTerm?.trim() || globalSearchTerm?.trim();
-      if (effectiveSearch) {
-        query = query.ilike("f_name", `%${effectiveSearch}%`);
+        // Inner join + filter to only files linked to that department
+        query = supabase
+          .from("file")
+          .select(`
+            f_uuid, f_name, language, file_path, created_at, uuid,
+            uploader:uuid(name),
+            file_department!inner (
+              d_uuid,
+              department:d_uuid ( d_uuid, d_name )
+            )
+          `)
+          .eq("file_department.d_uuid", selectedDepartment)
+          .order("created_at", { ascending: false });
       }
 
+      if (selectedLanguage) query = query.eq("language", selectedLanguage);
+      if (searchTerm) query = query.ilike("f_name", `%${searchTerm}%`);
+      if (globalSearchTerm) query = query.ilike("f_name", `%${globalSearchTerm}%`);
+
       const { data, error } = await query;
-      if (error) {
-        console.error("Error loading files:", error.message);
-        setAllDepartmentFiles([]);
-      } else {
-        setAllDepartmentFiles(data || []);
+      if (!error) {
+        setAllDepartmentFiles(
+          (data || []).map((f) => ({
+            ...f,
+            departments: (f.file_department || [])
+              .map((fd) => fd.department)
+              .filter(Boolean),
+          }))
+        );
       }
 
       setLoading(false);
     };
-
-    fetchFiles();
+    run();
   }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
 
   // ✅ Languages available from current result set (for filter options)
@@ -161,10 +170,21 @@ const AllFiles = () => {
                           Uploaded by: {file.uploader?.name || "Unknown"}
                         </div>
                       </div>
-                      <div className="flex gap-3 mt-2">
-                        <span className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1">
-                          {file.department?.d_name || "Unknown Department"}
-                        </span>
+                      <div className="flex gap-3 mt-2 flex-wrap">
+                        {(file.departments && file.departments.length > 0) ? (
+                          file.departments.map((dept) => (
+                            <span
+                              key={`${file.f_uuid}-${dept.d_uuid}`}
+                              className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1"
+                            >
+                              {dept.d_name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-block text-xs bg-yellow-100 text-yellow-800 rounded px-2 py-1">
+                            No Department
+                          </span>
+                        )}
                         <span className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1">
                           {file.language || "Unknown Language"}
                         </span>

@@ -18,46 +18,52 @@ const UploadedDocsContainer = () => {
       }
 
       try {
-        // First get user's department
+        // Get user's department
         const { data: userData, error: userError } = await supabase
           .from("users")
           .select("d_uuid, department(d_name)")
           .eq("uuid", user.id)
           .single();
-
         if (userError) throw userError;
-
         if (!userData?.d_uuid) {
-          setError("No department assigned");
+          setError("Your profile has no department.");
+          setLoading(false);
           return;
         }
 
-        setDepartmentName(userData.department.d_name);
+        setDepartmentName(userData.department?.d_name ?? "");
 
-        // Then fetch files for that department
+        // Fetch files linked to that department via join table
         const { data: filesData, error: filesError } = await supabase
           .from("file")
           .select(`
-            *,
-            department:d_uuid(d_name),
-            uploader:uuid(name)
+            f_uuid, f_name, language, file_path, created_at, uuid,
+            uploader:uuid(name),
+            file_department!inner (
+              d_uuid,
+              department:d_uuid ( d_uuid, d_name )
+            )
           `)
-          .eq("d_uuid", userData.d_uuid)
+          .eq("file_department.d_uuid", userData.d_uuid)
           .order("created_at", { ascending: false });
 
         if (filesError) throw filesError;
 
-        const filesWithUrls = filesData?.map((file) => ({
-          ...file,
-          publicUrl: file.file_path
-            ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
-            : null,
-        })) || [];
+        const filesWithUrls =
+          filesData?.map((f) => ({
+            ...f,
+            departments: (f.file_department || [])
+              .map((fd) => fd.department)
+              .filter(Boolean),
+            publicUrl: f.file_path
+              ? supabase.storage.from("file_storage").getPublicUrl(f.file_path).data.publicUrl
+              : null,
+          })) ?? [];
 
         setDocs(filesWithUrls);
+        setError("");
       } catch (err) {
-        console.error("Error:", err);
-        setError("Failed to load documents");
+        setError(err.message || "Failed to load documents.");
       } finally {
         setLoading(false);
       }
