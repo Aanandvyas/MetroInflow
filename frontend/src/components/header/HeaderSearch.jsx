@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 
@@ -170,7 +170,7 @@ const HeaderSearch = () => {
             tabIndex={-1}
             aria-label="Open filters"
           >
-            <FunnelIcon className="h-5 w-5 text-gray-500" />
+            <Bars3Icon className="h-5 w-5 text-gray-500" />
           </button>
         </div>
         {/* Chips below search bar */}
@@ -287,7 +287,7 @@ const HeaderSearch = () => {
                 key={file.f_uuid}
                 className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex flex-col"
                 onClick={() => {
-                  navigate(`/file/${file.f_uuid}`);
+                  window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer");
                   setShowPopup(false);
                   setQuery("");
                 }}

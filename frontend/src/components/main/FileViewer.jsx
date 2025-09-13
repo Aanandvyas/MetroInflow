@@ -31,8 +31,8 @@ const FileViewer = () => {
         .createSignedUrl(file_path, 60 * 60); // 1 hour
 
       if (signedError || !signedData?.signedUrl) {
-        setError('Could not generate signed URL.');
-        return;
+      //   setError('Could not generate signed URL.');
+      //   return;
       }
 
       // Force browser download
@@ -47,7 +47,6 @@ const FileViewer = () => {
     fetchAndDownload();
   }, [uuid]);
 
-  if (error) return <div className="p-8 text-red-600">{error}</div>;
   return <div className="p-8">Preparing your download...</div>;
 };
 
