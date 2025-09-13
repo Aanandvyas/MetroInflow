@@ -15,6 +15,7 @@ const AllFiles = () => {
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [favBusy, setFavBusy] = useState({});
+  const [languages, setLanguages] = useState([]); // <-- new, independent language options
 
   // Fetch departments
   useEffect(() => {
@@ -104,14 +105,40 @@ const AllFiles = () => {
     setLoading(false);
   };
 
+  // Fetch distinct languages ignoring selectedLanguage (but respecting dept + search)
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      const effectiveSearch = (searchTerm || globalSearchTerm || "").trim();
+      try {
+        let q;
+        if (selectedDepartment) {
+          q = supabase
+            .from("file")
+            .select("language, file_department!inner(d_uuid)")
+            .eq("file_department.d_uuid", selectedDepartment);
+        } else {
+          q = supabase.from("file").select("language");
+        }
+        if (effectiveSearch) q = q.ilike("f_name", `%${effectiveSearch}%`);
+        const { data, error } = await q.not("language", "is", null);
+        if (error) throw error;
+        const langs = Array.from(
+          new Set((data || []).map(r => r.language).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b));
+        setLanguages(langs);
+      } catch (e) {
+        console.error("Error fetching languages:", e.message);
+        setLanguages([]);
+      }
+    };
+    fetchLanguages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, searchTerm, globalSearchTerm]);
+
   useEffect(() => {
     fetchFiles();
     // eslint-disable-next-line
   }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
-
-  const languageOptions = useMemo(() => {
-    return [...new Set(allDepartmentFiles.map((f) => f.language).filter(Boolean))];
-  }, [allDepartmentFiles]);
 
   const groupedFiles = useMemo(() => {
     const groups = {};
@@ -184,7 +211,7 @@ const AllFiles = () => {
           onChange={(e) => setSelectedLanguage(e.target.value)}
         >
           <option value="">All Languages</option>
-          {languageOptions.map((lang) => (
+          {languages.map((lang) => (
             <option key={lang} value={lang}>
               {lang}
             </option>
