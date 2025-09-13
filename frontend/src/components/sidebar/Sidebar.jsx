@@ -17,7 +17,7 @@ const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon },
   { name: 'Assigned to me', path: '/assigned-to-me', icon: UsersIcon },
   { name: 'All Files', path: '/all-files', icon: PaperAirplaneIcon },
-  { name: 'Mails', path: '/mails', icon: EnvelopeIcon },
+  { name: 'Notifications', path: '/notifications', icon: EnvelopeIcon },
   { name: 'Favourite', path: '/favourite', icon: ArchiveBoxIcon },
 ];
 

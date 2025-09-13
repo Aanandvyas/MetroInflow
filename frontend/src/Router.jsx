@@ -12,6 +12,7 @@ import FileViewer from './components/main/FileViewer';
 import AllFiles from "./components/main/AllFiles";
 import Summary from "./components/main/Summary"; 
 import Favourite from "./components/main/Favourite";
+import Notifications from "./components/main/Notifications";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -32,6 +33,8 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/department/:d_uuid", element: <DepartmentFiles /> },
             { path: "/summary", element: <Summary /> },
             { path: "/favourite", element: <Favourite/> },
+            { path: "/notifications", element: <Notifications /> },
+
             
             // ✅ Added new routes for the sidebar links
             { path: "/recent", element: <Placeholder title="Recent" /> },
