@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
-        emailRedirectTo: "http://localhost:3000/login", // change for production
+        emailRedirectTo: process.env.REACT_APP_REDIRECT_URL || 'http://localhost:3000/login',
       },
     });
 
