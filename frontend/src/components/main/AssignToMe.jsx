@@ -46,32 +46,42 @@ const AssignToMe = () => {
           f_uuid,
           f_name,
           language,
+          file_path,
           created_at,
-          department:d_uuid(d_name),
+          departments:d_uuid(d_name),
           uploader:uuid(name)
         `)
-        .eq('d_uuid', userDepartment.d_uuid) // Only fetch files from user's department
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      // Apply additional filters
-      if (selectedLanguage) {
-        query = query.eq('language', selectedLanguage);
-      }
+        .eq('d_uuid', userDepartment.d_uuid)
+        .order('created_at', { ascending: false });
 
       const { data, error } = await query;
+      
       if (error) {
-        console.error('Error fetching recent files:', error);
+        console.error('Error fetching files:', error);
         setRecentFiles([]);
       } else {
-        // Add public URLs to files
-        const filesWithUrls = (data || []).map(file => ({
-          ...file,
-          publicUrl: file.file_path 
-            ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
-            : null
-        }));
-        setRecentFiles(filesWithUrls);
+        // Group files by f_uuid and combine their departments
+        const groupedFiles = data.reduce((acc, file) => {
+          const existingFile = acc.find(f => f.f_uuid === file.f_uuid);
+          if (existingFile) {
+            // Add department to existing file if not already present
+            if (!existingFile.departments.find(d => d.d_name === file.departments.d_name)) {
+              existingFile.departments.push(file.departments);
+            }
+          } else {
+            // Create new file entry with departments array
+            acc.push({
+              ...file,
+              departments: [file.departments],
+              publicUrl: file.file_path 
+                ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
+                : null
+            });
+          }
+          return acc;
+        }, []);
+
+        setRecentFiles(groupedFiles);
       }
       setFilesLoading(false);
     };
@@ -139,15 +149,16 @@ const AssignToMe = () => {
         </div>
 
         {filesLoading ? (
-          <div className="text-center py-4">Loading department files...</div>
+          <div className="text-center py-4">Loading files...</div>
         ) : recentFiles.length === 0 ? (
-          <div className="text-center py-4 text-gray-500">No files found in your department.</div>
+          <div className="text-center py-4 text-gray-500">No files found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departments</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded By</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -162,6 +173,18 @@ const AssignToMe = () => {
                         {file.f_name}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {file.departments.map((dept, index) => (
+                          <span 
+                            key={`${file.f_uuid}-${dept.d_name}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {dept.d_name}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-700">
                       {file.language || 'Unknown'}
                     </td>
@@ -170,7 +193,7 @@ const AssignToMe = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <a
-                        href={file.publicUrl || `/file/${file.f_uuid}`}
+                        href={file.publicUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline text-sm font-medium"
