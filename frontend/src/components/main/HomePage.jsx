@@ -93,6 +93,7 @@ const HomePage = () => {
                 <button 
                     onClick={() => navigate('/upload-document')}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 transition"
+                    title="Under construction"
                 >
                     <PlusIcon className="h-5 w-5" />
                     New
@@ -105,7 +106,7 @@ const HomePage = () => {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {departments.map((dept) => (
-                            <Link key={dept.d_uuid} to={`/department/${dept.d_uuid}`} className="block">
+                            <Link key={dept.d_uuid} to={`/department/${dept.d_uuid}`} className="block" title="Under construction">
                                 <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-500 transition cursor-pointer group h-full">
                                     <div className="flex items-center justify-between">
                                         <FolderIcon className="h-8 w-8 text-blue-500 group-hover:text-blue-600" />
@@ -138,11 +139,11 @@ const HomePage = () => {
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {recentFiles.map((file, idx) => (
-                                        <tr key={file.f_uuid + '-' + idx} className="hover:bg-gray-50 transition">
+                                        <tr key={file.f_uuid + '-' + idx} className="hover:bg-gray-50 transition" title="Under construction">
                                             <td
                                                 className="px-6 py-4 whitespace-nowrap flex items-center gap-3 cursor-pointer"
                                                 onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
-                                                title={file.f_name}
+                                                title="Under construction"
                                             >
                                                 <DocumentTextIcon className="h-6 w-6 text-blue-400 flex-shrink-0" />
                                                 <span className="font-medium text-blue-600 truncate max-w-xs hover:underline">
@@ -157,10 +158,9 @@ const HomePage = () => {
                                                     : 'Unknown'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                {/* Empty View button for backend endpoint */}
                                                 <button
-                                                    className="text-blue-600 bg-gray-100 rounded px-3 py-1 text-sm font-medium cursor-not-allowed"
-                                                    disabled
+                                                    className="text-white bg-blue-600 rounded px-3 py-1 text-sm font-medium hover:bg-blue-700"
+                                                    onClick={() => window.open('/summary', '_blank', 'noopener,noreferrer')}
                                                 >
                                                     Summary
                                                 </button>
@@ -181,7 +181,7 @@ const HomePage = () => {
                             <li className="py-4 text-gray-500">No notifications.</li>
                         ) : (
                             recentNotifications.map((file) => (
-                                <li key={file.f_uuid} className="flex items-start gap-4 py-4">
+                                <li key={file.f_uuid} className="flex items-start gap-4 py-4" title="Under construction">
                                     <div className="bg-blue-100 p-2 rounded-full mt-1">
                                         <span className="h-5 w-5 text-blue-600 font-bold">✅</span>
                                     </div>

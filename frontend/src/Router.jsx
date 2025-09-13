@@ -10,6 +10,7 @@ import DepartmentFiles from "./components/main/DepartmentFiles";
 import AssignToMe from "./components/main/AssignToMe";
 import FileViewer from './components/main/FileViewer';
 import AllFiles from "./components/main/AllFiles";
+import Summary from "./components/main/Summary"; // Make sure this file exists
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -28,6 +29,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/profile", element: <Profile /> },
             { path: "/upload-document", element: <DocumentUpload /> },
             { path: "/department/:d_uuid", element: <DepartmentFiles /> },
+            { path: "/summary", element: <Summary /> },
             
             // ✅ Added new routes for the sidebar links
             { path: "/recent", element: <Placeholder title="Recent" /> },
