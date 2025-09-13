@@ -133,14 +133,13 @@ const UploadedDocsCard = ({ uploadedDocs = [], loading, error, departmentName })
                         {file.users?.name || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <a
-                          className="text-blue-600 hover:underline text-sm font-medium"
-                          href={file.publicUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                          className="inline-block px-4 py-2 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
                         >
                           View
-                        </a>
+                        </button>
                       </td>
                     </tr>
                   ))}
