@@ -20,12 +20,14 @@ const Header = () => {
     return (
         <header className="w-full bg-white p-4 flex items-center justify-between border-b">
             {/* ✅ Left Section: Logos */}
-            <div className="flex items-center space-x-4">
-                <img src={kmrllogo} alt="KMRL Logo" className="h-11 object-contain" />
-                <img src={azadilogo} alt="Azadi Ka Amrit Mahotsav Logo" className="h-11 object-contain" />
-            </div>
+                        <div className="flex items-center space-x-4">
+                            <Link to="/">
+                                <img src={kmrllogo} alt="KMRL Logo" className="h-11 object-contain cursor-pointer" />
+                            </Link>
+                            <img src={azadilogo} alt="Azadi Ka Amrit Mahotsav Logo" className="h-11 object-contain" />
+                        </div>
 
-            {/* Center Section: Centralized Search */}
+                        {/* Center Section: Centralized Search */}
                         <div className="flex-1 max-w-2xl mx-8">
                             <HeaderSearch />
                         </div>
