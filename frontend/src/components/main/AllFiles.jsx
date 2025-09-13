@@ -32,25 +32,29 @@ const AllFiles = () => {
     fetchDepartments();
   }, []);
 
-  // Fetch files and favourites, then merge
+  // Fetch files and favorites, then merge
   const fetchFiles = async () => {
     setLoading(true);
 
-    // 1. Fetch all files
+    // 1. Fetch all files with departments and uploader
     let fileQuery = supabase
       .from("file")
       .select(`
         f_uuid,
         f_name,
         language,
-        d_uuid,
         created_at,
-        department:d_uuid(d_name)
+        uploader:uuid(name),
+        file_department (
+          d_uuid,
+          department:d_uuid ( d_uuid, d_name )
+        )
       `)
       .order("created_at", { ascending: false });
 
     if (selectedDepartment) {
-      fileQuery = fileQuery.eq("d_uuid", selectedDepartment);
+      fileQuery = fileQuery
+        .contains("file_department", [{ d_uuid: selectedDepartment }]);
     }
     if (selectedLanguage) {
       fileQuery = fileQuery.eq("language", selectedLanguage);
@@ -68,7 +72,7 @@ const AllFiles = () => {
       return;
     }
 
-    // 2. Fetch all favourites for this user
+    // 2. Fetch all favorites for this user
     let favouriteIds = [];
     if (user?.id) {
       const { data: favs, error: favError } = await supabase
@@ -76,14 +80,17 @@ const AllFiles = () => {
         .select("f_uuid")
         .eq("uuid", user.id);
       if (!favError && favs) {
-        favouriteIds = favs.map((f) => f.f_uuid);
+        favouriteIds = favs.map(f => f.f_uuid);
       }
     }
 
-    // 3. Merge: mark files as favourite if in favouriteIds
-    const filesWithFav = (files || []).map((file) => ({
-      ...file,
-      is_favorite: favouriteIds.includes(file.f_uuid),
+    // 3. Merge: mark files as favorite if in favouriteIds
+    const filesWithFav = (files || []).map(f => ({
+      ...f,
+      departments: (f.file_department || [])
+        .map(fd => fd.department)
+        .filter(Boolean),
+      is_favorite: favouriteIds.includes(f.f_uuid),
     }));
 
     setAllDepartmentFiles(filesWithFav);
@@ -172,10 +179,21 @@ const AllFiles = () => {
                           Uploaded by: {file.uploader?.name || "Unknown"}
                         </div>
                       </div>
-                      <div className="flex gap-3 mt-2">
-                        <span className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1">
-                          {file.department?.d_name || "Unknown Department"}
-                        </span>
+                      <div className="flex gap-3 mt-2 flex-wrap">
+                        {(file.departments && file.departments.length > 0) ? (
+                          file.departments.map((dept) => (
+                            <span
+                              key={`${file.f_uuid}-${dept.d_uuid}`}
+                              className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1"
+                            >
+                              {dept.d_name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-block text-xs bg-yellow-100 text-yellow-800 rounded px-2 py-1">
+                            No Department
+                          </span>
+                        )}
                         <span className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1">
                           {file.language || "Unknown Language"}
                         </span>

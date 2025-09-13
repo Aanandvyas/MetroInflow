@@ -17,39 +17,72 @@ const HomePage = () => {
     useEffect(() => {
         const fetchRecentFiles = async () => {
             setFilesLoading(true);
+
+            // 1) Fetch files (optionally filter by department via inner join)
+            const baseFields = `
+                f_uuid,
+                f_name,
+                language,
+                created_at
+            `;
             let query = supabase
                 .from('file')
-                .select(`
-                    f_uuid,
-                    f_name,
-                    language,
-                    created_at,
-                    department:d_uuid(
-                        d_name
-                    )
-                `)
+                .select(baseFields)
                 .order('created_at', { ascending: false })
                 .limit(10);
 
             if (selectedDepartment) {
-                query = query.eq('d_uuid', selectedDepartment);
-            }
-            if (selectedLanguage) {
-                query = query.eq('language', selectedLanguage);
-            }
-            if (searchTerm) {
-                query = query.ilike('f_name', `%${searchTerm}%`);
+                // Use inner join only to filter by department; we won't rely on nested data
+                query = supabase
+                    .from('file')
+                    .select(`${baseFields}, file_department!inner(d_uuid)`)
+                    .eq('file_department.d_uuid', selectedDepartment)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
             }
 
-            const { data, error } = await query;
-            if (error) {
-                console.error('Error fetching recent files:', error);
+            if (selectedLanguage) query = query.eq('language', selectedLanguage);
+            if (searchTerm) query = query.ilike('f_name', `%${searchTerm}%`);
+
+            const { data: files, error: filesError } = await query;
+            if (filesError || !files?.length) {
+                if (filesError) console.error('Error fetching recent files:', filesError);
                 setRecentFiles([]);
-            } else {
-                setRecentFiles(data || []);
+                setFilesLoading(false);
+                return;
             }
+
+            // 2) Fetch departments for those files from join table
+            const fUuids = files.map(f => f.f_uuid);
+            const { data: links, error: linksError } = await supabase
+                .from('file_department')
+                .select('f_uuid, department:department ( d_uuid, d_name )')
+                .in('f_uuid', fUuids);
+
+            if (linksError) {
+                console.error('Error fetching file departments:', linksError);
+            }
+
+            // 3) Group departments by file
+            const deptByFile = new Map();
+            (links || []).forEach(row => {
+                const key = row.f_uuid;
+                const dept = row.department || null;
+                if (!dept) return;
+                if (!deptByFile.has(key)) deptByFile.set(key, []);
+                deptByFile.get(key).push(dept);
+            });
+
+            // 4) Merge
+            const normalized = files.map(f => ({
+                ...f,
+                departments: deptByFile.get(f.f_uuid) || []
+            }));
+
+            setRecentFiles(normalized);
             setFilesLoading(false);
         };
+
         fetchRecentFiles();
     }, [selectedDepartment, selectedLanguage, searchTerm]);
 
@@ -150,7 +183,22 @@ const HomePage = () => {
                                                     {file.f_name}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.department?.d_name || 'Unknown'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {file.departments && file.departments.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {file.departments.map((dept) => (
+                                                            <span
+                                                                key={`${file.f_uuid}-${dept.d_uuid}`}
+                                                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                                                            >
+                                                                {dept.d_name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-500 text-sm">No Department</span>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.language || 'Unknown'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">
                                                 {file.created_at

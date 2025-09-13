@@ -14,6 +14,8 @@ const AssignToMe = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('');
   // Add: track which row’s menu is open
   const [openMenuId, setOpenMenuId] = useState(null);
+  // Add: viewport position for the menu
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
   // Close any open menu on outside click
   useEffect(() => {
@@ -24,79 +26,55 @@ const AssignToMe = () => {
 
   // First, fetch user's department
   useEffect(() => {
-    const fetchUserDepartment = async () => {
+    const run = async () => {
       if (!user) return;
-
-      const { data: userData, error: userError } = await supabase
+      const { data, error } = await supabase
         .from("users")
         .select("d_uuid, department(d_name)")
         .eq("uuid", user.id)
         .single();
-
-      if (userError) {
-        console.error("Error fetching user department:", userError);
-        return;
-      }
-
-      setUserDepartment(userData);
+      if (!error) setUserDepartment(data);
     };
-
-    fetchUserDepartment();
+    run();
   }, [user]);
 
-  // Then, fetch files only for user's department
+  // Then, fetch files only for user's department (via join)
   useEffect(() => {
-    const fetchRecentFiles = async () => {
+    const run = async () => {
       if (!userDepartment?.d_uuid) return;
-
       setFilesLoading(true);
+
       let query = supabase
-        .from('file')
+        .from("file")
         .select(`
-          f_uuid,
-          f_name,
-          language,
-          file_path,
-          created_at,
-          departments:d_uuid(d_name),
-          uploader:uuid(name)
+          f_uuid, f_name, language, file_path, created_at, uuid,
+          uploader:uuid(name),
+          file_department!inner (
+            d_uuid,
+            department:d_uuid ( d_uuid, d_name )
+          )
         `)
-        .eq('d_uuid', userDepartment.d_uuid)
-        .order('created_at', { ascending: false });
+        .eq("file_department.d_uuid", userDepartment.d_uuid)
+        .order("created_at", { ascending: false });
+
+      if (selectedLanguage) {
+        query = query.eq("language", selectedLanguage);
+      }
 
       const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching files:', error);
-        setRecentFiles([]);
-      } else {
-        // Group files by f_uuid and combine their departments
-        const groupedFiles = data.reduce((acc, file) => {
-          const existingFile = acc.find(f => f.f_uuid === file.f_uuid);
-          if (existingFile) {
-            // Add department to existing file if not already present
-            if (!existingFile.departments.find(d => d.d_name === file.departments.d_name)) {
-              existingFile.departments.push(file.departments);
-            }
-          } else {
-            // Create new file entry with departments array
-            acc.push({
-              ...file,
-              departments: [file.departments],
-              publicUrl: file.file_path 
-                ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
-                : null
-            });
-          }
-          return acc;
-        }, []);
-
-        setRecentFiles(groupedFiles);
+      if (!error) {
+        setRecentFiles(
+          (data || []).map((f) => ({
+            ...f,
+            departments: (f.file_department || [])
+              .map((fd) => fd.department)
+              .filter(Boolean),
+          }))
+        );
       }
       setFilesLoading(false);
     };
-
-    fetchRecentFiles();
+    run();
   }, [userDepartment, selectedLanguage]);
 
   // Calendar/Assignments logic
@@ -203,7 +181,7 @@ const AssignToMe = () => {
                       {file.uploader?.name || 'Unknown'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="relative inline-flex items-center gap-2">
+                      <div className="inline-flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
@@ -212,13 +190,14 @@ const AssignToMe = () => {
                           View
                         </button>
 
-                        {/* Three-dot menu */}
                         <button
                           type="button"
                           aria-haspopup="menu"
                           aria-expanded={openMenuId === file.f_uuid}
                           onClick={(e) => {
                             e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setMenuPos({ x: rect.right, y: rect.bottom });
                             setOpenMenuId(openMenuId === file.f_uuid ? null : file.f_uuid);
                           }}
                           className="p-2 rounded-md hover:bg-gray-100 text-gray-600"
@@ -226,31 +205,6 @@ const AssignToMe = () => {
                         >
                           <EllipsisVerticalIcon className="w-5 h-5" />
                         </button>
-
-                        {openMenuId === file.f_uuid && (
-                          <div
-                            role="menu"
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-10 z-20 w-40 rounded-md border border-gray-200 bg-white shadow-lg py-1"
-                          >
-                            <Link
-                              to="/summary"
-                              role="menuitem"
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              onClick={() => setOpenMenuId(null)}
-                            >
-                              Summary
-                            </Link>
-                            <Link
-                              to="/archive"
-                              role="menuitem"
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              onClick={() => setOpenMenuId(null)}
-                            >
-                              Archive
-                            </Link>
-                          </div>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -260,6 +214,33 @@ const AssignToMe = () => {
           </div>
         )}
       </div>
+
+      {/* Fixed-position dropdown so it’s never clipped */}
+      {openMenuId && (
+        <div
+          role="menu"
+          className="fixed z-[1000] w-40 rounded-md border border-gray-200 bg-white shadow-lg py-1"
+          style={{ top: menuPos.y + 6, left: Math.max(8, menuPos.x - 160) }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link
+            to="/summary"
+            role="menuitem"
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => setOpenMenuId(null)}
+          >
+            Summary
+          </Link>
+          <Link
+            to="/archive"
+            role="menuitem"
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => setOpenMenuId(null)}
+          >
+            Archive
+          </Link>
+        </div>
+      )}
     </div>
   );
 };
