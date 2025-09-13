@@ -18,7 +18,7 @@ const navItems = [
   { name: 'Assigned to me', path: '/assigned-to-me', icon: UsersIcon },
   { name: 'All Files', path: '/all-files', icon: PaperAirplaneIcon },
   { name: 'Mails', path: '/mails', icon: EnvelopeIcon },
-  { name: 'Archive', path: '/archive', icon: ArchiveBoxIcon },
+  { name: 'Favourite', path: '/favourite', icon: ArchiveBoxIcon },
 ];
 
 const Sidebar = () => {

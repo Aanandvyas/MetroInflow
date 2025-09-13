@@ -2,26 +2,20 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import { useFilter } from "../context/FilterContext";
-import FileCard from "./FileCard";
 import { Link } from "react-router-dom";
 
 const AllFiles = () => {
   const { user } = useAuth();
   const { searchTerm: globalSearchTerm } = useFilter();
 
-  // Filters (same as HomePage)
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // File viewer (side panel)
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  // ✅ Load departments for filter
+  // Fetch departments
   useEffect(() => {
     const fetchDepartments = async () => {
       const { data, error } = await supabase
@@ -38,56 +32,73 @@ const AllFiles = () => {
     fetchDepartments();
   }, []);
 
-  // ✅ Load files with filters (same pattern as HomePage)
-  useEffect(() => {
-    const fetchFiles = async () => {
-      setLoading(true);
+  // Fetch files and favourites, then merge
+  const fetchFiles = async () => {
+    setLoading(true);
 
-      // Modify the query to include uploader information
-      let query = supabase
-        .from("file")
-        .select(`
-          f_uuid,
-          f_name,
-          language,
-          d_uuid,
-          created_at,
-          department:d_uuid(d_name),
-          uploader:uuid(name)  // Add this line to get uploader name
-        `)
-        .order("created_at", { ascending: false });
+    // 1. Fetch all files
+    let fileQuery = supabase
+      .from("file")
+      .select(`
+        f_uuid,
+        f_name,
+        language,
+        d_uuid,
+        created_at,
+        department:d_uuid(d_name)
+      `)
+      .order("created_at", { ascending: false });
 
-      if (selectedDepartment) {
-        query = query.eq("d_uuid", selectedDepartment);
-      }
-      if (selectedLanguage) {
-        query = query.eq("language", selectedLanguage);
-      }
-      const effectiveSearch = searchTerm?.trim() || globalSearchTerm?.trim();
-      if (effectiveSearch) {
-        query = query.ilike("f_name", `%${effectiveSearch}%`);
-      }
+    if (selectedDepartment) {
+      fileQuery = fileQuery.eq("d_uuid", selectedDepartment);
+    }
+    if (selectedLanguage) {
+      fileQuery = fileQuery.eq("language", selectedLanguage);
+    }
+    const effectiveSearch = searchTerm?.trim() || globalSearchTerm?.trim();
+    if (effectiveSearch) {
+      fileQuery = fileQuery.ilike("f_name", `%${effectiveSearch}%`);
+    }
 
-      const { data, error } = await query;
-      if (error) {
-        console.error("Error loading files:", error.message);
-        setAllDepartmentFiles([]);
-      } else {
-        setAllDepartmentFiles(data || []);
-      }
-
+    const { data: files, error: fileError } = await fileQuery;
+    if (fileError) {
+      console.error("Error loading files:", fileError.message);
+      setAllDepartmentFiles([]);
       setLoading(false);
-    };
+      return;
+    }
 
+    // 2. Fetch all favourites for this user
+    let favouriteIds = [];
+    if (user?.id) {
+      const { data: favs, error: favError } = await supabase
+        .from("favorites")
+        .select("f_uuid")
+        .eq("uuid", user.id);
+      if (!favError && favs) {
+        favouriteIds = favs.map((f) => f.f_uuid);
+      }
+    }
+
+    // 3. Merge: mark files as favourite if in favouriteIds
+    const filesWithFav = (files || []).map((file) => ({
+      ...file,
+      is_favorite: favouriteIds.includes(file.f_uuid),
+    }));
+
+    setAllDepartmentFiles(filesWithFav);
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchFiles();
+    // eslint-disable-next-line
   }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
 
-  // ✅ Languages available from current result set (for filter options)
   const languageOptions = useMemo(() => {
     return [...new Set(allDepartmentFiles.map((f) => f.language).filter(Boolean))];
   }, [allDepartmentFiles]);
 
-  // ✅ Group files by created_at date
   const groupedFiles = useMemo(() => {
     const groups = {};
     (allDepartmentFiles || []).forEach((file) => {
@@ -189,12 +200,41 @@ const AllFiles = () => {
                         >
                           Summary
                         </Link>
-                        <Link
-                          to={`/archive`}
-                          className="ml-2 inline-block px-4 py-2 bg-green-500 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                        <button
+                          type="button"
+                          className={`ml-2 inline-block px-4 py-2 rounded-md text-sm font-medium ${
+                            file.is_favorite
+                              ? "bg-red-500 hover:bg-red-600"
+                              : "bg-yellow-500 hover:bg-yellow-600"
+                          } text-white`}
+                          onClick={async () => {
+                            if (!user?.id) return;
+
+                            if (file.is_favorite) {
+                              // remove favorite
+                              const { error } = await supabase
+                                .from("favorites")
+                                .delete()
+                                .eq("uuid", user.id)
+                                .eq("f_uuid", file.f_uuid);
+                              if (error) console.error("Failed to unfavorite:", error);
+                            } else {
+                              // add favorite
+                              const { error } = await supabase
+                                .from("favorites")
+                                .upsert(
+                                  { uuid: user.id, f_uuid: file.f_uuid },
+                                  { onConflict: "uuid,f_uuid" }
+                                );
+                              if (error) console.error("Failed to favorite:", error);
+                            }
+
+                            // reload files after change
+                            fetchFiles();
+                          }}
                         >
-                          Archive
-                        </Link>
+                          {file.is_favorite ? "Unfavorite" : "Favorite"}
+                        </button>
                       </div>
                     </div>
                   ))}
