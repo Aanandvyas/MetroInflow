@@ -201,63 +201,75 @@ const AllFiles = () => {
                       key={file.f_uuid}
                       className="bg-gray-50 rounded-lg shadow-md p-6 flex flex-col h-full transition-transform hover:scale-105"
                     >
-                      {/* Content grows, pushing actions to bottom */}
+                      {/* Content grows, pushing footer (date + actions) to bottom */}
                       <div className="flex-1 w-full">
-                        <div className="text-xl font-semibold text-gray-800 mb-2">{file.f_name}</div>
-                        <div className="text-sm text-gray-600 mb-2">
+                        <div className="text-xl font-semibold text-gray-800 mb-2">
+                          {file.f_name}
+                        </div>
+                        <div className="text-sm text-gray-600">
                           Uploaded by: {file.uploader?.name || "Unknown"}
                         </div>
 
-                        <div className="flex gap-3 mt-2 flex-wrap">
-                          {(file.departments && file.departments.length > 0) ? (
-                            file.departments.map((dept) => (
-                              <span
-                                key={`${file.f_uuid}-${dept.d_uuid}`}
-                                className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1"
-                              >
-                                {dept.d_name}
+                        {/* Labeled meta rows */}
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[12px] font-medium text-gray-600">Departments:</span>
+                            {(file.departments && file.departments.length > 0) ? (
+                              file.departments.map((dept) => (
+                                <span
+                                  key={`${file.f_uuid}-${dept.d_uuid}`}
+                                  className="inline-block text-xs bg-blue-100 text-blue-800 rounded px-2 py-0.5"
+                                >
+                                  {dept.d_name}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="inline-block text-xs bg-yellow-100 text-yellow-800 rounded px-2 py-0.5">
+                                No Department
                               </span>
-                            ))
-                          ) : (
-                            <span className="inline-block text-xs bg-yellow-100 text-yellow-800 rounded px-2 py-1">
-                              No Department
-                            </span>
-                          )}
-                          <span className="inline-block text-xs bg-gray-200 text-gray-700 rounded px-2 py-1">
-                            {file.language || "Unknown Language"}
-                          </span>
-                        </div>
+                            )}
+                          </div>
 
-                        <div className="mt-4 text-xs text-gray-500">
-                          {file.created_at ? new Date(file.created_at).toLocaleString() : "Unknown"}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[12px] font-medium text-gray-600">Language:</span>
+                            <span className="inline-block text-xs bg-violet-100 text-violet-800 rounded px-2 py-0.5">
+                              {file.language || "Unknown"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Actions pinned at bottom, same place for every card */}
-                      <div className="mt-auto pt-4 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
-                          className="inline-flex items-center justify-center h-9 px-4 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
-                        >
-                          View
-                        </button>
-                        <Link
-                          to={`/summary`}
-                          className="inline-flex items-center justify-center h-9 px-4 bg-gray-500 text-white rounded-md text-sm font-medium hover:bg-gray-800"
-                        >
-                          Summary
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => toggleFavorite(file.f_uuid, file.is_favorite)}
-                          disabled={!!favBusy[file.f_uuid]}
-                          className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
-                            file.is_favorite ? "bg-red-500 hover:bg-red-600" : "bg-yellow-500 hover:bg-yellow-600"
-                          } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
-                        >
-                          {file.is_favorite ? "Unfavorite" : "Favorite"}
-                        </button>
+                      {/* Footer: date (static) + actions */}
+                      <div className="pt-3 mt-4 border-t border-gray-200">
+                        <div className="text-xs text-gray-500">
+                          {file.created_at ? new Date(file.created_at).toLocaleString() : "Unknown"}
+                        </div>
+
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                            className="inline-flex items-center justify-center h-9 px-4 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                          >
+                            View
+                          </button>
+                          <Link
+                            to={`/summary`}
+                            className="inline-flex items-center justify-center h-9 px-4 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700"
+                          >
+                            Summary
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => toggleFavorite(file.f_uuid, file.is_favorite)}
+                            disabled={!!favBusy[file.f_uuid]}
+                            className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
+                              file.is_favorite ? "bg-red-500 hover:bg-red-600" : "bg-amber-500 hover:bg-amber-600"
+                            } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
+                          >
+                            {file.is_favorite ? "Unfavorite" : "Favorite"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
