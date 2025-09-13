@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
+import { supabase } from "../../supabaseClient"; // ADD
 
 const Profile = () => {
-    const { user, getUserProfile, getRoles, updateUserRole, signOutUser } = useAuth();
+    const { user, getUserProfile, updateUserRole, signOutUser } = useAuth();
     const navigate = useNavigate();
     const [profile, setProfile] = useState(null);
     const [roles, setRoles] = useState([]);
@@ -13,30 +14,49 @@ const Profile = () => {
     const [loading, setLoading] = useState(true);
     const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
 
+    const fetchRolesForDept = async (d_uuid) => {
+        if (!d_uuid) {
+            setRoles([]);
+            return;
+        }
+        const { data, error } = await supabase
+            .from("role")
+            .select("r_uuid, r_name, d_uuid")
+            .eq("d_uuid", d_uuid)
+            .order("r_name", { ascending: true });
+        if (error) {
+            console.error("Failed to load roles for department:", error);
+            setRoles([]);
+            return;
+        }
+        setRoles(data || []);
+    };
+
     useEffect(() => {
         const fetchData = async () => {
             if (user) {
                 const profileData = await getUserProfile(user.id);
                 setProfile(profileData);
                 setSelectedRole(profileData?.r_uuid || "");
-
-                const rolesData = await getRoles();
-                setRoles(rolesData || []);
+                await fetchRolesForDept(profileData?.d_uuid);
             }
             setLoading(false);
         };
         fetchData();
-    }, [user, getUserProfile, getRoles]);
+    }, [user, getUserProfile]);
+
+    // If department changes later, reload roles list
+    useEffect(() => {
+        if (profile?.d_uuid) fetchRolesForDept(profile.d_uuid);
+    }, [profile?.d_uuid]);
 
     const handleSaveChanges = async () => {
         if (!selectedRole) {
             setStatusMessage({ text: 'Please select a role.', type: 'error' });
             return;
         }
-
         setStatusMessage({ text: 'Saving...', type: 'loading' });
         const result = await updateUserRole(user.id, selectedRole);
-
         if (result.success) {
             const updatedProfile = await getUserProfile(user.id);
             setProfile(updatedProfile);
@@ -44,7 +64,6 @@ const Profile = () => {
         } else {
             setStatusMessage({ text: 'Failed to update role. Please try again.', type: 'error' });
         }
-
         setIsEditing(false);
         setTimeout(() => setStatusMessage({ text: '', type: '' }), 3000);
     };
@@ -110,11 +129,15 @@ const Profile = () => {
                         <select
                             value={selectedRole}
                             onChange={(e) => setSelectedRole(e.target.value)}
-                            disabled={!isEditing}
+                            disabled={!isEditing || roles.length === 0 || !profile?.d_uuid}
                             className={`mt-1 w-full p-3 border rounded-lg ${!isEditing ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                         >
-                            <option value="">{profile.role ? profile.role.r_name : 'Not Assigned'}</option>
-                            {roles.map((role) => (
+                           <option value="">
+                             {profile?.d_uuid
+                               ? (roles.length ? 'Select role' : 'No roles in this department')
+                               : 'Assign department first'}
+                           </option>
+                           {roles.map((role) => (
                                 <option key={role.r_uuid} value={role.r_uuid}>
                                     {role.r_name}
                                 </option>

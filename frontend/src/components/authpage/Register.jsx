@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import SearchableDropdown from "./SearchableDropdown";
 import { supabase } from "../../supabaseClient";
@@ -22,7 +22,7 @@ const Register = () => {
   const [departments, setDepartments] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
 
-  const { signUpNewUser } = useAuth();
+  const { } = useAuth();
   const navigate = useNavigate();
 
   // Fetch department names for dropdown
@@ -33,7 +33,7 @@ const Register = () => {
         console.error("Error loading departments:", error);
         setDepartments([]);
       } else {
-        setDepartments(data.map((d) => d.d_name));
+        setDepartments((data || []).map((d) => d.d_name));
       }
       setLoadingDepartments(false);
     };
@@ -42,37 +42,86 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const calcAge = (iso) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age;
+  };
+
+  const handleRegister = async (e) => {
     e.preventDefault();
+    setError("");
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
-    setError("");
     setLoading(true);
 
-    try {
-      const { success, error } = await signUpNewUser(formData);
+    const { email, password, fullName } = formData;
 
-      if (!success) {
-        setError(error.message);
-      } else {
-        alert("Registration successful! Please check your email.");
-        navigate("/login");
-      }
-    } catch (err) {
-      console.error("Registration error:", err);
-      setError("Unexpected error. Please try again.");
-    } finally {
+    const { data, error: signErr } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name: fullName?.trim() || "" } },
+    });
+    if (signErr) {
       setLoading(false);
+      setError(signErr.message);
+      return;
+    }
+
+    const uid = data?.user?.id;
+
+    // Try to resolve department UUID from the selected department name
+    let deptUuid = null;
+    if (formData.departmentName) {
+      const { data: deptRow } = await supabase
+        .from("department")
+        .select("d_uuid")
+        .eq("d_name", formData.departmentName)
+        .maybeSingle();
+      deptUuid = deptRow?.d_uuid || null;
+    }
+
+    // Only upsert profile when session exists (no session in email-confirm flow)
+    if (uid && data?.session) {
+      const profile = {
+        uuid: uid,
+        email,
+        name: fullName?.trim() || email,
+        phone_number: formData.phoneNumber || null,
+        address: formData.address || null,
+        dob: formData.dob || null,
+        gender: formData.gender || null,
+        age: calcAge(formData.dob),
+        ...(deptUuid ? { d_uuid: deptUuid } : {}),
+      };
+
+      const { error: upsertErr } = await supabase
+        .from("users")
+        .upsert(profile, { onConflict: "uuid" });
+      if (upsertErr) {
+        console.warn("Profile upsert failed (will retry on first login):", upsertErr.message);
+      }
+    }
+
+    setLoading(false);
+
+    if (data.session) {
+      navigate("/profile");
+    } else {
+      // Email confirmation flow — user will create profile on first login via AuthContext fallback
+      navigate("/login");
     }
   };
 
@@ -86,7 +135,7 @@ const Register = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8">
+        <form onSubmit={handleRegister} className="mt-8">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Full Name */}
             <div>
@@ -218,7 +267,7 @@ const Register = () => {
                 value={formData.address}
                 onChange={handleChange}
                 className="w-full px-3 py-2 mt-1 border rounded-md"
-              ></textarea>
+              />
             </div>
           </div>
 
