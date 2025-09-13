@@ -1,67 +1,97 @@
 package config
 
 import (
-	"backend/models"
-	"backend/services"
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
-	"time"
+	"net/url"
+	"os"
+	"path/filepath"
+
+	"backend/models"
 )
 
-// InitConfig stub for main.go
-func InitConfig() {
-	// TODO: Load environment variables, etc.
+type SupabaseClient struct {
+	URL string
+	Key string
 }
 
-// POST /v1/documents/{id}/process
-func ProcessDocumentHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+var Supabase SupabaseClient
+
+// InitConfig loads Supabase credentials
+func InitConfig() {
+	Supabase = SupabaseClient{
+		URL: os.Getenv("SUPABASE_URL"),
+		Key: os.Getenv("SUPABASE_SERVICE_KEY"), // Use SERVICE_KEY for consistency with main.go
 	}
+}
 
-	id := r.URL.Path[len("/v1/documents/"):]
-	id = id[:len(id)-len("/process")] // remove trailing /process
+// UploadFile uploads a file to Supabase storage (handles spaces/& in path)
+func (s SupabaseClient) UploadFile(bucket, path string, file io.Reader) error {
+	encodedPath := url.PathEscape(path)
+	endpoint := fmt.Sprintf("%s/storage/v1/object/%s/%s", s.URL, bucket, encodedPath)
 
-	doc, err := models.GetDocumentByID(id)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", filepath.Base(path))
+	_, _ = io.Copy(part, file)
+	writer.Close()
+
+	req, err := http.NewRequest("POST", endpoint, body)
 	if err != nil {
-		http.Error(w, "Document not found", http.StatusNotFound)
-		return
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.Key)
+	req.Header.Set("apikey", s.Key)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("upload failed: %s", resp.Status)
+	}
+	return nil
+}
+
+// InsertDocument saves metadata into Supabase Postgres
+func (s SupabaseClient) InsertDocument(doc models.Document) (string, error) {
+	endpoint := fmt.Sprintf("%s/rest/v1/documents", s.URL)
+
+	data, _ := json.Marshal(doc)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(data))
+	if err != nil {
+		return "", err
 	}
 
-	// 1️⃣ Run OCR if not done
-	if doc.Status == "uploaded" || doc.Status == "error" {
-		text, err := services.RunOCR(doc.FileName)
-		if err != nil {
-			models.UpdateStatus(doc.ID, "error", map[string]interface{}{"error_message": err.Error()})
-			http.Error(w, "OCR failed", http.StatusInternalServerError)
-			return
-		}
-		models.UpdateStatus(doc.ID, "ocr_done", map[string]interface{}{
-			"ocr_text":         text,
-			"ocr_completed_at": time.Now(),
-		})
-		doc.OCRText = text
-		doc.Status = "ocr_done"
+	req.Header.Set("Authorization", "Bearer "+s.Key)
+	req.Header.Set("apikey", s.Key)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "return=representation")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("insert failed: %s", resp.Status)
 	}
 
-	// 2️⃣ Run summarizer if not done
-	if doc.Status == "ocr_done" {
-		summary, err := services.CallHFSummarizerWithChunking(doc.OCRText)
-		if err != nil {
-			models.UpdateStatus(doc.ID, "error", map[string]interface{}{"error_message": err.Error()})
-			http.Error(w, "Summarizer failed", http.StatusInternalServerError)
-			return
-		}
-		models.UpdateStatus(doc.ID, "summary_done", map[string]interface{}{
-			"summary_text":         summary,
-			"summary_completed_at": time.Now(),
-		})
+	var inserted []models.Document
+	if err := json.NewDecoder(resp.Body).Decode(&inserted); err != nil {
+		return "", err
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Document processed successfully",
-		"doc_id":  doc.ID,
-	})
+	if len(inserted) == 0 {
+		return "", fmt.Errorf("no document returned")
+	}
+	return inserted[0].ID, nil
 }

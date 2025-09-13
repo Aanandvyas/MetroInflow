@@ -1,72 +1,91 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"backend/config"
 	"backend/handlers"
-	"backend/workers"
+
+	"github.com/joho/godotenv"
 )
 
+func checkDBConnection() {
+	url := os.Getenv("SUPABASE_URL")
+	key := os.Getenv("SUPABASE_SERVICE_KEY")
+
+	if url == "" || key == "" {
+		log.Println("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+		return
+	}
+
+	endpoint := fmt.Sprintf("%s/rest/v1/documents?limit=1", url)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		log.Printf("❌ Failed to build DB request: %v\n", err)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("apikey", key)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("❌ Failed DB connection: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		log.Printf("❌ DB responded with error: %s\n", resp.Status)
+		return
+	}
+
+	var docs []map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&docs); err != nil {
+		log.Printf("❌ Could not decode DB response: %v\n", err)
+		return
+	}
+
+	log.Println("✅ Successfully connected to Supabase DB")
+}
+
 func main() {
-	// 1️⃣ Load environment variables and initialize Supabase client
+	// 1️⃣ Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️ No .env file found, falling back to system environment")
+	}
+
+	// 2️⃣ Initialize config (Supabase client)
 	config.InitConfig()
-	log.Println("Config initialized.")
+	log.Println("✅ Config initialized.")
 
-	// 2️⃣ Start background workers
-	go func() {
-		log.Println("Starting OCR Worker...")
-		workers.OCRWorker()
-	}()
+	// 3️⃣ Test DB connection
+	checkDBConnection()
 
-	go func() {
-		log.Println("Starting Summarizer Worker...")
-		workers.SummarizerWorker()
-	}()
-
-	// 3️⃣ Define HTTP routes
+	// 4️⃣ Define HTTP routes
 	http.HandleFunc("/v1/documents", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			handlers.UploadDocumentsHandler(w, r)
-		} else if r.Method == http.MethodGet {
-			handlers.ListDocumentsHandler(w, r)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
-	// Routes for /v1/documents/{id} and /v1/documents/{id}/process
-	http.HandleFunc("/v1/documents/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path[len("/v1/documents/"):] // extract trailing path
-
-		if strings.HasSuffix(path, "/process") && r.Method == http.MethodPost {
-			handlers.ProcessDocumentHandler(w, r)
-			return
-		}
-
-		if r.Method == http.MethodGet {
-			handlers.GetDocumentHandler(w, r)
-			return
-		}
-
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	})
-
-	// 4️⃣ Health check
+	// 5️⃣ Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
 
-	// 5️⃣ Start HTTP server
+	// 6️⃣ Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-
 	srv := &http.Server{
 		Addr:         ":" + port,
 		ReadTimeout:  10 * time.Second,
@@ -74,8 +93,8 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Printf("Server started at http://localhost:%s\n", port)
+	log.Printf("🚀 Server started at http://localhost:%s\n", port)
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		log.Fatalf("❌ Server failed: %v", err)
 	}
 }
