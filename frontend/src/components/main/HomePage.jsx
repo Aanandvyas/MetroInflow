@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
-import { FolderIcon, PlusIcon, DocumentTextIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-
-// Mock data for notifications can remain for now
-const recentNotifications = [
-    { text: 'New policy on remote work updated by HR Department.', time: '2 hours ago', icon: DocumentTextIcon },
-    { text: "Engineering Department shared 'Project Alpha Blueprints' with Public Relations.", time: '4 hours ago', icon: UserGroupIcon },
-    { text: "Meeting invitation for 'Q2 Financial Review' sent by Finance Department.", time: '6 hours ago', icon: DocumentTextIcon },
-];
+import { FolderIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
 const HomePage = () => {
     const [departments, setDepartments] = useState([]);
@@ -18,6 +11,7 @@ const HomePage = () => {
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [selectedLanguage, setSelectedLanguage] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [recentNotifications, setRecentNotifications] = useState([]);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -75,6 +69,23 @@ const HomePage = () => {
         fetchDepartments();
     }, []);
 
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            const { data, error } = await supabase
+                .from("file")
+                .select("f_uuid, f_name, created_at")
+                .order("created_at", { ascending: false })
+                .limit(5);
+            if (!error && data) {
+                setRecentNotifications(data);
+            }
+        };
+        fetchNotifications();
+        // Optionally, poll every 30s for new notifications
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <div className="p-8 bg-gray-50/50">
             <div className="flex items-center justify-between mb-8">
@@ -128,9 +139,15 @@ const HomePage = () => {
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {recentFiles.map((file, idx) => (
                                         <tr key={file.f_uuid + '-' + idx} className="hover:bg-gray-50 transition">
-                                            <td className="px-6 py-4 whitespace-nowrap flex items-center gap-3">
+                                            <td
+                                                className="px-6 py-4 whitespace-nowrap flex items-center gap-3 cursor-pointer"
+                                                onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                                                title={file.f_name}
+                                            >
                                                 <DocumentTextIcon className="h-6 w-6 text-blue-400 flex-shrink-0" />
-                                                <span className="font-medium text-gray-800 truncate max-w-xs" title={file.f_name}>{file.f_name}</span>
+                                                <span className="font-medium text-blue-600 truncate max-w-xs hover:underline">
+                                                    {file.f_name}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.department?.d_name || 'Unknown'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.language || 'Unknown'}</td>
@@ -140,14 +157,13 @@ const HomePage = () => {
                                                     : 'Unknown'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <a
-                                                    className="text-blue-600 hover:underline text-sm font-medium"
-                                                    href={`/file/${file.f_uuid}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
+                                                {/* Empty View button for backend endpoint */}
+                                                <button
+                                                    className="text-blue-600 bg-gray-100 rounded px-3 py-1 text-sm font-medium cursor-not-allowed"
+                                                    disabled
                                                 >
-                                                    View
-                                                </a>
+                                                    Summary
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -161,17 +177,25 @@ const HomePage = () => {
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">Recent Notifications</h2>
                 <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                     <ul className="divide-y divide-gray-200">
-                        {recentNotifications.map((notification, index) => (
-                            <li key={index} className="flex items-start gap-4 py-4">
-                                <div className="bg-gray-100 p-2 rounded-full mt-1">
-                                    <notification.icon className="h-5 w-5 text-gray-600" />
-                                </div>
-                                <div>
-                                    <p className="text-gray-800">{notification.text}</p>
-                                    <p className="text-sm text-gray-500 mt-1">{notification.time}</p>
-                                </div>
-                            </li>
-                        ))}
+                        {recentNotifications.length === 0 ? (
+                            <li className="py-4 text-gray-500">No notifications.</li>
+                        ) : (
+                            recentNotifications.map((file) => (
+                                <li key={file.f_uuid} className="flex items-start gap-4 py-4">
+                                    <div className="bg-blue-100 p-2 rounded-full mt-1">
+                                        <span className="h-5 w-5 text-blue-600 font-bold">✅</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-800">
+                                            <span className="font-semibold">{file.f_name}</span> was added
+                                        </p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            {file.created_at ? new Date(file.created_at).toLocaleString() : ""}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))
+                        )}
                     </ul>
                 </div>
             </section>
