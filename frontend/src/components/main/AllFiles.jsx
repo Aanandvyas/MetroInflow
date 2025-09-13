@@ -109,7 +109,7 @@ const AllFiles = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-6">All Department Files</h1>
       </div>
 
-      {/* Filters */}
+      {/* Filters (remove search input) */}
       <div className="flex flex-wrap gap-4 mb-6">
         <select
           className="border rounded px-3 py-2"
@@ -136,14 +136,7 @@ const AllFiles = () => {
             </option>
           ))}
         </select>
-
-        <input
-          className="border rounded px-3 py-2"
-          type="text"
-          placeholder="Search files by name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        {/* Removed the search input here */}
       </div>
 
       {/* Files grid */}

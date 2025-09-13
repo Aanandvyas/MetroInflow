@@ -11,7 +11,6 @@ const AssignToMe = () => {
   const [filesLoading, setFilesLoading] = useState(true);
   const [userDepartment, setUserDepartment] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
 
   // First, fetch user's department
   useEffect(() => {
@@ -59,9 +58,6 @@ const AssignToMe = () => {
       if (selectedLanguage) {
         query = query.eq('language', selectedLanguage);
       }
-      if (searchTerm) {
-        query = query.ilike('f_name', `%${searchTerm}%`);
-      }
 
       const { data, error } = await query;
       if (error) {
@@ -81,7 +77,7 @@ const AssignToMe = () => {
     };
 
     fetchRecentFiles();
-  }, [userDepartment, selectedLanguage, searchTerm]);
+  }, [userDepartment, selectedLanguage]);
 
   // Calendar/Assignments logic
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -140,13 +136,6 @@ const AssignToMe = () => {
               <option key={lang} value={lang}>{lang}</option>
             ))}
           </select>
-          <input
-            type="text"
-            placeholder="Search files..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="border rounded px-3 py-2 flex-grow"
-          />
         </div>
 
         {filesLoading ? (
