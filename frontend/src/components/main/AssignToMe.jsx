@@ -3,7 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import CalendarCard from "../assign-to-me/CalendarCard";
 import AssignmentsCard from "../assign-to-me/AssignmentsCard";
-import { DocumentTextIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { Link } from "react-router-dom";
 
 const AssignToMe = () => {
   const { user } = useAuth();
@@ -11,6 +12,15 @@ const AssignToMe = () => {
   const [filesLoading, setFilesLoading] = useState(true);
   const [userDepartment, setUserDepartment] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('');
+  // Add: track which row’s menu is open
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  // Close any open menu on outside click
+  useEffect(() => {
+    const handleDocClick = () => setOpenMenuId(null);
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, []);
 
   // First, fetch user's department
   useEffect(() => {
@@ -104,6 +114,7 @@ const AssignToMe = () => {
       const dateKey = formatDateKey(new Date(doc.created_at));
       if (!mapped[dateKey]) mapped[dateKey] = [];
       mapped[dateKey].push({
+        f_uuid: doc.f_uuid, // add uuid for actions
         title: doc.f_name,
         from: userDepartment?.department?.d_name || "Your Department",
       });
@@ -175,8 +186,8 @@ const AssignToMe = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
-                        {file.departments.map((dept, index) => (
-                          <span 
+                        {file.departments.map((dept) => (
+                          <span
                             key={`${file.f_uuid}-${dept.d_name}`}
                             className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
                           >
@@ -192,13 +203,55 @@ const AssignToMe = () => {
                       {file.uploader?.name || 'Unknown'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
-                        className="inline-block px-4 py-2 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
-                      >
-                        View
-                      </button>
+                      <div className="relative inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                          className="inline-block px-4 py-2 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                        >
+                          View
+                        </button>
+
+                        {/* Three-dot menu */}
+                        <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={openMenuId === file.f_uuid}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === file.f_uuid ? null : file.f_uuid);
+                          }}
+                          className="p-2 rounded-md hover:bg-gray-100 text-gray-600"
+                          title="More actions"
+                        >
+                          <EllipsisVerticalIcon className="w-5 h-5" />
+                        </button>
+
+                        {openMenuId === file.f_uuid && (
+                          <div
+                            role="menu"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-10 z-20 w-40 rounded-md border border-gray-200 bg-white shadow-lg py-1"
+                          >
+                            <Link
+                              to="/summary"
+                              role="menuitem"
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              onClick={() => setOpenMenuId(null)}
+                            >
+                              Summary
+                            </Link>
+                            <Link
+                              to="/archive"
+                              role="menuitem"
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              onClick={() => setOpenMenuId(null)}
+                            >
+                              Archive
+                            </Link>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
