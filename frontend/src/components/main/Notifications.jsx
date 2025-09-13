@@ -33,50 +33,95 @@ const Notifications = () => {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]); // [{ f_uuid, f_name, created_at }]
   const [userDeptIds, setUserDeptIds] = useState([]);
+  const [deptsLoading, setDeptsLoading] = useState(true); // <-- new
+
+  // Simple spinner + skeletons
+  const Spinner = () => (
+    <span
+      className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent text-blue-600"
+      role="status"
+      aria-label="loading"
+    />
+  );
+
+  const SkeletonItem = () => (
+    <li className="flex items-center justify-between gap-3 p-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="rounded-md bg-gray-200 h-9 w-9 animate-pulse" />
+        <div className="min-w-0">
+          <div className="h-4 bg-gray-200 rounded w-56 mb-2 animate-pulse" />
+          <div className="h-3 bg-gray-100 rounded w-24 animate-pulse" />
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="h-8 w-16 bg-gray-200 rounded animate-pulse" />
+        <div className="h-8 w-16 bg-gray-200 rounded animate-pulse" />
+      </div>
+    </li>
+  );
 
   // Fetch user's departments (expects user_department table: uuid, d_uuid)
   useEffect(() => {
-    if (!user?.id) return;
+    let active = true;
+    if (!user?.id) {
+      setUserDeptIds([]);
+      setDeptsLoading(false);
+      return;
+    }
+    setDeptsLoading(true);
     const loadUserDepts = async () => {
-      // Try user_department mapping
       const { data: mapRows, error: mapErr } = await supabase
         .from("user_department")
         .select("d_uuid")
         .eq("uuid", user.id);
       if (!mapErr && mapRows?.length) {
-        setUserDeptIds(mapRows.map((r) => r.d_uuid));
-        return;
+        if (active) setUserDeptIds(mapRows.map((r) => r.d_uuid));
+      } else {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("d_uuid")
+          .eq("uuid", user.id)
+          .maybeSingle();
+        if (active) setUserDeptIds(profile?.d_uuid ? [profile.d_uuid] : []);
       }
-      // Fallback: if your users table has a single department column
-      const { data: profile } = await supabase
-        .from("users")
-        .select("d_uuid")
-        .eq("uuid", user.id)
-        .maybeSingle();
-      if (profile?.d_uuid) setUserDeptIds([profile.d_uuid]);
-      else setUserDeptIds([]); // none
+      if (active) setDeptsLoading(false);
     };
     loadUserDepts();
+    return () => {
+      active = false;
+    };
   }, [user?.id]);
 
   // Initial load (all days for user’s departments) + realtime
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    // Wait until departments are resolved before deciding UI
+    if (deptsLoading) {
+      setLoading(true);
+      return;
+    }
+
+    // If user has no departments, show empty only after depts resolved
     if (!userDeptIds || userDeptIds.length === 0) {
       setItems([]);
       setLoading(false);
       return;
     }
+
     setLoading(true);
 
     const load = async () => {
-      // Files that are linked to any of the user's departments
       const { data, error } = await supabase
         .from("file")
         .select("f_uuid, f_name, created_at, file_department!inner(d_uuid)")
         .in("file_department.d_uuid", userDeptIds)
         .order("created_at", { ascending: false })
-        .limit(300); // adjust as needed
+        .limit(300);
 
       if (error) {
         console.error("Failed to load notifications:", error);
@@ -85,10 +130,10 @@ const Notifications = () => {
         return;
       }
 
-      // Deduplicate files that may be linked to multiple user departments
       const seen = new Map();
       (data || []).forEach((f) => {
-        if (!seen.has(f.f_uuid)) seen.set(f.f_uuid, { f_uuid: f.f_uuid, f_name: f.f_name, created_at: f.created_at });
+        if (!seen.has(f.f_uuid))
+          seen.set(f.f_uuid, { f_uuid: f.f_uuid, f_name: f.f_name, created_at: f.created_at });
       });
       setItems(Array.from(seen.values()));
       setLoading(false);
@@ -96,9 +141,7 @@ const Notifications = () => {
 
     load();
 
-    // Realtime: file inserts and new mappings into the user’s departments
     const addIfRelevant = async (f_uuid) => {
-      // Check mapping for this file
       const { data: links } = await supabase
         .from("file_department")
         .select("d_uuid")
@@ -138,7 +181,7 @@ const Notifications = () => {
       supabase.removeChannel(filesChannel);
       supabase.removeChannel(fdChannel);
     };
-  }, [user?.id, userDeptIds]);
+  }, [user?.id, userDeptIds, deptsLoading]);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -158,10 +201,28 @@ const Notifications = () => {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">Notifications</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+        Notifications
+        {(loading || deptsLoading) && <Spinner />}
+      </h1>
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        {loading ? (
-          <div className="text-gray-500">Loading…</div>
+        {loading || deptsLoading ? (
+          <div className="space-y-6">
+            {Array.from({ length: 3 }).map((_, gi) => (
+              <div key={gi}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-2 w-2 rounded-full bg-gray-300" />
+                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-10 bg-gray-100 rounded animate-pulse ml-2" />
+                </div>
+                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-md">
+                  {Array.from({ length: 4 }).map((_, li) => (
+                    <SkeletonItem key={li} />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         ) : groups.length === 0 ? (
           <div className="text-gray-500">No notifications for your departments.</div>
         ) : (

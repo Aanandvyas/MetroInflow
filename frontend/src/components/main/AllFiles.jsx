@@ -38,28 +38,34 @@ const AllFiles = () => {
     setLoading(true);
 
     // 1. Fetch all files with departments and uploader
+    const selectClause = `
+      f_uuid,
+      f_name,
+      language,
+      created_at,
+      uploader:uuid(name),
+      file_department${selectedDepartment ? "!inner" : ""} (
+        d_uuid,
+        department:d_uuid ( d_uuid, d_name )
+      )
+    `;
+
     let fileQuery = supabase
       .from("file")
-      .select(`
-        f_uuid,
-        f_name,
-        language,
-        created_at,
-        uploader:uuid(name),
-        file_department (
-          d_uuid,
-          department:d_uuid ( d_uuid, d_name )
-        )
-      `)
+      .select(selectClause)
       .order("created_at", { ascending: false });
 
+    // Department: inner join + nested column filter
     if (selectedDepartment) {
-      fileQuery = fileQuery
-        .contains("file_department", [{ d_uuid: selectedDepartment }]);
+      fileQuery = fileQuery.eq("file_department.d_uuid", selectedDepartment);
     }
+
+    // Language
     if (selectedLanguage) {
       fileQuery = fileQuery.eq("language", selectedLanguage);
     }
+
+    // Search (local or global)
     const effectiveSearch = searchTerm?.trim() || globalSearchTerm?.trim();
     if (effectiveSearch) {
       fileQuery = fileQuery.ilike("f_name", `%${effectiveSearch}%`);
