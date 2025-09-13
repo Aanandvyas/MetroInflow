@@ -80,6 +80,9 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	// http.HandleFunc("/v1/files", handlers.ListFilesHandler)
+	// http.HandleFunc("/v1/files/", handlers.GetFileHandler)
+	// http.HandleFunc("/v1/departments", handlers.ListDepartmentsHandler)
 
 	// 5️⃣ Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

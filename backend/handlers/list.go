@@ -32,3 +32,30 @@ func ListDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(docs)
 }
+
+/*TODO
+the below fn is not working
+*/
+// func ListFilesHandler(w http.ResponseWriter, r *http.Request) {
+// 	files, err := models.GetAllFiles(config.DB)
+// 	if err != nil {
+// 		http.Error(w, "Failed to fetch files", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(files)
+// }
+
+/*
+TODO
+the below fn is not working
+*/
+// func ListDepartmentsHandler(w http.ResponseWriter, r *http.Request) {
+// 	depts, err := models.GetAllDepartments(config.DB)
+// 	if err != nil {
+// 		http.Error(w, "Failed to fetch departments", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(depts)
+// }

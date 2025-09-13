@@ -19,15 +19,16 @@ func GetAllDepartments(db *sql.DB) ([]Department, error) {
 	}
 	defer rows.Close()
 
-	var departments []Department
+	var depts []Department
 	for rows.Next() {
 		var dept Department
-		if err := rows.Scan(&dept.DUUID, &dept.DName); err != nil {
+		err := rows.Scan(&dept.DUUID, &dept.DName)
+		if err != nil {
 			return nil, err
 		}
-		departments = append(departments, dept)
+		depts = append(depts, dept)
 	}
-	return departments, nil
+	return depts, nil
 }
 
 type Document struct {
@@ -64,4 +65,34 @@ func InsertFileDepartment(db *sql.DB, f_uuid, d_uuid string) error {
     `
 	_, err := db.Exec(query, f_uuid, d_uuid)
 	return err
+}
+
+func GetAllFiles(db *sql.DB) ([]Document, error) {
+	rows, err := db.QueryContext(context.Background(), "SELECT f_uuid, f_name, language, file_path, d_uuid, status, uploaded_at FROM file")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var files []Document
+	for rows.Next() {
+		var doc Document
+		err := rows.Scan(&doc.FUUID, &doc.FileName, &doc.Language, &doc.FilePath, &doc.DUUID, &doc.Status, &doc.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, doc)
+	}
+	return files, nil
+}
+
+func GetFileByUUID(db *sql.DB, fuuid string) (*Document, error) {
+	query := "SELECT f_uuid, f_name, language, file_path, d_uuid, status, uploaded_at FROM file WHERE f_uuid = $1"
+	row := db.QueryRowContext(context.Background(), query, fuuid)
+	var doc Document
+	err := row.Scan(&doc.FUUID, &doc.FileName, &doc.Language, &doc.FilePath, &doc.DUUID, &doc.Status, &doc.UploadedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &doc, nil
 }

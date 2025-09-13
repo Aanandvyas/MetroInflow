@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"backend/config"
 	"backend/models"
@@ -39,4 +40,22 @@ func GetDocumentHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(docs[0])
+}
+
+func GetFileHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract file UUID from URL
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 {
+		http.Error(w, "Missing file UUID", http.StatusBadRequest)
+		return
+	}
+	fuuid := parts[3]
+
+	file, err := models.GetFileByUUID(config.DB, fuuid)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(file)
 }
