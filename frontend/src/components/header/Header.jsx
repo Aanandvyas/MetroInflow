@@ -12,9 +12,10 @@ import {
 // ✅ Import your logos
 import kmrllogo from '../../assets/kmrllogo.jpg';
 import azadilogo from '../../assets/azadilogo.jpg';
+import HeaderSearch from './HeaderSearch';
 
 const Header = () => {
-    const { searchTerm, setSearchTerm, setShowFilters } = useFilter();
+    const { setShowFilters } = useFilter();
 
     return (
         <header className="w-full bg-white p-4 flex items-center justify-between border-b">
@@ -24,33 +25,12 @@ const Header = () => {
                 <img src={azadilogo} alt="Azadi Ka Amrit Mahotsav Logo" className="h-11 object-contain" />
             </div>
 
-            {/* Center Section: Search Bar */}
-            <div className="relative flex-1 max-w-xl mx-8">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Search files and messages..."
-                    className="w-full bg-gray-50 border rounded-lg py-2 pl-10 pr-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <button
-                    onClick={() => {
-                        console.log('Header filter click', {
-                            setShowFiltersType: typeof setShowFilters,
-                            setShowFilterPanelType: typeof setShowFilterPanel
-                        });
-                        const setter = setShowFilters ?? setShowFilters;
-                        if (typeof setter === 'function') setter(true);
-                        else console.error('No valid filter setter available on FilterContext');
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200"
-                >
-                    <AdjustmentsHorizontalIcon className="h-5 w-5 text-gray-500" />
-                </button>
-            </div>
+            {/* Center Section: Centralized Search */}
+                        <div className="flex-1 max-w-2xl mx-8">
+                            <HeaderSearch />
+                        </div>
 
-            {/* Right Section: Icons */}
+                        {/* Right Section: Icons */}
             <div className="flex items-center space-x-6">
                  <Squares2X2Icon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
                  <QuestionMarkCircleIcon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />

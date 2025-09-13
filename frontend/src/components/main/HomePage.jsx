@@ -108,37 +108,6 @@ const HomePage = () => {
             </section>
             <section className="mt-12">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">Recent Files</h2>
-                {/* Filters and Search */}
-                <div className="flex flex-wrap gap-4 mb-4">
-                    <select
-                        className="border rounded px-3 py-2"
-                        value={selectedDepartment}
-                        onChange={e => setSelectedDepartment(e.target.value)}
-                    >
-                        <option value="">All Departments</option>
-                        {departments.map(dept => (
-                            <option key={dept.d_uuid} value={dept.d_uuid}>{dept.d_name}</option>
-                        ))}
-                    </select>
-                    <select
-                        className="border rounded px-3 py-2"
-                        value={selectedLanguage}
-                        onChange={e => setSelectedLanguage(e.target.value)}
-                    >
-                        <option value="">All Languages</option>
-                        {/* Unique language options from files */}
-                        {[...new Set(recentFiles.map(f => f.language).filter(Boolean))].map(lang => (
-                            <option key={lang} value={lang}>{lang}</option>
-                        ))}
-                    </select>
-                    <input
-                        className="border rounded px-3 py-2"
-                        type="text"
-                        placeholder="Search files by name..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
-                </div>
                 <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                     {filesLoading ? (
                         <div>Loading recent files...</div>
