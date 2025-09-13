@@ -34,7 +34,18 @@ const Header = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <button onClick={() => setShowFilters(true)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200">
+                <button
+                    onClick={() => {
+                        console.log('Header filter click', {
+                            setShowFiltersType: typeof setShowFilters,
+                            setShowFilterPanelType: typeof setShowFilterPanel
+                        });
+                        const setter = setShowFilters ?? setShowFilters;
+                        if (typeof setter === 'function') setter(true);
+                        else console.error('No valid filter setter available on FilterContext');
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200"
+                >
                     <AdjustmentsHorizontalIcon className="h-5 w-5 text-gray-500" />
                 </button>
             </div>
