@@ -14,6 +14,7 @@ const AllFiles = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [favBusy, setFavBusy] = useState({});
 
   // Fetch departments
   useEffect(() => {
@@ -122,6 +123,34 @@ const AllFiles = () => {
     return groups;
   }, [allDepartmentFiles]);
 
+  const toggleFavorite = async (f_uuid, isFavorite) => {
+    if (!user?.id) return;
+    // optimistic UI
+    setAllDepartmentFiles(prev =>
+      prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: !isFavorite } : f))
+    );
+    setFavBusy(prev => ({ ...prev, [f_uuid]: true }));
+    try {
+      if (isFavorite) {
+        const { error } = await supabase.from("favorites").delete()
+          .eq("uuid", user.id).eq("f_uuid", f_uuid);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("favorites")
+          .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
+        if (error) throw error;
+      }
+    } catch (e) {
+      // revert on failure
+      setAllDepartmentFiles(prev =>
+        prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: isFavorite } : f))
+      );
+      console.error("Favorite toggle failed:", e);
+    } finally {
+      setFavBusy(prev => ({ ...prev, [f_uuid]: false }));
+    }
+  };
+
   return (
     <div className="p-8 bg-white min-h-full">
       <div className="flex items-center justify-between">
@@ -221,34 +250,11 @@ const AllFiles = () => {
                         </Link>
                         <button
                           type="button"
+                          onClick={() => toggleFavorite(file.f_uuid, file.is_favorite)}
+                          disabled={!!favBusy[file.f_uuid]}
                           className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
                             file.is_favorite ? "bg-red-500 hover:bg-red-600" : "bg-yellow-500 hover:bg-yellow-600"
-                          } text-white`}
-                          onClick={async () => {
-                            if (!user?.id) return;
-
-                            if (file.is_favorite) {
-                              // remove favorite
-                              const { error } = await supabase
-                                .from("favorites")
-                                .delete()
-                                .eq("uuid", user.id)
-                                .eq("f_uuid", file.f_uuid);
-                              if (error) console.error("Failed to unfavorite:", error);
-                            } else {
-                              // add favorite
-                              const { error } = await supabase
-                                .from("favorites")
-                                .upsert(
-                                  { uuid: user.id, f_uuid: file.f_uuid },
-                                  { onConflict: "uuid,f_uuid" }
-                                );
-                              if (error) console.error("Failed to favorite:", error);
-                            }
-
-                            // reload files after change
-                            fetchFiles();
-                          }}
+                          } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
                         >
                           {file.is_favorite ? "Unfavorite" : "Favorite"}
                         </button>

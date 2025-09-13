@@ -7,6 +7,7 @@ const Favourite = () => {
   const { user } = useAuth();
   const [favourites, setFavourites] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [favBusy, setFavBusy] = useState({});
 
   const fetchFavourites = async () => {
     if (!user?.id) return;
@@ -59,23 +60,22 @@ const Favourite = () => {
 
   const toggleFavorite = async (file) => {
     if (!user?.id) return;
+    const id = file.f_uuid;
+    // optimistic: remove from list on unfavorite
+    setFavourites(prev => prev.filter(f => f.file?.f_uuid !== id));
+    setFavBusy(prev => ({ ...prev, [id]: true }));
     try {
-      if (file.is_favorite) {
-        const { error } = await supabase
-          .from("favorites")
-          .delete()
-          .eq("uuid", user.id)
-          .eq("f_uuid", file.f_uuid);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("favorites")
-          .upsert({ uuid: user.id, f_uuid: file.f_uuid }, { onConflict: "uuid,f_uuid" });
-        if (error) throw error;
-      }
-      await fetchFavourites();
+      const { error } = await supabase.from("favorites")
+        .delete()
+        .eq("uuid", user.id)
+        .eq("f_uuid", id);
+      if (error) throw error;
     } catch (e) {
-      console.error("Failed to toggle favorite:", e);
+      // revert on failure
+      setFavourites(prev => [{ file, fav_uuid: `tmp-${id}` }, ...prev]);
+      console.error("Unfavorite failed:", e);
+    } finally {
+      setFavBusy(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -140,10 +140,11 @@ const Favourite = () => {
                   </Link>
                   <button
                     type="button"
-                    className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
+                    className={`ml-2 inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
                       file.is_favorite ? "bg-red-500 hover:bg-red-600" : "bg-yellow-500 hover:bg-yellow-600"
                     } text-white`}
                     onClick={() => toggleFavorite(file)}
+                    disabled={!!favBusy[file.f_uuid]}
                   >
                     {file.is_favorite ? "Unfavorite" : "Favorite"}
                   </button>
