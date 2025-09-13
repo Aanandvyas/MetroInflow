@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+
+	_ "github.com/lib/pq"
 
 	"backend/models"
 )
@@ -20,13 +23,24 @@ type SupabaseClient struct {
 }
 
 var Supabase SupabaseClient
+var DB *sql.DB
 
 // InitConfig loads Supabase credentials
 func InitConfig() {
 	Supabase = SupabaseClient{
 		URL: os.Getenv("SUPABASE_URL"),
-		Key: os.Getenv("SUPABASE_SERVICE_KEY"), // Use SERVICE_KEY for consistency with main.go
+		Key: os.Getenv("SUPABASE_SERVICE_KEY"),
 	}
+}
+
+// InitDB initializes the database connection
+func InitDB(connStr string) error {
+	var err error
+	DB, err = sql.Open("postgres", connStr)
+	if err != nil {
+		return err
+	}
+	return DB.Ping()
 }
 
 // UploadFile uploads a file to Supabase storage (handles spaces/& in path)
@@ -93,5 +107,5 @@ func (s SupabaseClient) InsertDocument(doc models.Document) (string, error) {
 	if len(inserted) == 0 {
 		return "", fmt.Errorf("no document returned")
 	}
-	return inserted[0].ID, nil
+	return inserted[0].FUUID, nil
 }

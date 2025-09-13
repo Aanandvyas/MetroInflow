@@ -67,6 +67,11 @@ func main() {
 	// 3️⃣ Test DB connection
 	checkDBConnection()
 
+	connStr := os.Getenv("DATABASE_URL")
+	if err := config.InitDB(connStr); err != nil {
+		log.Fatalf("Failed to connect to DB: %v", err)
+	}
+
 	// 4️⃣ Define HTTP routes
 	http.HandleFunc("/v1/documents", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {

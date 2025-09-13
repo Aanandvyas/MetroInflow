@@ -13,19 +13,9 @@ import (
 	"backend/models"
 )
 
-// ✅ Allowed departments
-var allowedDepartments = map[string]bool{
-	"Civil & Track Department":                  true,
-	"Customer Relations & Marketing Department": true,
-	"Emergency & Maintenance Department":        true,
-	"Finance & Procurement Department":          true,
-	"Signaling & Telecommunications Department": true,
-	"Train Operations Department":               true,
-}
-
 // UploadDocumentsHandler handles multiple file uploads
 func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(50 << 20) // 50 MB
+	err := r.ParseMultipartForm(50 << 20)
 	if err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
@@ -37,10 +27,29 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dept := r.FormValue("department")
-	log.Printf("[DEBUG] Received department: '%s'\n", dept)
-	if !allowedDepartments[dept] {
-		http.Error(w, "Invalid department", http.StatusBadRequest)
+	d_uuid := r.FormValue("d_uuid")
+	if d_uuid == "" {
+		http.Error(w, "Missing department UUID", http.StatusBadRequest)
+		return
+	}
+
+	// Validate department UUID exists in DB and get department name
+	var deptName string
+	deptExists := false
+	departments, err := models.GetAllDepartments(config.DB)
+	if err != nil {
+		http.Error(w, "Failed to fetch departments", http.StatusInternalServerError)
+		return
+	}
+	for _, dept := range departments {
+		if dept.DUUID == d_uuid {
+			deptExists = true
+			deptName = dept.DName
+			break
+		}
+	}
+	if !deptExists {
+		http.Error(w, "Invalid department UUID", http.StatusBadRequest)
 		return
 	}
 
@@ -61,8 +70,8 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Path → Department/timestamp_filename
-		storagePath := filepath.Join(dept, time.Now().Format("20060102150405")+"_"+f.Filename)
+		// Use department name for storage path
+		storagePath := filepath.Join(deptName, time.Now().Format("20060102150405")+"_"+f.Filename)
 
 		// Use buffer for upload
 		if err := config.Supabase.UploadFile("file_storage", storagePath, buf); err != nil {
@@ -72,18 +81,23 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Insert into DB
 		doc := models.Document{
-			FileName:    f.Filename,
-			StoragePath: storagePath,
-			Department:  dept,
-			Status:      "uploaded",
+			FileName: f.Filename,
+			Language: "en", // or get from form
+			FilePath: storagePath,
+			DUUID:    d_uuid,
+			Status:   "uploaded",
 		}
 
-		id, err := config.Supabase.InsertDocument(doc)
+		fuuid, err := models.InsertDocument(config.DB, doc)
 		if err != nil {
 			log.Printf("InsertDocument error for %s: %+v\n", doc.FileName, err)
 			continue
 		}
-		doc.ID = id
+		doc.FUUID = fuuid
+
+		// Optionally link file to department
+		_ = models.InsertFileDepartment(config.DB, fuuid, d_uuid)
+
 		uploaded = append(uploaded, doc)
 	}
 

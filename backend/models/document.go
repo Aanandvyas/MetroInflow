@@ -1,9 +1,67 @@
 package models
 
+import (
+	"context"
+	"database/sql"
+	"log"
+)
+
+type Department struct {
+	DUUID string `json:"d_uuid"`
+	DName string `json:"d_name"`
+}
+
+// Fetch all departments from DB
+func GetAllDepartments(db *sql.DB) ([]Department, error) {
+	rows, err := db.QueryContext(context.Background(), "SELECT d_uuid, d_name FROM department")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var departments []Department
+	for rows.Next() {
+		var dept Department
+		if err := rows.Scan(&dept.DUUID, &dept.DName); err != nil {
+			return nil, err
+		}
+		departments = append(departments, dept)
+	}
+	return departments, nil
+}
+
 type Document struct {
-	ID          string `json:"id,omitempty"`
-	FileName    string `json:"file_name"`
-	StoragePath string `json:"storage_path"`
-	Department  string `json:"department"`
-	Status      string `json:"status"`
+	FUUID      string `json:"f_uuid"`
+	FileName   string `json:"f_name"`
+	Language   string `json:"language"`
+	UUID       string `json:"uuid"`
+	FilePath   string `json:"file_path"`
+	DUUID      string `json:"d_uuid"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"created_at,omitempty"`
+	UploadedAt string `json:"uploaded_at,omitempty"`
+}
+
+func InsertDocument(db *sql.DB, doc Document) (string, error) {
+	query := `
+        INSERT INTO file (f_name, language, file_path, d_uuid, status, created_at, uploaded_at)
+        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        RETURNING f_uuid
+    `
+	var fuuid string
+	err := db.QueryRow(query, doc.FileName, doc.Language, doc.FilePath, doc.DUUID, doc.Status).Scan(&fuuid)
+	if err != nil {
+		log.Printf("InsertDocument DB error: %+v\n", err)
+		return "", err
+	}
+	return fuuid, nil
+}
+
+func InsertFileDepartment(db *sql.DB, f_uuid, d_uuid string) error {
+	query := `
+        INSERT INTO file_department (f_uuid, d_uuid, created_at)
+        VALUES ($1, $2, NOW())
+    `
+	_, err := db.Exec(query, f_uuid, d_uuid)
+	return err
 }
