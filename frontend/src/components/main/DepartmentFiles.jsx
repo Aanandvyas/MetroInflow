@@ -69,7 +69,7 @@ const DepartmentFiles = () => {
             {files.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {files.map(file => (
-                        <div key={file.uuid} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <div key={`${file.d_uuid}-${file.f_uuid}`} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <DocumentTextIcon className="h-10 w-10 text-gray-400 mb-3" />
                             <h3 className="font-semibold text-gray-800 truncate" title={file.f_name}>
                                 {file.f_name}

@@ -8,6 +8,13 @@ import {
 import { useNavigate } from "react-router-dom";
 
 const DocumentUpload = () => {
+  // Replace single departmentId with array
+  const [selectedDepartments, setSelectedDepartments] = useState([]);
+  
+  // Add new state for department search/filter
+  const [departmentSearch, setDepartmentSearch] = useState('');
+
+  // Rest of the state declarations remain same
   const { user } = useAuth();
   const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
@@ -66,13 +73,32 @@ const DocumentUpload = () => {
     }
   };
 
+  // Filter departments based on search
+  const filteredDepartments = departments.filter(dept => 
+    dept.d_name.toLowerCase().includes(departmentSearch.toLowerCase()) &&
+    !selectedDepartments.find(selected => selected.d_uuid === dept.d_uuid)
+  );
+
+  // Handle department selection
+  const addDepartment = (dept) => {
+    setSelectedDepartments(prev => [...prev, dept]);
+    setDepartmentSearch('');
+  };
+
+  // Handle department removal
+  const removeDepartment = (deptId) => {
+    setSelectedDepartments(prev => 
+      prev.filter(dept => dept.d_uuid !== deptId)
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
       setStatus({ message: "You must be logged in to upload.", type: "error" });
       return;
     }
-    if (!file || !title || !departmentId || !language) {
+    if (!file || !title || selectedDepartments.length === 0 || !language) {
       setStatus({
         message: "Please fill out all required fields.",
         type: "error",
@@ -95,11 +121,8 @@ const DocumentUpload = () => {
         throw new Error(userError?.message || "Could not find user profile.");
       }
 
-      const department = departments.find((d) => d.d_uuid === departmentId);
-      if (!department) throw new Error("Selected department not found.");
-
       const fileName = `${Date.now()}_${file.name}`;
-      const filePath = `${department.d_name}/${fileName}`;
+      const filePath = `shared/${fileName}`; // Store in shared folder since multiple departments
 
       // Step 2: Upload file to storage
       const { error: uploadError } = await supabase.storage
@@ -107,17 +130,20 @@ const DocumentUpload = () => {
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
-// Step 3: Insert metadata into the 'file' table
-const { error: insertError } = await supabase.from("file").insert({
-  f_name: title,
-  language,
-  d_uuid: departmentId,      // department foreign key
-  uuid: userData.uuid,       // user foreign key
-  file_path: filePath,       // storage path
-  created_at: new Date().toISOString(),
-  // f_uuid will be auto-generated in DB if column has default gen_random_uuid()
-});
+      // Insert file entries for each department
+      const fileEntries = selectedDepartments.map(dept => ({
+        f_name: title,
+        language,
+        d_uuid: dept.d_uuid,
+        uuid: userData.uuid,
+        file_path: filePath,
+        created_at: new Date().toISOString(),
+      }));
 
+      // Step 3: Insert metadata into the 'file' table
+      const { error: insertError } = await supabase
+        .from("file")
+        .insert(fileEntries);
 
       if (insertError) throw insertError;
 
@@ -132,6 +158,61 @@ const { error: insertError } = await supabase.from("file").insert({
       setUploading(false);
     }
   };
+
+  // Replace the department select with this new UI
+  const renderDepartmentSelect = () => (
+    <div className="md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Assign to Departments
+      </label>
+      
+      {/* Selected departments */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {selectedDepartments.map(dept => (
+          <span 
+            key={dept.d_uuid}
+            className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-700"
+          >
+            {dept.d_name}
+            <button
+              type="button"
+              onClick={() => removeDepartment(dept.d_uuid)}
+              className="ml-2 text-blue-500 hover:text-blue-700"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {/* Department search input */}
+      <div className="relative">
+        <input
+          type="text"
+          value={departmentSearch}
+          onChange={(e) => setDepartmentSearch(e.target.value)}
+          placeholder="Search departments..."
+          className="w-full p-3 border border-gray-300 rounded-lg"
+        />
+        
+        {/* Dropdown for filtered departments */}
+        {departmentSearch && filteredDepartments.length > 0 && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-auto">
+            {filteredDepartments.map(dept => (
+              <button
+                key={dept.d_uuid}
+                type="button"
+                onClick={() => addDepartment(dept)}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100"
+              >
+                {dept.d_name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -228,31 +309,8 @@ const { error: insertError } = await supabase.from("file").insert({
               placeholder="e.g., English"
             />
           </div>
-          <div className="md:col-span-2">
-            <label
-              htmlFor="department"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Assign to Department
-            </label>
-            <select
-              id="department"
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              required
-              disabled={loadingDepartments}
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-100"
-            >
-              <option value="" disabled>
-                {loadingDepartments ? "Loading..." : "-- Select a Department --"}
-              </option>
-              {departments.map((dept) => (
-                <option key={dept.d_uuid} value={dept.d_uuid}>
-                  {dept.d_name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Replace department select with new component */}
+          {renderDepartmentSelect()}
         </div>
 
         {/* Status and Submit */}

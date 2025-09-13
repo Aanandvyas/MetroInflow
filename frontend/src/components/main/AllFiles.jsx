@@ -42,18 +42,18 @@ const AllFiles = () => {
     const fetchFiles = async () => {
       setLoading(true);
 
+      // Modify the query to include uploader information
       let query = supabase
         .from("file")
-        .select(
-          `
+        .select(`
           f_uuid,
           f_name,
           language,
           d_uuid,
           created_at,
-          department:d_uuid(d_name)
-        `
-        )
+          department:d_uuid(d_name),
+          uploader:uuid(name)  // Add this line to get uploader name
+        `)
         .order("created_at", { ascending: false });
 
       if (selectedDepartment) {
@@ -165,7 +165,7 @@ const AllFiles = () => {
                       <div className="w-full">
                         <div className="text-xl font-semibold text-gray-800 mb-2">{file.f_name}</div>
                         <div className="text-sm text-gray-500 mb-2">
-                          Uploaded by: {file.uploader_name || "Unknown"}
+                          Uploaded by: {file.uploader?.name || "Unknown"} {/* Modified this line */}
                         </div>
                       </div>
                       <div className="flex gap-3 mt-2">
