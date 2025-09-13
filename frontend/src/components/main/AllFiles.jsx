@@ -6,20 +6,68 @@ import FileCard from "./FileCard";
 
 const AllFiles = () => {
   const { user } = useAuth();
-  const { searchTerm, showFilters, setShowFilters } = useFilter();
+  const { searchTerm: globalSearchTerm } = useFilter();
+
+  // Filters (same as HomePage)
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Load all files (joined with uploader info + department if needed)
+  // File viewer (side panel)
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  // ✅ Load departments for filter
   useEffect(() => {
-    const fetchDepartmentFiles = async () => {
+    const fetchDepartments = async () => {
+      const { data, error } = await supabase
+        .from("department")
+        .select("d_uuid, d_name")
+        .order("d_name", { ascending: true });
+      if (error) {
+        console.error("Error fetching departments:", error.message);
+        setDepartments([]);
+      } else {
+        setDepartments(data || []);
+      }
+    };
+    fetchDepartments();
+  }, []);
+
+  // ✅ Load files with filters (same pattern as HomePage)
+  useEffect(() => {
+    const fetchFiles = async () => {
       setLoading(true);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("file")
-        .select("*") 
+        .select(
+          `
+          f_uuid,
+          f_name,
+          language,
+          d_uuid,
+          created_at,
+          department:d_uuid(d_name)
+        `
+        )
         .order("created_at", { ascending: false });
 
+      if (selectedDepartment) {
+        query = query.eq("d_uuid", selectedDepartment);
+      }
+      if (selectedLanguage) {
+        query = query.eq("language", selectedLanguage);
+      }
+      const effectiveSearch = searchTerm?.trim() || globalSearchTerm?.trim();
+      if (effectiveSearch) {
+        query = query.ilike("f_name", `%${effectiveSearch}%`);
+      }
+
+      const { data, error } = await query;
       if (error) {
         console.error("Error loading files:", error.message);
         setAllDepartmentFiles([]);
@@ -30,21 +78,18 @@ const AllFiles = () => {
       setLoading(false);
     };
 
-    fetchDepartmentFiles();
-  }, [user]);
+    fetchFiles();
+  }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
 
-  // ✅ Search filter
-  const filteredFiles = useMemo(() => {
-    if (!searchTerm) return allDepartmentFiles;
-    return allDepartmentFiles.filter((file) =>
-      file.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [allDepartmentFiles, searchTerm]);
+  // ✅ Languages available from current result set (for filter options)
+  const languageOptions = useMemo(() => {
+    return [...new Set(allDepartmentFiles.map((f) => f.language).filter(Boolean))];
+  }, [allDepartmentFiles]);
 
   // ✅ Group files by created_at date
   const groupedFiles = useMemo(() => {
     const groups = {};
-    filteredFiles.forEach((file) => {
+    (allDepartmentFiles || []).forEach((file) => {
       const date = file.created_at
         ? new Date(file.created_at).toLocaleDateString("en-US", {
             year: "numeric",
@@ -56,43 +101,97 @@ const AllFiles = () => {
       groups[date].push(file);
     });
     return groups;
-  }, [filteredFiles]);
+  }, [allDepartmentFiles]);
 
   return (
     <div className="p-8 bg-gray-50/50 min-h-full">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        All Department Files
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">All Department Files</h1>
+      </div>
 
-      {/* Right side filter drawer */}
-      {showFilters && (
-        <div className="fixed inset-y-0 right-0 bg-white w-80 shadow-lg p-6 z-20">
-          <h2 className="text-lg font-semibold">Filters</h2>
-          <p className="text-sm text-gray-500 mt-4">
-            Filter options would go here.
-          </p>
-          <button
-            onClick={() => setShowFilters(false)}
-            className="mt-6 text-blue-600"
-          >
-            Close
-          </button>
-        </div>
-      )}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 mb-6">
+        <select
+          className="border rounded px-3 py-2"
+          value={selectedDepartment}
+          onChange={(e) => setSelectedDepartment(e.target.value)}
+        >
+          <option value="">All Departments</option>
+          {departments.map((dept) => (
+            <option key={dept.d_uuid} value={dept.d_uuid}>
+              {dept.d_name}
+            </option>
+          ))}
+        </select>
 
-      <div className="mt-6">
+        <select
+          className="border rounded px-3 py-2"
+          value={selectedLanguage}
+          onChange={(e) => setSelectedLanguage(e.target.value)}
+        >
+          <option value="">All Languages</option>
+          {languageOptions.map((lang) => (
+            <option key={lang} value={lang}>
+              {lang}
+            </option>
+          ))}
+        </select>
+
+        <input
+          className="border rounded px-3 py-2"
+          type="text"
+          placeholder="Search files by name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* Files grid */}
+      <div>
         {loading ? (
           <p>Loading files...</p>
         ) : Object.keys(groupedFiles).length > 0 ? (
           <div className="space-y-8">
             {Object.entries(groupedFiles).map(([date, files]) => (
               <div key={date}>
-                <h2 className="text-lg font-semibold text-gray-600 mb-4">
-                  {date}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <h2 className="text-lg font-semibold text-gray-600 mb-4">{date}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                   {files.map((file) => (
-                    <FileCard key={file.f_uuid} file={file} />
+                    <div
+                      key={file.f_uuid}
+                      className="bg-white rounded-xl shadow-md p-6 flex flex-col items-start transition-transform hover:scale-105"
+                      style={{ minHeight: "180px" }}
+                    >
+                      <div className="w-full">
+                        <div className="text-xl font-semibold text-gray-800 mb-2">{file.f_name}</div>
+                        <div className="text-sm text-gray-500 mb-2">
+                          Uploaded by: {file.uploader_name || "Unknown"}
+                        </div>
+                      </div>
+                      <div className="flex gap-3 mt-2">
+                        <span className="inline-block text-xs bg-gray-100 text-gray-700 rounded px-2 py-1">
+                          {file.department?.d_name || "Unknown Department"}
+                        </span>
+                        <span className="inline-block text-xs bg-gray-100 text-gray-700 rounded px-2 py-1">
+                          {file.language || "Unknown Language"}
+                        </span>
+                      </div>
+                      <div className="mt-4 text-xs text-gray-400">
+                        {file.created_at
+                          ? new Date(file.created_at).toLocaleString()
+                          : "Unknown"}
+                      </div>
+                      <div className="mt-4">
+                        <a
+                          className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                          href={`/file/${file.f_uuid}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View
+                        </a>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

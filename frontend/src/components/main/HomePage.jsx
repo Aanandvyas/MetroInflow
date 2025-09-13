@@ -29,12 +29,13 @@ const HomePage = () => {
                     f_uuid,
                     f_name,
                     language,
+                    created_at,
                     department:d_uuid(
                         d_name
                     )
                 `)
-                .order('f_uuid', { ascending: true })
-                .limit(20);
+                .order('created_at', { ascending: false })
+                .limit(10);
 
             if (selectedDepartment) {
                 query = query.eq('d_uuid', selectedDepartment);
@@ -151,6 +152,7 @@ const HomePage = () => {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Language</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
@@ -163,8 +165,12 @@ const HomePage = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.department?.d_name || 'Unknown'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-gray-700">{file.language || 'Unknown'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+                                                {file.created_at
+                                                    ? new Date(file.created_at).toLocaleString()
+                                                    : 'Unknown'}
+                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                {/* Example action: View file (customize as needed) */}
                                                 <a
                                                     className="text-blue-600 hover:underline text-sm font-medium"
                                                     href={`/file/${file.f_uuid}`}

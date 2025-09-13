@@ -6,6 +6,8 @@ import AssignmentsCard from "../assign-to-me/AssignmentsCard";
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 
 const AssignToMe = () => {
+  const { user, dUuid } = useAuth(); // Get user's department UUID from context
+
   const [recentFiles, setRecentFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
