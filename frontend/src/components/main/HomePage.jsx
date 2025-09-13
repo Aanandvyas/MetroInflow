@@ -160,7 +160,7 @@ const HomePage = () => {
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <button
                                                     className="text-white bg-blue-600 rounded px-3 py-1 text-sm font-medium hover:bg-blue-700"
-                                                    onClick={() => window.open('/summary', '_blank', 'noopener,noreferrer')}
+                                                    onClick={() => window.open('/summary', 'noopener,noreferrer')}
                                                 >
                                                     Summary
                                                 </button>

@@ -156,9 +156,7 @@ const AllFiles = () => {
                       style={{ minHeight: "180px" }}
                     >
                       <div className="w-full">
-                        <div className="text-xl font-semibold text-gray-800 mb-2">
-                          {file.f_name}
-                        </div>
+                        <div className="text-xl font-semibold text-gray-800 mb-2">{file.f_name}</div>
                         <div className="text-sm text-gray-600 mb-2">
                           Uploaded by: {file.uploader?.name || "Unknown"}
                         </div>
@@ -177,22 +175,23 @@ const AllFiles = () => {
                           : "Unknown"}
                       </div>
                       <div className="mt-4 flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                        <a
                           className="inline-block px-4 py-2 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                          href={`/file/${file.f_uuid}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           View
-                        </button>
+                        </a>
                         <Link
-                          to="/summary"
-                          className="inline-block px-4 py-2 bg-gray-500 text-white rounded-md text-sm font-medium hover:bg-gray-800"
+                          to={`/summary`}
+                          className="ml-2 inline-block px-4 py-2 bg-gray-500 text-white rounded-md text-sm font-medium hover:bg-gray-800"
                         >
                           Summary
                         </Link>
                         <Link
-                          to="/archive"
-                          className="inline-block px-4 py-2 bg-green-500 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                          to={`/archive`}
+                          className="ml-2 inline-block px-4 py-2 bg-green-500 text-white rounded-md text-sm font-medium hover:bg-green-700"
                         >
                           Archive
                         </Link>
