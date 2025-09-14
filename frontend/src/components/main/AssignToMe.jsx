@@ -54,7 +54,8 @@ const AssignToMe = () => {
           )
         `)
         .eq("file_department.d_uuid", userDepartment.d_uuid)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(20); // Limit to only last 20 files
 
       if (selectedLanguage) {
         query = query.eq("language", selectedLanguage);
