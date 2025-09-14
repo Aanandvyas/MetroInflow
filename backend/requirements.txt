@@ -6,7 +6,6 @@ paddlepaddle
 python-multipart
 pydantic
 
-flask
 gunicorn
 requests
 python-dotenv
