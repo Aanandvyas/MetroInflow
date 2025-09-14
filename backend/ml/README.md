@@ -1,7 +1,8 @@
 .env file Adi bhai ko bhej di hai...
-
+got it brotherrrrr
 
 apni use krna , meri limit hit ho jyegi
+theek hai
 
 
 
@@ -11,7 +12,7 @@ waitress use krr rhe hai
 
 config.py file me model info hai
 
-http://localhost:8000/  pe kholna
+http://localhost:8000/  pe kholna -->HTML
 
 
 
@@ -36,7 +37,7 @@ python app.py    (ek hi user allow krega)
 
 run thisfor multiple ---->   waitress-serve --host=0.0.0.0 --port=8000 app:app
 
-
+uvicorn app_fastapi:app --host 0.0.0.0 --port 9000
 
 
 

@@ -1,3 +1,4 @@
+// ...existing code...
 package models
 
 import (
@@ -5,6 +6,25 @@ import (
 	"database/sql"
 	"log"
 )
+
+type Summary struct {
+	SUUID     string `json:"s_uuid"`
+	FUUID     string `json:"f_uuid"`
+	Summary   string `json:"summary"`
+	CreatedAt string `json:"created_at,omitempty"`
+}
+
+func InsertSummary(db *sql.DB, summary Summary) error {
+	query := `
+			INSERT INTO summary (f_uuid, summary, created_at)
+			VALUES ($1, $2, NOW())
+		`
+	_, err := db.Exec(query, summary.FUUID, summary.Summary)
+	if err != nil {
+		log.Println("InsertSummary DB error:", err)
+	}
+	return err
+}
 
 type Department struct {
 	DUUID string `json:"d_uuid"`

@@ -101,7 +101,7 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 
 		uploaded = append(uploaded, doc)
 
-		// Asynchronous OCR trigger
+		// Asynchronous OCR and summary trigger
 		go func(filePath, fuuid string) {
 			log.Println("[DEBUG] Triggering OCR for:", filePath)
 			// Download file from Supabase Storage to temp local path
@@ -128,6 +128,22 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := models.InsertOCRResult(config.DB, ocrResult); err != nil {
 				log.Println("[DEBUG] Failed to insert OCR result:", err)
+			}
+
+			// Trigger summary generation
+			log.Println("[DEBUG] Triggering summary for:", fuuid)
+			summaryText, err := services.RunSummarizer(ocrText)
+			if err != nil {
+				log.Println("[DEBUG] Summary error:", err)
+				return
+			}
+			log.Println("[DEBUG] Summary generated:", summaryText)
+			summary := models.Summary{
+				FUUID:   fuuid,
+				Summary: summaryText,
+			}
+			if err := models.InsertSummary(config.DB, summary); err != nil {
+				log.Println("[DEBUG] Failed to insert summary:", err)
 			}
 		}(storagePath, fuuid)
 	}
