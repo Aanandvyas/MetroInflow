@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import { useFilter } from "../context/FilterContext";
 import { Link } from "react-router-dom";
+import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const AllFiles = () => {
   const { user } = useAuth();
@@ -227,6 +228,30 @@ const AllFiles = () => {
     }
   };
 
+  // This prevents event propagation issues with Link
+  const handleViewClick = async (e, fileUuid) => {
+    e.preventDefault(); // Stop the link navigation temporarily
+    e.stopPropagation(); // Prevent any parent handlers
+    
+    if (user) {
+      console.log("View clicked for file:", fileUuid);
+      try {
+        const success = await markNotificationAsSeen(fileUuid, user.id);
+        console.log("Notification marked as seen:", success);
+        
+        // Now navigate programmatically
+        window.location.href = `/file/${fileUuid}`;
+      } catch (err) {
+        console.error("Error in view click handler:", err);
+        // If error, still navigate
+        window.location.href = `/file/${fileUuid}`;
+      }
+    } else {
+      // Just navigate if no user
+      window.location.href = `/file/${fileUuid}`;
+    }
+  };
+  
   return (
     <div className="p-8 bg-white min-h-full">
       <div className="flex items-center justify-between">

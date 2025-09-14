@@ -176,6 +176,35 @@ const DocumentUpload = () => {
           .from("file_department")
           .insert(joinRows);
         if (joinError) throw joinError;
+
+        // Get all users from the selected departments
+        const { data: usersInDepartments, error: usersError } = await supabase
+          .from("users")
+          .select("uuid")
+          .in("d_uuid", selectedDepartments.map(d => d.d_uuid));
+        if (usersError) {
+          console.error("Error fetching users for departments:", usersError);
+          // Continue without sending notifications if fetching users fails
+        }
+
+        // Prepare the notification rows for insertion
+        if (usersInDepartments && usersInDepartments.length > 0) {
+          const notificationRows = usersInDepartments.map(u => ({
+            uuid: u.uuid,
+            f_uuid: insertedFile.f_uuid,
+            is_seen: false, // Initial status is unseen
+            created_at: new Date().toISOString(),
+          }));
+
+          // Insert the notifications into the notifications table
+          const { error: notificationError } = await supabase
+            .from("notifications")
+            .insert(notificationRows);
+          if (notificationError) {
+            console.error("Error inserting notifications:", notificationError);
+            // Continue even if this fails, as the core upload succeeded
+          }
+        }
       }
 
       setStatus({

@@ -340,17 +340,6 @@ const HomePage = () => {
                     <div className="flex items-center justify-between">
                       <FolderIcon className="h-8 w-8 text-teal-600 group-hover:text-teal-700" />
                     </div>
-
-                    {/* Badge in the top-right corner */}
-                    {count > 0 && (
-                      <span
-                        title={`${count} file${count === 1 ? "" : "s"}`}
-                        className="absolute top-3 right-3 inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full text-[11px] font-semibold bg-red-500 text-white shadow-sm"
-                      >
-                        {count}
-                      </span>
-                    )}
-
                     <h3 className="mt-4 text-lg font-semibold text-gray-800">{dept.d_name}</h3>
                   </div>
                 </Link>

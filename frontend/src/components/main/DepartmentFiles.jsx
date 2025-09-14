@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { DocumentTextIcon, ArrowLeftIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import KebabMenu from '../assign-to-me/common/KebabMenu'; // adjust relative path if different
+import KebabMenu from '../assign-to-me/common/KebabMenu';
 import { useAuth } from '../context/AuthContext';
+// Import the notification utility
+import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const DepartmentFiles = () => {
     const { d_uuid } = useParams(); // Gets the department UUID from the URL
@@ -40,6 +42,23 @@ const DepartmentFiles = () => {
             setImpBusy((s) => ({ ...s, [f_uuid]: false }));
             setOpenMenuId(null);
         }
+    };
+
+    // Add a new handler for file viewing
+    const handleFileView = async (fileUuid) => {
+        // Mark notification as seen if user is logged in
+        if (user?.id) {
+            try {
+                // Mark notification as seen first
+                await markNotificationAsSeen(fileUuid, user.id);
+                console.log("Notification marked as seen from DepartmentFiles");
+            } catch (err) {
+                console.error("Error marking notification as seen:", err);
+            }
+        }
+        
+        // Then open the file in a new tab
+        window.open(`/file/${fileUuid}`, "_blank", "noopener,noreferrer");
     };
 
     useEffect(() => {
@@ -106,9 +125,10 @@ const DepartmentFiles = () => {
                             </h3>
                             <p className="text-sm text-gray-500 mb-4">{file.language}</p>
                             <div className="mt-auto flex items-center gap-2 w-full">
+                                {/* Update the View button to use our new handler */}
                                 <button
                                     type="button"
-                                    onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                                    onClick={() => handleFileView(file.f_uuid)}
                                     className="inline-block px-4 py-2 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
                                 >
                                     View
