@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import { useFilter } from "../context/FilterContext";
@@ -15,8 +15,25 @@ const AllFiles = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [favBusy, setFavBusy] = useState({});
-  const [languages, setLanguages] = useState([]); // <-- new, independent language options
+  const [languages, setLanguages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  
+  const observer = useRef();
+  const lastFileElementRef = useCallback(node => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        loadMoreFiles();
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore]);
+
+  const FILES_PER_PAGE = 10;
 
   // Fetch departments
   useEffect(() => {
@@ -35,9 +52,23 @@ const AllFiles = () => {
     fetchDepartments();
   }, []);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(1);
+    setAllDepartmentFiles([]);
+    setHasMore(true);
+  }, [selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
+
   // Fetch files and favorites, then merge
-  const fetchFiles = async () => {
-    setLoading(true);
+  const fetchFiles = useCallback(async (pageNum = 1, append = false) => {
+    if (pageNum === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    const from = (pageNum - 1) * FILES_PER_PAGE;
+    const to = from + FILES_PER_PAGE - 1;
 
     // 1. Fetch all files with departments and uploader
     const selectClause = `
@@ -54,8 +85,9 @@ const AllFiles = () => {
 
     let fileQuery = supabase
       .from("file")
-      .select(selectClause)
-      .order("created_at", { ascending: false });
+      .select(selectClause, { count: 'exact' })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     // Department: inner join + nested column filter
     if (selectedDepartment) {
@@ -73,13 +105,19 @@ const AllFiles = () => {
       fileQuery = fileQuery.ilike("f_name", `%${effectiveSearch}%`);
     }
 
-    const { data: files, error: fileError } = await fileQuery;
+    const { data: files, error: fileError, count } = await fileQuery;
     if (fileError) {
       console.error("Error loading files:", fileError.message);
-      setAllDepartmentFiles([]);
+      if (pageNum === 1) {
+        setAllDepartmentFiles([]);
+      }
       setLoading(false);
+      setLoadingMore(false);
       return;
     }
+
+    // Check if there are more files to load
+    setHasMore(!!(count && count > to + 1));
 
     // 2. Fetch all favorites for this user
     let favouriteIds = [];
@@ -102,9 +140,27 @@ const AllFiles = () => {
       is_favorite: favouriteIds.includes(f.f_uuid),
     }));
 
-    setAllDepartmentFiles(filesWithFav);
+    if (append) {
+      setAllDepartmentFiles(prev => [...prev, ...filesWithFav]);
+    } else {
+      setAllDepartmentFiles(filesWithFav);
+    }
+    
     setLoading(false);
-  };
+    setLoadingMore(false);
+  }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm, FILES_PER_PAGE]);
+
+  const loadMoreFiles = useCallback(() => {
+    if (hasMore && !loading && !loadingMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchFiles(nextPage, true);
+    }
+  }, [page, hasMore, loading, loadingMore, fetchFiles]);
+
+  useEffect(() => {
+    fetchFiles(1, false);
+  }, [fetchFiles]);
 
   // Fetch distinct languages ignoring selectedLanguage (but respecting dept + search)
   useEffect(() => {
@@ -136,14 +192,9 @@ const AllFiles = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDepartment, searchTerm, globalSearchTerm]);
 
-  useEffect(() => {
-    fetchFiles();
-    // eslint-disable-next-line
-  }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
-
   const groupedFiles = useMemo(() => {
     const groups = {};
-    (allDepartmentFiles || []).forEach((file) => {
+    (allDepartmentFiles || []).forEach((file, index) => {
       const date = file.created_at
         ? new Date(file.created_at).toLocaleDateString("en-US", {
             year: "numeric",
@@ -152,7 +203,13 @@ const AllFiles = () => {
           })
         : "Unknown Date";
       if (!groups[date]) groups[date] = [];
-      groups[date].push(file);
+      
+      // Add ref to the last element for infinite scroll
+      if (index === allDepartmentFiles.length - 1) {
+        groups[date].push({ ...file, isLast: true });
+      } else {
+        groups[date].push(file);
+      }
     });
     return groups;
   }, [allDepartmentFiles]);
@@ -289,7 +346,7 @@ const AllFiles = () => {
 
       {/* Files grid */}
       <div>
-        {loading ? (
+        {loading && page === 1 ? (
           <p className="text-gray-600">Loading files...</p>
         ) : Object.keys(groupedFiles).length > 0 ? (
           <div className="space-y-8">
@@ -297,9 +354,10 @@ const AllFiles = () => {
               <div key={date}>
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{date}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 items-stretch auto-rows-[minmax(260px,_1fr)]">
-                  {files.map((file) => (
+                  {files.map((file, index) => (
                     <div
                       key={file.f_uuid}
+                      ref={file.isLast ? lastFileElementRef : null}
                       className="bg-gray-50 rounded-lg shadow-md p-6 flex flex-col h-full transition-transform hover:scale-105"
                     >
                       {/* Content grows, pushing footer (date + actions) to bottom */}
@@ -373,6 +431,11 @@ const AllFiles = () => {
                 </div>
               </div>
             ))}
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-center text-gray-500 mt-10">No files found.</p>
