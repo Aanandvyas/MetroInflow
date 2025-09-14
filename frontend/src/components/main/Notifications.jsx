@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -199,6 +199,17 @@ const Notifications = () => {
     }));
   }, [items]);
 
+  const fetchAndDownload = async (fileId) => {
+    setLoading(true);
+    const { data, error } = await supabase.storage.from("files").download(fileId);
+    if (!data) {
+      console.error("Failed to download file:", error);
+      setLoading(false);
+      return;
+    }
+    const url = URL.createObjectURL(data.signedUrl);
+  };
+
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
@@ -250,12 +261,12 @@ const Notifications = () => {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
-                          type="button"
-                          onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
-                          className="inline-flex items-center justify-center h-8 px-3 bg-blue-500 text-white rounded-md text-xs font-medium hover:bg-blue-600"
-                        >
-                          View
-                        </button>
+                            type="button"
+                            onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
+                            className="inline-flex items-center justify-center h-9 px-4 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                          >
+                            View
+                          </button>
                         <Link
                           to="/summary"
                           className="inline-flex items-center justify-center h-8 px-3 bg-gray-600 text-white rounded-md text-xs font-medium hover:bg-gray-700"

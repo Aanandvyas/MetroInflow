@@ -2,7 +2,7 @@ import React from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../supabaseClient';
 
-const FileCard = ({ file }) => {
+const FileCard = ({ file, onToggleFavorite }) => {
     const publicUrl = file.file_path
         ? supabase.storage.from("file_storage").getPublicUrl(file.file_path).data.publicUrl
         : null;
@@ -25,6 +25,17 @@ const FileCard = ({ file }) => {
                     )}
                 </div>
             </div>
+            <button
+                type="button"
+                onClick={() => onToggleFavorite(file.f_uuid, file.is_favorite)}
+                className={`inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-medium ${
+                    file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
+                } text-white`}
+                title={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
+                aria-label={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
+            >
+                {file.is_favorite ? "Unmark Important" : "Mark Important"}
+            </button>
         </div>
     );
 };

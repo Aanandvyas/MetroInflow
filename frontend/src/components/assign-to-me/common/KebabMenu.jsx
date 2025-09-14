@@ -1,76 +1,61 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-const KebabMenu = ({
-  open,
-  anchorEl,
-  onClose,
-  width = 160,
-  offset = 6,
-  children,
-}) => {
+const KebabMenu = ({ open, anchorEl, onClose, children, width = 180 }) => {
   const menuRef = useRef(null);
-  const [pos, setPos] = useState({ top: -9999, left: -9999 });
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
-  const calcPos = () => {
-    if (!anchorEl) return;
-    const rect = anchorEl.getBoundingClientRect();
-    const left = clamp(rect.right - width, 8, window.innerWidth - width - 8);
-    const top = clamp(rect.bottom + offset, 8, window.innerHeight - 8);
-    setPos({ top, left });
-  };
-
-  // Recalculate immediately when opened
   useLayoutEffect(() => {
-    if (open) calcPos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, anchorEl]);
+    if (!open || !anchorEl) return;
+    const rect = anchorEl.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-  // Follow scroll/resize anywhere in the page
+    const menuW = menuRef.current?.offsetWidth || width;
+    const menuH = menuRef.current?.offsetHeight || 160;
+
+    let left = rect.left + rect.width - menuW;
+    if (left < 8) left = 8;
+    if (left + menuW > vw - 8) left = vw - menuW - 8;
+
+    let top = rect.bottom + 8;
+    if (top + menuH > vh - 8) {
+      // flip above if not enough space below
+      top = rect.top - menuH - 8;
+    }
+    if (top < 8) top = Math.max(8, vh - menuH - 8);
+
+    setPos({ top, left });
+  }, [open, anchorEl, width]);
+
   useEffect(() => {
     if (!open) return;
-    const onScroll = () => calcPos();
-    const onResize = () => calcPos();
-    // capture: true lets us catch scrolls from any scrollable ancestor
-    document.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onResize);
-    return () => {
-      document.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onResize);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, anchorEl]);
-
-  // Close on outside click or Escape
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e) => {
-      const insideMenu = menuRef.current && menuRef.current.contains(e.target);
-      const insideAnchor = anchorEl && anchorEl.contains(e.target);
-      if (!insideMenu && !insideAnchor) onClose?.();
-    };
     const onKey = (e) => e.key === "Escape" && onClose?.();
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
+    const onRecalc = () => onClose?.(); // close on scroll/resize to avoid drift
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onRecalc);
+    window.addEventListener("scroll", onRecalc, true);
     return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onRecalc);
+      window.removeEventListener("scroll", onRecalc, true);
     };
-  }, [open, anchorEl, onClose]);
+  }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !anchorEl) return null;
 
   return createPortal(
-    <div
-      ref={menuRef}
-      role="menu"
-      className="fixed z-[1000] w-40 rounded-md border border-gray-200 bg-white shadow-lg py-1"
-      style={{ top: pos.top, left: pos.left, width }}
-    >
-      {children}
-    </div>,
+    <>
+      <div className="fixed inset-0 z-[999]" onClick={onClose} />
+      <div
+        ref={menuRef}
+        className="fixed z-[1000] min-w-[180px] rounded-md border border-gray-200 bg-white shadow-lg py-1"
+        style={{ top: pos.top, left: pos.left }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </>,
     document.body
   );
 };

@@ -184,6 +184,49 @@ const AllFiles = () => {
     }
   };
 
+  // Add this function inside the component
+  const toggleImportant = async (f_uuid, currentlyImportant) => {
+    if (!user?.id || favBusy[f_uuid]) return;
+
+    // Optimistic UI
+    setFavBusy((s) => ({ ...s, [f_uuid]: true }));
+    setAllDepartmentFiles((prev) =>
+      prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: !currentlyImportant } : f))
+    );
+
+    try {
+      if (currentlyImportant) {
+        const { error } = await supabase
+          .from("favorites")
+          .delete()
+          .eq("uuid", user.id)
+          .eq("f_uuid", f_uuid);
+        if (error) throw error;
+      } else {
+        // If you don't have a unique constraint on (uuid,f_uuid), keep this insert.
+        const { data: exists } = await supabase
+          .from("favorites")
+          .select("fav_uuid")
+          .eq("uuid", user.id)
+          .eq("f_uuid", f_uuid)
+          .maybeSingle();
+
+        if (!exists) {
+          const { error } = await supabase.from("favorites").insert({ uuid: user.id, f_uuid });
+          if (error) throw error;
+        }
+      }
+    } catch (e) {
+      console.error("Important toggle failed:", e);
+      // Revert on failure
+      setAllDepartmentFiles((prev) =>
+        prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: currentlyImportant } : f))
+      );
+    } finally {
+      setFavBusy((s) => ({ ...s, [f_uuid]: false }));
+    }
+  };
+
   return (
     <div className="p-8 bg-white min-h-full">
       <div className="flex items-center justify-between">
@@ -286,21 +329,17 @@ const AllFiles = () => {
                           >
                             View
                           </button>
-                          <Link
-                            to={`/summary`}
-                            className="inline-flex items-center justify-center h-9 px-4 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700"
-                          >
-                            Summary
-                          </Link>
                           <button
                             type="button"
-                            onClick={() => toggleFavorite(file.f_uuid, file.is_favorite)}
+                            onClick={() => toggleImportant(file.f_uuid, file.is_favorite)}
                             disabled={!!favBusy[file.f_uuid]}
                             className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
-                              file.is_favorite ? "bg-red-500 hover:bg-red-600" : "bg-amber-500 hover:bg-amber-600"
+                              file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
                             } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
+                            title={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
+                            aria-label={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
                           >
-                            {file.is_favorite ? "Unfavorite" : "Favorite"}
+                            {file.is_favorite ? "Unmark Important" : "Mark Important"}
                           </button>
                         </div>
                       </div>

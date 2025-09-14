@@ -3,14 +3,38 @@ import React, { useState, useRef } from "react";
 import { DocumentTextIcon, BellIcon, EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import { Link } from "react-router-dom";
 import KebabMenu from "./common/KebabMenu";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../../supabaseClient";
 
 const AssignmentsCard = ({ selectedDate, assignments = [], loading }) => {
   const [openMenuId, setOpenMenuId] = useState(null);
   const itemBtnRefs = useRef(new Map());
+  const { user } = useAuth();
+  const [impBusy, setImpBusy] = useState({}); // busy map
+
   const setAnchorRef = (id) => (el) => {
     const map = itemBtnRefs.current;
     if (el) map.set(id, el);
     else map.delete(id);
+  };
+
+  // Mark Important (favorites)
+  const markImportant = async (f_uuid) => {
+    if (!user?.id || !f_uuid || impBusy[f_uuid]) return;
+    setImpBusy((s) => ({ ...s, [f_uuid]: true }));
+    try {
+      // upsert so repeated clicks are safe (requires unique constraint on uuid,f_uuid)
+      const { error } = await supabase
+        .from("favorites")
+        .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
+      if (error) throw error;
+    } catch (e) {
+      console.error("Mark Important failed:", e);
+      alert("Could not mark Important. Please try again.");
+    } finally {
+      setImpBusy((s) => ({ ...s, [f_uuid]: false }));
+      setOpenMenuId(null);
+    }
   };
 
   return (
@@ -68,14 +92,21 @@ const AssignmentsCard = ({ selectedDate, assignments = [], loading }) => {
                   >
                     Summary
                   </Link>
-                  <Link
-                    to="/archive"
+
+                  {/* Mark Important */}
+                  <button
+                    type="button"
                     role="menuitem"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setOpenMenuId(null)}
+                    onClick={() => markImportant(doc.f_uuid)}
+                    disabled={!doc.f_uuid || !!impBusy[doc.f_uuid]}
+                    className={`block w-full text-left px-4 py-2 text-sm ${
+                      impBusy[doc.f_uuid]
+                        ? "text-gray-400 cursor-not-allowed"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
                   >
-                    Archive
-                  </Link>
+                    Mark Important
+                  </button>
                 </KebabMenu>
               </div>
             );

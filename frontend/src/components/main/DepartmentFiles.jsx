@@ -3,20 +3,43 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { DocumentTextIcon, ArrowLeftIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import KebabMenu from '../assign-to-me/common/KebabMenu'; // adjust relative path if different
+import { useAuth } from '../context/AuthContext';
 
 const DepartmentFiles = () => {
     const { d_uuid } = useParams(); // Gets the department UUID from the URL
+    const { user } = useAuth();
     const [files, setFiles] = useState([]);
     const [department, setDepartment] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [openMenuId, setOpenMenuId] = useState(null);
+    const [impBusy, setImpBusy] = useState({}); // <-- added
     const btnRefs = useRef(new Map());
 
     const setBtnRef = (id) => (el) => {
         const m = btnRefs.current;
         if (el) m.set(id, el);
         else m.delete(id);
+    };
+
+    // Mark Important
+    const markImportant = async (f_uuid) => {
+        if (!user?.id || !f_uuid || impBusy[f_uuid]) return;
+        setImpBusy((s) => ({ ...s, [f_uuid]: true }));
+        try {
+            const { error } = await supabase
+                .from('favorites')
+                .upsert({ uuid: user.id, f_uuid }, { onConflict: 'uuid,f_uuid' });
+            if (error) throw error;
+            // Optional: reflect locally
+            setFiles((prev) => prev.map(f => f.f_uuid === f_uuid ? { ...f, is_favorite: true } : f));
+        } catch (e) {
+            console.error('Mark Important failed:', e);
+            alert('Could not mark Important. Please try again.');
+        } finally {
+            setImpBusy((s) => ({ ...s, [f_uuid]: false }));
+            setOpenMenuId(null);
+        }
     };
 
     useEffect(() => {
@@ -72,7 +95,7 @@ const DepartmentFiles = () => {
             <h1 className="text-3xl font-bold text-gray-800 mb-8">
                 {department ? department.d_name : 'Department'} Files
             </h1>
-            
+
             {files.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {files.map(file => (
@@ -116,14 +139,20 @@ const DepartmentFiles = () => {
                                     >
                                         Summary
                                     </Link>
-                                    <Link
-                                        to="/archive"
+                                    {/* Mark Important */}
+                                    <button
+                                        type="button"
                                         role="menuitem"
-                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                        onClick={() => setOpenMenuId(null)}
+                                        onClick={() => markImportant(file.f_uuid)}
+                                        disabled={!file.f_uuid || !!impBusy[file.f_uuid]}
+                                        className={`block w-full text-left px-4 py-2 text-sm ${
+                                            impBusy[file.f_uuid]
+                                                ? "text-gray-400 cursor-not-allowed"
+                                                : "text-gray-700 hover:bg-gray-100"
+                                        }`}
                                     >
-                                        Archive
-                                    </Link>
+                                        Mark Important
+                                    </button>
                                 </KebabMenu>
                             </div>
                         </div>

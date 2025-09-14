@@ -11,8 +11,10 @@ import AssignToMe from "./components/main/AssignToMe";
 import FileViewer from './components/main/FileViewer';
 import AllFiles from "./components/main/AllFiles";
 import Summary from "./components/main/Summary"; 
-import Favourite from "./components/main/Favourite";
+import Favourite from "./components/main/Important";
 import Notifications from "./components/main/Notifications";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Important from "./components/main/Important";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -32,8 +34,9 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/upload-document", element: <DocumentUpload /> },
             { path: "/department/:d_uuid", element: <DepartmentFiles /> },
             { path: "/summary", element: <Summary /> },
-            { path: "/favourite", element: <Favourite/> },
+            { path: "/important", element: <Important /> },
             { path: "/notifications", element: <Notifications /> },
+            { path: "/important", element: <Favourite /> },
 
             
             // ✅ Added new routes for the sidebar links

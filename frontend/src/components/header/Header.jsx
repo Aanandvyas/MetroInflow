@@ -7,6 +7,8 @@ import {
     UserCircleIcon,
     Squares2X2Icon,
     QuestionMarkCircleIcon,
+    BellAlertIcon,
+    BellIcon,
 } from '@heroicons/react/24/outline';
 
 // ✅ Import your logos
@@ -34,8 +36,10 @@ const Header = () => {
 
                         {/* Right Section: Icons */}
             <div className="flex items-center space-x-6">
-                 <Squares2X2Icon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
-                 <QuestionMarkCircleIcon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
+                <Link to="/notifications">
+                    <BellIcon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
+                </Link>
+                <QuestionMarkCircleIcon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
                 <Link to="/profile">
                     <UserCircleIcon className="h-8 w-8 text-gray-600" />
                 </Link>

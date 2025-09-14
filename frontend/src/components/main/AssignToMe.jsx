@@ -12,10 +12,9 @@ const AssignToMe = () => {
   const [filesLoading, setFilesLoading] = useState(true);
   const [userDepartment, setUserDepartment] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('');
-  // Add: track which row’s menu is open
   const [openMenuId, setOpenMenuId] = useState(null);
-  // Add: viewport position for the menu
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const [impBusy, setImpBusy] = useState({}); // <-- add
 
   // Close any open menu on outside click
   useEffect(() => {
@@ -101,6 +100,29 @@ const AssignToMe = () => {
   }, [recentFiles, userDepartment]);
 
   const docsForSelectedDate = docsByDate[formatDateKey(selectedDate)] || [];
+
+  // Mark Important (favorites)
+  const markImportant = async (f_uuid) => {
+    if (!user?.id || !f_uuid || impBusy[f_uuid]) return;
+    setImpBusy((s) => ({ ...s, [f_uuid]: true }));
+    try {
+      const { error } = await supabase
+        .from("favorites")
+        .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
+      if (error) throw error;
+
+      // reflect in local list (optional)
+      setRecentFiles((prev) =>
+        prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: true } : f))
+      );
+    } catch (e) {
+      console.error("Failed to mark Important:", e);
+      alert("Could not mark Important. Please try again.");
+    } finally {
+      setImpBusy((s) => ({ ...s, [f_uuid]: false }));
+      setOpenMenuId(null);
+    }
+  };
 
   return (
     <div className="p-8 bg-gray-50/50 min-h-screen">
@@ -231,14 +253,18 @@ const AssignToMe = () => {
           >
             Summary
           </Link>
-          <Link
-            to="/archive"
+
+          <button
+            type="button"
             role="menuitem"
-            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            onClick={() => setOpenMenuId(null)}
+            onClick={() => markImportant(openMenuId)}
+            disabled={!!impBusy[openMenuId]}
+            className={`block w-full text-left px-4 py-2 text-sm ${
+              impBusy[openMenuId] ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:bg-gray-100"
+            }`}
           >
-            Archive
-          </Link>
+            Mark Important
+          </button>
         </div>
       )}
     </div>
