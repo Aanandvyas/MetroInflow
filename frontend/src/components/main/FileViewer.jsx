@@ -8,7 +8,7 @@ const BUCKET_NAME = 'file_storage';
 
 const FileViewer = () => {
   const { uuid } = useParams();
-  const [error, setError] = useState('');
+  const [error] = useState('');
   const { user } = useAuth();
   const location = useLocation();
   
@@ -26,7 +26,7 @@ const FileViewer = () => {
           .single();
 
         if (error || !data) {
-          setError('File not found in database.');
+          console.log('File not found in database.');
           return;
         }
 
@@ -45,7 +45,7 @@ const FileViewer = () => {
           .createSignedUrl(file_path, 60 * 60); // 1 hour
 
         if (signedError || !signedData?.signedUrl) {
-          setError('Could not generate signed URL.');
+          console.log('Could not generate signed URL.');
           return;
         }
 
@@ -58,7 +58,7 @@ const FileViewer = () => {
         document.body.removeChild(link);
       } catch (err) {
         console.error('Error in file viewer:', err);
-        setError('An error occurred while processing your request.');
+        console.log('An error occurred while processing your request.');
       }
     };
 

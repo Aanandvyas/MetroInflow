@@ -47,7 +47,12 @@ const HeaderSearch = () => {
           f_name,
           language,
           created_at,
-          department:d_uuid(d_name, d_uuid)
+          file_department(
+            department(
+              d_name,
+              d_uuid
+            )
+          )
         `)
         .order("created_at", { ascending: false });
 
@@ -60,7 +65,9 @@ const HeaderSearch = () => {
           filtered = filtered.filter(
             file =>
               file.f_name.toLowerCase().includes(q) ||
-              (file.department?.d_name || "").toLowerCase().includes(q)
+              (file.file_department || []).some(fd =>
+                fd.department?.d_name?.toLowerCase().includes(q)
+              )
           );
         }
 
@@ -68,8 +75,9 @@ const HeaderSearch = () => {
         if (selectedDepartments.length > 0) {
           filtered = filtered.filter(
             file =>
-              file.department &&
-              selectedDepartments.includes(file.department.d_uuid)
+              (file.file_department || []).some(fd =>
+                selectedDepartments.includes(fd.department?.d_uuid)
+              )
           );
         }
 
@@ -293,9 +301,14 @@ const HeaderSearch = () => {
                 }}
               >
                 <span className="font-medium text-gray-800">{file.f_name}</span>
-                <span className="text-xs text-gray-500">{file.department?.d_name || "Unknown Department"}</span>
-                <span className="text-xs text-gray-400">{file.language || ""}</span>
-                <span className="text-xs text-gray-400">{file.created_at ? new Date(file.created_at).toLocaleString() : ""}</span>
+                <span className="text-xs text-gray-500">
+      {(file.file_department || [])
+        .map(fd => fd.department?.d_name)
+        .filter(Boolean)
+        .join(", ") || "No Department"}
+    </span>
+    <span className="text-xs text-gray-400">{file.language || ""}</span>
+    <span className="text-xs text-gray-400">{file.created_at ? new Date(file.created_at).toLocaleString() : ""}</span>
               </div>
             ))
           )}
