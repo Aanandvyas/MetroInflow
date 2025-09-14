@@ -96,3 +96,23 @@ func GetFileByUUID(db *sql.DB, fuuid string) (*Document, error) {
 	}
 	return &doc, nil
 }
+
+type OCRResult struct {
+	OCRUUID       string  `json:"ocr_uuid"`
+	FUUID         string  `json:"f_uuid"`
+	Data          string  `json:"data"`
+	AvgConfidence float64 `json:"avg_confidence"`
+	CreatedAt     string  `json:"created_at,omitempty"`
+}
+
+func InsertOCRResult(db *sql.DB, result OCRResult) error {
+	query := `
+        INSERT INTO ocr (f_uuid, data, avg_confidence, created_at)
+        VALUES ($1, $2, $3, NOW())
+    `
+	_, err := db.Exec(query, result.FUUID, result.Data, result.AvgConfidence)
+	if err != nil {
+		log.Println("InsertOCRResult DB error:", err)
+	}
+	return err
+}

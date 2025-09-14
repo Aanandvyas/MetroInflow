@@ -22,6 +22,38 @@ type SupabaseClient struct {
 	Key string
 }
 
+// DownloadFile downloads a file from Supabase Storage to a local path
+func (s SupabaseClient) DownloadFile(bucket, path, localPath string) error {
+	encodedPath := url.PathEscape(path)
+	endpoint := fmt.Sprintf("%s/storage/v1/object/%s/%s", s.URL, bucket, encodedPath)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.Key)
+	req.Header.Set("apikey", s.Key)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("download failed: %s", resp.Status)
+	}
+
+	outFile, err := os.Create(localPath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, resp.Body)
+	return err
+}
+
 var Supabase SupabaseClient
 var DB *sql.DB
 

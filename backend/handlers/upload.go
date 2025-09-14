@@ -6,11 +6,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
 	"backend/config"
 	"backend/models"
+	"backend/services"
 )
 
 // UploadDocumentsHandler handles multiple file uploads
@@ -95,10 +97,39 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		doc.FUUID = fuuid
 
-		// Optionally link file to department
 		_ = models.InsertFileDepartment(config.DB, fuuid, d_uuid)
 
 		uploaded = append(uploaded, doc)
+
+		// Asynchronous OCR trigger
+		go func(filePath, fuuid string) {
+			log.Println("[DEBUG] Triggering OCR for:", filePath)
+			// Download file from Supabase Storage to temp local path
+			tmpPath := filepath.Join(os.TempDir(), filepath.Base(filePath))
+			err := config.Supabase.DownloadFile("file_storage", filePath, tmpPath)
+			if err != nil {
+				log.Println("[DEBUG] Download error:", err)
+				return
+			}
+			defer func() {
+				_ = os.Remove(tmpPath)
+			}()
+			ocrText, avgConf, err := services.RunOCR(tmpPath)
+			if err != nil {
+				log.Println("[DEBUG] OCR error:", err)
+				return
+			}
+			log.Println("[DEBUG] OCR extracted text:", ocrText)
+			log.Println("[DEBUG] OCR avg confidence:", avgConf)
+			ocrResult := models.OCRResult{
+				FUUID:         fuuid,
+				Data:          ocrText,
+				AvgConfidence: avgConf,
+			}
+			if err := models.InsertOCRResult(config.DB, ocrResult); err != nil {
+				log.Println("[DEBUG] Failed to insert OCR result:", err)
+			}
+		}(storagePath, fuuid)
 	}
 
 	if len(uploaded) == 0 {
