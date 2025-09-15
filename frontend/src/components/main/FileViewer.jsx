@@ -2,22 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const BUCKET_NAME = 'file_storage';
 
 const FileViewer = () => {
   const { uuid } = useParams();
-  const [error] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const location = useLocation();
   
-  // We'll keep this for backward compatibility but won't rely on it
+  // Check if this view was initiated from a notification
   const fromNotification = new URLSearchParams(location.search).get('from') === 'notification';
 
   useEffect(() => {
     const fetchAndDownload = async () => {
       try {
+        setLoading(true);
+        
         // Fetch file info from DB
         const { data, error } = await supabase
           .from('file')
@@ -26,16 +28,26 @@ const FileViewer = () => {
           .single();
 
         if (error || !data) {
-          console.log('File not found in database.');
+          setError('File not found in database.');
           return;
         }
 
         const { f_name, file_path } = data;
 
-        // Always mark notification as seen if user is logged in
-        // regardless of where the view came from
-        if (user) {
-          await markNotificationAsSeen(uuid, user.id);
+        // If viewing from notification, mark it as seen
+        if (fromNotification && user) {
+          try {
+            const { error: markError } = await supabase
+              .from('notifications')
+              .update({ is_seen: true })
+              .match({ f_uuid: uuid, uuid: user.id });
+              
+            if (markError) {
+              console.error('Error marking notification as seen:', markError);
+            }
+          } catch (err) {
+            console.error('Error updating notification status:', err);
+          }
         }
 
         // Generate signed URL (private bucket)
@@ -45,7 +57,7 @@ const FileViewer = () => {
           .createSignedUrl(file_path, 60 * 60); // 1 hour
 
         if (signedError || !signedData?.signedUrl) {
-          console.log('Could not generate signed URL.');
+          setError('Could not generate signed URL.');
           return;
         }
 
@@ -58,12 +70,14 @@ const FileViewer = () => {
         document.body.removeChild(link);
       } catch (err) {
         console.error('Error in file viewer:', err);
-        console.log('An error occurred while processing your request.');
+        setError('An error occurred while processing your request.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchAndDownload();
-  }, [uuid, user]);
+  }, [uuid, fromNotification, user]);
 
   return (
     <div className="p-8 flex flex-col items-center justify-center min-h-[300px]">

@@ -16,15 +16,14 @@ export const markNotificationAsSeen = async (fileUuid, userId) => {
         f_uuid: fileUuid, 
         uuid: userId,
         is_seen: false
-      })
-      .select();
-    
+      });
+
     if (error) {
       console.error("Error marking notification as seen:", error);
       return false;
     }
     
-    return data && data.length > 0;
+    return true; // Just return success boolean
   } catch (err) {
     console.error("Exception in markNotificationAsSeen:", err);
     return false;
