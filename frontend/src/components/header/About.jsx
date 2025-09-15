@@ -6,7 +6,7 @@ const teamMembers = [
   'Anand Vyas',
   'Saksham Kriplani',
   'Yash Rathore',
-  'Aditya Teja',
+  'V Aditya Teja',
   'Vaishnavi Parashar',
 ];
 
