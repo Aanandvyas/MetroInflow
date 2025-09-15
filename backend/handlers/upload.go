@@ -13,6 +13,7 @@ import (
 	"backend/config"
 	"backend/models"
 	"backend/services"
+	"backend/utils"
 )
 
 // UploadDocumentsHandler handles multiple file uploads
@@ -101,7 +102,7 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 
 		uploaded = append(uploaded, doc)
 
-		// Asynchronous OCR and summary trigger
+		// Asynchronous OCR, summary, and notification trigger
 		go func(filePath, fuuid string) {
 			log.Println("[DEBUG] Triggering OCR for:", filePath)
 			// Download file from Supabase Storage to temp local path
@@ -144,6 +145,35 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := models.InsertSummary(config.DB, summary); err != nil {
 				log.Println("[DEBUG] Failed to insert summary:", err)
+			}
+
+			// Insert notification and send email
+			// For demo: assume doc.UUID is the user uuid (adjust if needed)
+			notif := models.Notification{
+				UUID:   doc.UUID,
+				FUUID:  fuuid,
+				IsSeen: false,
+			}
+			if err := models.InsertNotification(config.DB, notif); err != nil {
+				log.Println("[DEBUG] Failed to insert notification:", err)
+			} else {
+				// Fetch user email and file details
+				userEmail := ""
+				fileName := doc.FileName
+				// Fetch user email from DB
+				row := config.DB.QueryRow("SELECT email FROM users WHERE uuid = $1", doc.UUID)
+				_ = row.Scan(&userEmail)
+				if userEmail != "" {
+					subject := "New file uploaded: " + fileName
+					body := "A new file has been added to your account.\n\nFile: " + fileName + "\nDepartment: " + deptName + "\nSummary: " + summaryText
+					if err := utils.SendGmailNotification(userEmail, subject, body); err != nil {
+						log.Println("[DEBUG] Failed to send email notification:", err)
+					} else {
+						log.Println("[DEBUG] Email notification sent to:", userEmail)
+					}
+				} else {
+					log.Println("[DEBUG] No email found for user:", doc.UUID)
+				}
 			}
 		}(storagePath, fuuid)
 	}

@@ -10,6 +10,7 @@ import (
 
 	"backend/config"
 	"backend/handlers"
+	"backend/utils"
 
 	"github.com/joho/godotenv"
 )
@@ -89,7 +90,50 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	// 6️⃣ Start HTTP server
+	// 6️⃣ Start notification polling goroutine
+	go func() {
+		for {
+			rows, err := config.DB.Query(`SELECT notif_id, uuid, f_uuid FROM notifications WHERE is_sent = false`)
+			if err != nil {
+				log.Println("[NOTIF] DB query error:", err)
+				time.Sleep(10 * time.Second)
+				continue
+			}
+			for rows.Next() {
+				var notifID, uuid, fuuid string
+				if err := rows.Scan(&notifID, &uuid, &fuuid); err != nil {
+					log.Println("[NOTIF] Row scan error:", err)
+					continue
+				}
+				// Fetch user email
+				var userEmail string
+				row := config.DB.QueryRow("SELECT email FROM users WHERE uuid = $1", uuid)
+				_ = row.Scan(&userEmail)
+				// Fetch file name
+				var fileName string
+				row2 := config.DB.QueryRow("SELECT f_name FROM file WHERE f_uuid = $1", fuuid)
+				_ = row2.Scan(&fileName)
+				if userEmail != "" && fileName != "" {
+					subject := "New file uploaded: " + fileName
+					body := "A new file has been added to your account.\n\nFile: " + fileName
+					if err := utils.SendGmailNotification(userEmail, subject, body); err != nil {
+						log.Println("[NOTIF] Failed to send email:", err)
+					} else {
+						log.Println("[NOTIF] Email sent to:", userEmail)
+						// Mark notification as sent
+						_, err := config.DB.Exec("UPDATE notifications SET is_sent = true WHERE notif_id = $1", notifID)
+						if err != nil {
+							log.Println("[NOTIF] Failed to update is_sent:", err)
+						}
+					}
+				}
+			}
+			rows.Close()
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	// 7️⃣ Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
