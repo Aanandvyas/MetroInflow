@@ -15,6 +15,7 @@ import Favourite from "./components/main/Important";
 import Notifications from "./components/main/Notifications";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Important from "./components/main/Important";
+import About from "./components/header/About";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -37,6 +38,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/important", element: <Important /> },
             { path: "/notifications", element: <Notifications /> },
             { path: "/important", element: <Favourite /> },
+            { path: "/about", element: <About/> },
 
             
             // ✅ Added new routes for the sidebar links
