@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from paddleocr import PaddleOCR
 from PIL import Image
@@ -9,6 +10,13 @@ import fitz  # PyMuPDF
 from pydantic import BaseModel
 
 app = FastAPI(title="OCR Service")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize OCR once
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
