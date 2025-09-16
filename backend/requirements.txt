@@ -5,7 +5,6 @@ paddleocr
 paddlepaddle
 python-multipart
 pydantic
-
 gunicorn
 requests
 python-dotenv
