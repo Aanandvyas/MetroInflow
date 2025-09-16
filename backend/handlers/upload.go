@@ -7,7 +7,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path" 
+
+	//used for windows
+	// "path"
+	//used for linux
 	"path/filepath"
 	"time"
 
@@ -77,7 +80,7 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 		//for windows ->path and linux ->filepath
 
 		// Use department name for storage path
-		storagePath := path.Join(deptName, time.Now().Format("20060102150405")+"_"+f.Filename) 
+		storagePath := filepath.Join(deptName, time.Now().Format("20060102150405")+"_"+f.Filename)
 		log.Printf("[DEBUG] Uploading file %s, size: %d bytes", f.Filename, buf.Len())
 		// Use buffer for upload
 		if err := config.Supabase.UploadFile("file_storage", storagePath, buf); err != nil {
