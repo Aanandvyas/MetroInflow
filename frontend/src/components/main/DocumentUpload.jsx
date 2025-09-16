@@ -135,21 +135,22 @@ const DocumentUpload = () => {
         throw new Error(userError?.message || "Could not find user profile.");
       }
 
-      // Upload and insert for each selected file
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const fileName = `${Date.now()}_${i}_${f.name}`;
         const filePath = `shared/${fileName}`;
 
+        // 1. Upload to Supabase Storage
         const { error: uploadError } = await supabase
           .storage
           .from("file_storage")
           .upload(filePath, f, {
-            upsert: false, // set true to overwrite if same path exists
+            upsert: false,
             contentType: f.type || undefined,
           });
         if (uploadError) throw uploadError;
 
+        // 2. Insert into file table
         const displayName =
           files.length === 1 && title.trim().length > 0 ? title.trim() : f.name;
 
@@ -166,7 +167,7 @@ const DocumentUpload = () => {
           .single();
         if (insertFileError) throw insertFileError;
 
-        // Link this file to all selected departments
+        // 3. Link to departments
         const joinRows = selectedDepartments.map((dept) => ({
           f_uuid: insertedFile.f_uuid,
           d_uuid: dept.d_uuid,
@@ -177,33 +178,47 @@ const DocumentUpload = () => {
           .insert(joinRows);
         if (joinError) throw joinError;
 
-        // Get all users from the selected departments
+        // 4. Notify users in those departments
         const { data: usersInDepartments, error: usersError } = await supabase
           .from("users")
           .select("uuid")
           .in("d_uuid", selectedDepartments.map(d => d.d_uuid));
+
         if (usersError) {
           console.error("Error fetching users for departments:", usersError);
-          // Continue without sending notifications if fetching users fails
         }
-
-        // Prepare the notification rows for insertion
         if (usersInDepartments && usersInDepartments.length > 0) {
           const notificationRows = usersInDepartments.map(u => ({
             uuid: u.uuid,
             f_uuid: insertedFile.f_uuid,
-            is_seen: false, // Initial status is unseen
+            is_seen: false,
             created_at: new Date().toISOString(),
           }));
+          await supabase.from("notifications").insert(notificationRows);
+        }
 
-          // Insert the notifications into the notifications table
-          const { error: notificationError } = await supabase
-            .from("notifications")
-            .insert(notificationRows);
-          if (notificationError) {
-            console.error("Error inserting notifications:", notificationError);
-            // Continue even if this fails, as the core upload succeeded
+        // 5. Send file + f_uuid to backend
+        try {
+          const formData = new FormData();
+          formData.append("f_uuid", insertedFile.f_uuid);
+          formData.append("files", f, f.name);
+
+          const response = await fetch(
+            process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            console.error("Backend summary request failed.");
+          } else {
+            const summaryData = await response.json();
+            console.log("Summary backend response:", summaryData);
           }
+        } catch (backendErr) {
+          console.error("Error sending file to summary backend:", backendErr);
         }
       }
 

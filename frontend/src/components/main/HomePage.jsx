@@ -404,57 +404,9 @@ const HomePage = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
                           className="text-white bg-blue-600 rounded px-3 py-1 text-sm font-medium hover:bg-blue-700"
-                          onClick={async () => {
-                            try {
-                              // 1. Get file info from Supabase
-                              const { data: fileRow, error: fileError } = await supabase
-                                .from("file")
-                                .select("f_uuid, f_name, file_path, d_uuid")
-                                .eq("f_uuid", file.f_uuid)
-                                .single();
-                              if (fileError || !fileRow) {
-                                alert("File not found in database.");
-                                return;
-                              }
-
-                              // 2. Download the file from Supabase Storage
-                              const { data: downloadData, error: downloadError } = await supabase
-                                .storage
-                                .from("file_storage")
-                                .download(fileRow.file_path);
-                              if (downloadError || !downloadData) {
-                                alert("Could not download file from storage.");
-                                return;
-                              }
-                              const fileBlob = downloadData;
-                              const fileObj = new File([fileBlob], fileRow.f_name);
-
-                              // 3. Prepare FormData for upload
-                              const formData = new FormData();
-                              formData.append("d_uuid", fileRow.d_uuid);
-                              formData.append("name", fileRow.f_name);
-                              formData.append("files", fileObj);
-
-                              // 4. Upload to backend
-                              const response = await fetch(summaryBackendUrl, {
-                                method: "POST",
-                                body: formData,
-                              });
-                              if (!response.ok) {
-                                alert("Failed to upload file to backend.");
-                                return;
-                              }
-                              const summaryData = await response.json();
-
-                              // 5. Redirect to summary page with s_uuid from backend response
-                              if (summaryData && summaryData.s_uuid) {
-                                navigate("/summary", { state: { s_uuid: summaryData.s_uuid } });
-                              } else {
-                                alert("Summary data not returned from backend.");
-                              }
-                            } catch (err) {
-                              alert("Error: " + err.message);
-                            }
+                          onClick={() => {
+                            // Just navigate to /summary with f_uuid, no download/upload
+                            navigate("/summary", { state: { f_uuid: file.f_uuid } });
                           }}
                         >
                           Summary
@@ -506,63 +458,15 @@ const HomePage = () => {
                             View
                           </button>
                           <button
-                          type="button"
-                          className="inline-flex items-center justify-center h-8 px-3 bg-gray-600 text-white rounded-md text-xs font-medium hover:bg-gray-700"
-                          onClick={async () => {
-                            try {
-                              // 1. Get file info from Supabase
-                              const { data: fileRow, error: fileError } = await supabase
-                                .from("file")
-                                .select("f_uuid, f_name, file_path, d_uuid")
-                                .eq("f_uuid", file.f_uuid)
-                                .single();
-                              if (fileError || !fileRow) {
-                                alert("File not found in database.");
-                                return;
-                              }
-
-                              // 2. Download the file from Supabase Storage
-                              const { data: downloadData, error: downloadError } = await supabase
-                                .storage
-                                .from("file_storage")
-                                .download(fileRow.file_path);
-                              if (downloadError || !downloadData) {
-                                alert("Could not download file from storage.");
-                                return;
-                              }
-                              const fileBlob = downloadData;
-                              const fileObj = new File([fileBlob], fileRow.f_name);
-
-                              // 3. Prepare FormData for upload
-                              const formData = new FormData();
-                              formData.append("d_uuid", fileRow.d_uuid);
-                              formData.append("name", fileRow.f_name);
-                              formData.append("files", fileObj);
-
-                              // 4. Upload to backend
-                              const response = await fetch("http://localhost:8080/v1/documents", {
-                                method: "POST",
-                                body: formData,
-                              });
-                              if (!response.ok) {
-                                alert("Failed to upload file to backend.");
-                                return;
-                              }
-                              const summaryData = await response.json();
-
-                              // 5. Redirect to summary page with s_uuid from backend response
-                              if (summaryData && summaryData.s_uuid) {
-                                navigate("/summary", { state: { s_uuid: summaryData.s_uuid } });
-                              } else {
-                                alert("Summary data not returned from backend.");
-                              }
-                            } catch (err) {
-                              alert("Error: " + err.message);
-                            }
-                          }}
-                        >
-                          Summary
-                        </button>
+                            type="button"
+                            className="inline-flex items-center justify-center h-8 px-3 bg-gray-600 text-white rounded-md text-xs font-medium hover:bg-gray-700"
+                            onClick={() => {
+                              // Just navigate to /summary with f_uuid, no download/upload
+                              navigate("/summary", { state: { f_uuid: file.f_uuid } });
+                            }}
+                          >
+                            Summary
+                          </button>
                         </div>
                       </li>
                     ))}

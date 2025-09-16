@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 
-const HARDCODED_FUUID = "81073771-447f-4266-b2c7-a90e91f6b417";
-
 const Summary = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const f_uuid = location.state?.f_uuid;
   const [loading, setLoading] = useState(true);
   const [summaryData, setSummaryData] = useState(null);
 
   useEffect(() => {
+    if (!f_uuid) {
+      setLoading(false);
+      return;
+    }
     const fetchSummary = async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("summary")
-        .select("*")
-        .eq("f_uuid", HARDCODED_FUUID)
+        .select("f_uuid, summary, created_at")
+        .eq("f_uuid", f_uuid)
         .maybeSingle();
+
       if (error || !data) {
         setSummaryData(null);
       } else {
@@ -24,7 +30,20 @@ const Summary = () => {
       setLoading(false);
     };
     fetchSummary();
-  }, []);
+  }, [f_uuid]);
+
+  if (!f_uuid)
+    return (
+      <div className="p-8 text-red-500">
+        No file selected for summary.{" "}
+        <button
+          className="underline text-blue-600"
+          onClick={() => navigate(-1)}
+        >
+          Go Back
+        </button>
+      </div>
+    );
 
   if (loading) return <div>Loading...</div>;
 
