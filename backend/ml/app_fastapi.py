@@ -19,7 +19,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="template")
 
 class SummarizeRequest(BaseModel):
     text: str
@@ -28,6 +28,8 @@ class SummarizeRequest(BaseModel):
 load_dotenv()
 HF_API_KEY = os.getenv("HF_API_KEY")
 HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"}
+
+# --- Helper Functions ---
 
 def query_huggingface_api(payload, retries=3, backoff_factor=2):
     attempt = 0
