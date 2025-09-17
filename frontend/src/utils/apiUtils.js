@@ -178,3 +178,57 @@ export const listDocuments = async (params = {}) => {
     throw error;
   }
 };
+
+/**
+ * Get summary for a document
+ * @param {string} documentId - The document ID to get the summary for
+ * @returns {Promise} - Response from the API with summary data
+ */
+export const getSummary = async (documentId) => {
+  try {
+    if (!documentId) {
+      throw new Error('Document ID is required to get summary');
+    }
+
+    console.log(`Fetching summary for document: ${documentId}`);
+    
+    // First try to get from API if available
+    if (config.api.endpoints.summary) {
+      try {
+        const url = `${API_BASE_URL}${config.api.endpoints.summary}/${documentId}`;
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Summary retrieved from API');
+          return data;
+        }
+        
+        // If API returns 404, it might mean the summary is not yet ready
+        // In this case, we'll fall back to Supabase
+        console.warn(`API returned ${response.status} for summary request, falling back to database`);
+      } catch (apiError) {
+        console.error('Error fetching summary from API:', apiError);
+        // Fall back to Supabase on API error
+      }
+    }
+    
+    // Fall back to querying Supabase directly
+    const { supabase } = await import('../supabaseClient');
+    
+    const { data, error } = await supabase
+      .from("summary")
+      .select("f_uuid, summary, created_at")
+      .eq("f_uuid", documentId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    
+    return data; // This might be null if no summary exists
+  } catch (error) {
+    console.error("Summary fetch error:", error);
+    throw error;
+  }
+};

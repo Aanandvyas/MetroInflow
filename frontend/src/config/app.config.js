@@ -12,6 +12,7 @@ const config = {
       documents: '/documents',
       users: '/users',
       departments: '/departments',
+      summary: '/summary', // New endpoint for document summaries
     },
     timeout: 30000, // 30 seconds
   },
