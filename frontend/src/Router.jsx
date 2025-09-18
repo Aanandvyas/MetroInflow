@@ -6,6 +6,7 @@ import HomePage from "./components/main/HomePage";
 import Profile from "./components/main/Profile"; 
 import DocumentUpload from "./components/main/DocumentUpload";
 import ProtectedRoute from "./ProtectedRoute";
+import AdminProtectedRoute from "./AdminProtectedRoute";
 import DepartmentFiles from "./components/main/DepartmentFiles";
 import AssignToMe from "./components/main/AssignToMe";
 import FileViewer from './components/main/FileViewer';
@@ -41,8 +42,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/notifications", element: <Notifications /> },
             { path: "/important", element: <Favourite /> },
             { path: "/about", element: <About/> },
-            { path: "/admin", element: <Admin /> },
-            
+            { path: "/admin", element: <AdminProtectedRoute><Admin /></AdminProtectedRoute> },
             
             // ✅ Added new routes for the sidebar links
             { path: "/recent", element: <Placeholder title="Recent" /> },

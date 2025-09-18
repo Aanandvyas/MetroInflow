@@ -12,7 +12,7 @@ import {
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user } = useAuth(); // ✅ get user
+  const { userProfile } = useAuth(); // ✅ get userProfile with complete user data
 
   // ✅ Base nav items
   const navItems = [
@@ -24,7 +24,7 @@ const Sidebar = () => {
   ];
   
   // ✅ Add Admin Page only if user isAdmin
-  if (user?.isAdmin) {
+  if (userProfile?.isAdmin) {
     navItems.push({ name: 'Admin Page', path: '/admin', icon: CogIcon });
   }
 

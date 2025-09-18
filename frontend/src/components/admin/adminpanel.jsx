@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
+import { useAuth } from "../context/AuthContext";
 import { PlusIcon, TrashIcon, UserPlusIcon, BuildingOffice2Icon, DocumentCheckIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 
 const AccordionSection = ({ title, icon, open, setOpen, children }) => (
@@ -24,6 +25,7 @@ const AccordionSection = ({ title, icon, open, setOpen, children }) => (
 );
 
 const AdminPanel = () => {
+  const { signUpNewUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [role, setRole] = useState([]);
@@ -31,20 +33,22 @@ const AdminPanel = () => {
   const [newRole, setNewRole] = useState({ r_name: "", d_uuid: "", permission_level: 1 });
 
   const [formData, setFormData] = useState({
-    name: "",
+    fullName: "",
     email: "",
-    phone_number: "",
+    phoneNumber: "",
     dob: "",
     gender: "",
     address: "",
     password: "",
     confirmPassword: "",
     departmentName: "",
+    roleId: "",
     isAdmin: false,
   });
 
   const [newDept, setNewDept] = useState({ d_name: "" });
   const [status, setStatus] = useState({ message: "", type: "" });
+  const [pendingAdminChanges, setPendingAdminChanges] = useState({});
 
   // Accordion open states
   const [openCreateUser, setOpenCreateUser] = useState(true);
@@ -65,10 +69,18 @@ const AdminPanel = () => {
         .select("d_uuid, d_name");
       const { data: rolesData, error: rolesError } = await supabase
         .from("role")
-        .select("r_uuid, r_name, permission_level");
+        .select("r_uuid, r_name, permission_level, d_uuid");
       if (usersError) setStatus({ message: "Error loading users: " + usersError.message, type: "error" });
       if (deptError) setStatus({ message: "Error loading departments: " + deptError.message, type: "error" });
       if (rolesError) setStatus({ message: "Error loading role: " + rolesError.message, type: "error" });
+      
+      console.log('Data loaded:', {
+        users: usersData,
+        departments: deptData,
+        roles: rolesData,
+        rolesError: rolesError
+      });
+      
       setUsers(usersData || []);
       setDepartments(deptData || []);
       setRole(rolesData || []);
@@ -79,10 +91,19 @@ const AdminPanel = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
+      
+      // Reset role when department changes
+      if (name === "departmentName") {
+        newData.roleId = "";
+      }
+      
+      return newData;
+    });
   };
 
   const handleCreateUser = async (e) => {
@@ -94,61 +115,199 @@ const AdminPanel = () => {
     setStatus({ message: "Creating user...", type: "loading" });
 
     try {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+      // Create user using the same process as register.jsx but with custom logic for admin panel
+      const {
+        email,
+        password,
+        fullName,
+        phoneNumber,
+        dob,
+        gender,
+        address,
+        departmentName,
+      } = formData;
+
+      // 1. Create account in Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: "http://localhost:3000/login", // change for production
+        },
       });
-      if (signUpError) {
-        setStatus({ message: "Auth error: " + signUpError.message, type: "error" });
+
+      if (error) {
+        setStatus({ message: "Error creating user: " + error.message, type: "error" });
         return;
       }
-      const userId = signUpData?.user?.id;
-      if (!userId) {
-        setStatus({ message: "Could not get user ID after sign up.", type: "error" });
-        return;
-      }
+
       let d_uuid = null;
-      if (formData.departmentName) {
-        const dept = departments.find((d) => d.d_name === formData.departmentName);
-        d_uuid = dept ? dept.d_uuid : null;
+
+      // 2. Get department uuid from department table
+      if (departmentName) {
+        const { data: deptData, error: deptError } = await supabase
+          .from("department")
+          .select("d_uuid")
+          .ilike("d_name", departmentName)
+          .single();
+
+        if (deptError) {
+          setStatus({ message: "Department not found: " + deptError.message, type: "error" });
+          return;
+        }
+
+        d_uuid = deptData?.d_uuid || null;
       }
-      const { error: dbError } = await supabase.from("users").insert({
-        uuid: userId,
-        email: formData.email,
-        name: formData.name,
-        phone_number: formData.phone_number,
-        dob: formData.dob,
-        gender: formData.gender,
-        address: formData.address,
-        isAdmin: formData.isAdmin,
-        d_uuid,
-      });
-      if (dbError) {
-        setStatus({ message: "DB error: " + dbError.message, type: "error" });
-        return;
+
+      // 3. Insert into users table with role and admin status
+      if (data.user) {
+        const userData = {
+          uuid: data.user.id,
+          email,
+          name: fullName,
+          phone_number: phoneNumber,
+          dob,
+          gender,
+          address,
+          d_uuid,
+          age: dob
+            ? new Date().getFullYear() - new Date(dob).getFullYear()
+            : null,
+        };
+
+        // Add role and admin status if specified
+        if (formData.roleId) {
+          userData.r_uuid = formData.roleId;
+        }
+        if (formData.isAdmin) {
+          userData.isAdmin = formData.isAdmin;
+        }
+
+        const { error: userError } = await supabase.from("users").insert([userData]);
+
+        if (userError) {
+          setStatus({ message: "Error inserting user details: " + userError.message, type: "error" });
+          return;
+        }
       }
-      setStatus({ message: "User created!", type: "success" });
+
+      setStatus({ message: "User created successfully!", type: "success" });
+
+      // Reset form
       setFormData({
-        name: "",
+        fullName: "",
         email: "",
-        phone_number: "",
+        phoneNumber: "",
         dob: "",
         gender: "",
         address: "",
         password: "",
         confirmPassword: "",
         departmentName: "",
+        roleId: "",
         isAdmin: false,
       });
+
     } catch (err) {
       setStatus({ message: "Unexpected error: " + err.message, type: "error" });
     }
   };
 
   const handleDeleteUser = async (uuid) => {
-    if (!window.confirm("Delete this user?")) return;
-    await supabase.from("users").delete().eq("uuid", uuid);
-    setStatus({ message: "User deleted.", type: "success" });
+    if (!window.confirm("Delete this user? This will permanently remove the user from both the database and authentication system.")) return;
+    
+    setStatus({ message: "Deleting user...", type: "loading" });
+    
+    try {
+      // First, delete from the users table
+      const { error: dbError } = await supabase
+        .from("users")
+        .delete()
+        .eq("uuid", uuid);
+
+      if (dbError) {
+        setStatus({ message: "Error deleting user from database: " + dbError.message, type: "error" });
+        return;
+      }
+
+      // Then, delete from Supabase Auth using Admin API
+      const { error: authError } = await supabase.auth.admin.deleteUser(uuid);
+
+      if (authError) {
+        console.warn("User deleted from database but failed to delete from auth:", authError.message);
+        
+        // Check if the error is because user doesn't exist in auth (already deleted)
+        if (authError.message.includes('User not found') || authError.message.includes('not found')) {
+          setStatus({ 
+            message: "User deleted from database. User was not found in authentication system (may have been already deleted).", 
+            type: "success" 
+          });
+        } else {
+          setStatus({ 
+            message: "User deleted from database, but there was an issue removing from authentication system. You may need to manually delete from Supabase dashboard.", 
+            type: "error" 
+          });
+        }
+        return;
+      }
+
+      // Update local state to remove the user from the list
+      setUsers(users.filter(user => user.uuid !== uuid));
+      setStatus({ message: "User completely deleted from both database and authentication system.", type: "success" });
+      
+    } catch (err) {
+      setStatus({ message: "Error deleting user: " + err.message, type: "error" });
+    }
+  };
+
+  const handleAdminStatusChange = (uuid, newStatus) => {
+    setPendingAdminChanges(prev => ({
+      ...prev,
+      [uuid]: newStatus
+    }));
+  };
+
+  const handleConfirmAdminStatus = async (uuid) => {
+    const newStatus = pendingAdminChanges[uuid];
+    if (newStatus === undefined) return;
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ isAdmin: newStatus })
+        .eq("uuid", uuid);
+
+      if (error) {
+        setStatus({ message: "Error updating admin status: " + error.message, type: "error" });
+        return;
+      }
+
+      // Update the local users state
+      setUsers(users.map(user => 
+        user.uuid === uuid 
+          ? { ...user, isAdmin: newStatus }
+          : user
+      ));
+
+      // Remove from pending changes
+      setPendingAdminChanges(prev => {
+        const newPending = { ...prev };
+        delete newPending[uuid];
+        return newPending;
+      });
+
+      setStatus({ message: "Admin status updated successfully!", type: "success" });
+    } catch (err) {
+      setStatus({ message: "Error updating admin status: " + err.message, type: "error" });
+    }
+  };
+
+  const handleCancelAdminChange = (uuid) => {
+    setPendingAdminChanges(prev => {
+      const newPending = { ...prev };
+      delete newPending[uuid];
+      return newPending;
+    });
   };
 
   const handleCreateDept = async (e) => {
@@ -220,11 +379,58 @@ const handleDeleteRole = async (r_uuid) => {
           </option>
         ))}
       </select>
-      <span className="absolute right-3 top-3 pointer-events-none text-gray-400">
-        ▼
-      </span>
     </div>
   );
+
+  // Dropdown for roles in user creation
+  const RoleDropdown = () => {
+    // Filter roles based on selected department
+    const filteredRoles = formData.departmentName 
+      ? role.filter(r => {
+          const dept = departments.find(d => d.d_name === formData.departmentName);
+          console.log('Filtering roles:', {
+            selectedDept: formData.departmentName,
+            dept: dept,
+            role: r,
+            matches: dept && r.d_uuid === dept.d_uuid
+          });
+          return dept && r.d_uuid === dept.d_uuid;
+        })
+      : [];
+
+    console.log('RoleDropdown state:', {
+      allRoles: role,
+      filteredRoles: filteredRoles,
+      selectedDept: formData.departmentName,
+      departments: departments
+    });
+
+    return (
+      <div className="relative">
+        <select
+          name="roleId"
+          className="p-2 border rounded w-full"
+          value={formData.roleId}
+          onChange={handleChange}
+          disabled={!formData.departmentName}
+        >
+          <option value="">
+            {!formData.departmentName 
+              ? "Select Department First" 
+              : filteredRoles.length === 0 
+                ? "No Roles Available" 
+                : "Select Role"
+            }
+          </option>
+          {filteredRoles.map((r) => (
+            <option key={r.r_uuid} value={r.r_uuid}>
+              {r.r_name} (Level {r.permission_level})
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -252,9 +458,9 @@ const handleDeleteRole = async (r_uuid) => {
         setOpen={setOpenCreateUser}
       >
         <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-blue-50 p-6 rounded-lg shadow">
-          <input type="text" name="name" placeholder="Full Name" className="p-2 border rounded" value={formData.name} onChange={handleChange} required />
+          <input type="text" name="fullName" placeholder="Full Name" className="p-2 border rounded" value={formData.fullName} onChange={handleChange} required />
           <input type="email" name="email" placeholder="Email" className="p-2 border rounded" value={formData.email} onChange={handleChange} required />
-          <input type="tel" name="phone_number" placeholder="Phone Number" className="p-2 border rounded" value={formData.phone_number} onChange={handleChange} required />
+          <input type="tel" name="phoneNumber" placeholder="Phone Number" className="p-2 border rounded" value={formData.phoneNumber} onChange={handleChange} required />
           <input type="date" name="dob" placeholder="Date of Birth" className="p-2 border rounded" value={formData.dob} onChange={handleChange} required />
           <select name="gender" className="p-2 border rounded" value={formData.gender} onChange={handleChange} required>
             <option value="">Gender</option>
@@ -264,6 +470,7 @@ const handleDeleteRole = async (r_uuid) => {
           </select>
           <input type="text" name="address" placeholder="Address" className="p-2 border rounded" value={formData.address} onChange={handleChange} required />
           <DepartmentDropdown />
+          <RoleDropdown />
           <input type="password" name="password" placeholder="Password" className="p-2 border rounded" value={formData.password} onChange={handleChange} required />
           <input type="password" name="confirmPassword" placeholder="Confirm Password" className="p-2 border rounded" value={formData.confirmPassword} onChange={handleChange} required />
           <label className="flex items-center gap-2">
@@ -303,7 +510,36 @@ const handleDeleteRole = async (r_uuid) => {
                   <tr key={u.uuid} className="hover:bg-blue-50">
                     <td className="px-4 py-2 border-b">{u.name || "-"}</td>
                     <td className="px-4 py-2 border-b">{u.email}</td>
-                    <td className="px-4 py-2 border-b">{u.isAdmin ? "Yes" : "No"}</td>
+                    <td className="px-4 py-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={pendingAdminChanges[u.uuid] !== undefined ? pendingAdminChanges[u.uuid] : u.isAdmin}
+                          onChange={(e) => handleAdminStatusChange(u.uuid, e.target.value === 'true')}
+                          className="px-2 py-1 border rounded text-sm"
+                        >
+                          <option value={false}>User</option>
+                          <option value={true}>Admin</option>
+                        </select>
+                        {pendingAdminChanges[u.uuid] !== undefined && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleConfirmAdminStatus(u.uuid)}
+                              className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                              title="Confirm change"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => handleCancelAdminChange(u.uuid)}
+                              className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+                              title="Cancel change"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2 border-b">
                       {departments.find((d) => d.d_uuid === u.d_uuid)?.d_name || "-"}
                     </td>
