@@ -35,15 +35,10 @@ const Profile = () => {
     useEffect(() => {
         const fetchData = async () => {
             if (user) {
-                try {
-                    const profileData = await getUserProfile(user.id);
-                    setProfile(profileData);
-                    setSelectedRole(profileData?.r_uuid || "");
-                    await fetchRolesForDept(profileData?.d_uuid);
-                } catch (error) {
-                    console.error("Error fetching profile:", error);
-                    setProfile(null);
-                }
+                const profileData = await getUserProfile(user.id);
+                setProfile(profileData);
+                setSelectedRole(profileData?.r_uuid || "");
+                await fetchRolesForDept(profileData?.d_uuid);
             }
             setLoading(false);
         };
@@ -79,31 +74,11 @@ const Profile = () => {
     };
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading profile...</p>
-                </div>
-            </div>
-        );
+        return <p className="text-center p-10">Loading profile...</p>;
     }
     
     if (!profile) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold text-red-600 mb-4">Profile Not Found</h1>
-                    <p className="text-gray-600 mb-4">Could not load your profile data. This might be a temporary issue.</p>
-                    <button 
-                        onClick={() => window.location.reload()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Retry
-                    </button>
-                </div>
-            </div>
-        );
+        return <p className="text-center p-10">Could not load profile data.</p>;
     }
 
     return (

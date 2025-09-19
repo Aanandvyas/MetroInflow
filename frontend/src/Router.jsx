@@ -6,7 +6,6 @@ import HomePage from "./components/main/HomePage";
 import Profile from "./components/main/Profile"; 
 import DocumentUpload from "./components/main/DocumentUpload";
 import ProtectedRoute from "./ProtectedRoute";
-import AdminProtectedRoute from "./AdminProtectedRoute";
 import DepartmentFiles from "./components/main/DepartmentFiles";
 import AssignToMe from "./components/main/AssignToMe";
 import FileViewer from './components/main/FileViewer';
@@ -17,8 +16,6 @@ import Notifications from "./components/main/Notifications";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Important from "./components/main/Important";
 import About from "./components/header/About";
-import Admin_login from "./components/admin/login";
-import Admin from "./components/admin/adminpanel";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -42,7 +39,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/notifications", element: <Notifications /> },
             { path: "/important", element: <Favourite /> },
             { path: "/about", element: <About/> },
-            { path: "/admin", element: <AdminProtectedRoute><Admin /></AdminProtectedRoute> },
+
             
             // ✅ Added new routes for the sidebar links
             { path: "/recent", element: <Placeholder title="Recent" /> },
@@ -55,7 +52,6 @@ export const Router = createBrowserRouter([ // Corrected export name
             { path: "/file/:uuid", element: <FileViewer /> },
         ],
     },
-    { path: "/admin-login", element: <Admin_login /> },
     { path: "/login", element: <Login /> },
     { path: "/register", element: <Register /> },
 ]);
