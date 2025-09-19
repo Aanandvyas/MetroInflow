@@ -94,9 +94,12 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		title := r.FormValue("title")
+		language := r.FormValue("language")
+
 		doc := models.Document{
-			FileName: f.Filename,
-			Language: "en", // or get from form
+			FileName: title, // use title if provided, else f.Filename
+			Language: language,
 			FilePath: storagePath,
 			DUUID:    d_uuids_raw, // store all department UUIDs (optional, for reference)
 			Status:   "uploaded",
