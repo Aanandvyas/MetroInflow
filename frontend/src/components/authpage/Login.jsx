@@ -35,7 +35,7 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-blue-100">
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-md p-8 m-4 bg-white border border-gray-200 rounded-lg shadow-md">
 
         {/* Header */}
@@ -127,10 +127,6 @@ const Login = () => {
           Don't have an account?{' '}
           <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
             Sign Up
-          </Link>
-          <br />
-          <Link to="/admin-login" className="font-medium text-indigo-600 hover:text-indigo-500">
-            Admin Login
           </Link>
         </p>
 
