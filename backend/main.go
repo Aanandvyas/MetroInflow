@@ -24,7 +24,7 @@ func checkDBConnection() {
 		return
 	}
 
-	endpoint := fmt.Sprintf("%s/rest/v1/file?limit=1", url)
+	endpoint := fmt.Sprintf("%s/rest/v1/documents?limit=1", url)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
