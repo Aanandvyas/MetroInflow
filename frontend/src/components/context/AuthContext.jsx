@@ -6,7 +6,6 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // ✅ Sign up a new user
@@ -163,15 +162,6 @@ export const AuthProvider = ({ children }) => {
 
       setSession(session);
       setUser(session?.user ?? null);
-      
-      // Fetch user profile data if user exists
-      if (session?.user) {
-        const profile = await getUserProfile(session.user.id);
-        setUserProfile(profile);
-      } else {
-        setUserProfile(null);
-      }
-      
       setLoading(false);
     };
 
@@ -179,17 +169,9 @@ export const AuthProvider = ({ children }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
-      // Fetch user profile data if user exists
-      if (session?.user) {
-        const profile = await getUserProfile(session.user.id);
-        setUserProfile(profile);
-      } else {
-        setUserProfile(null);
-      }
     });
 
     return () => {
@@ -200,7 +182,6 @@ export const AuthProvider = ({ children }) => {
   const value = {
     session,
     user,
-    userProfile,
     loading,
     signUpNewUser,
     signInUser,
