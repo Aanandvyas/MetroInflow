@@ -42,10 +42,7 @@ export const Router = createBrowserRouter([ // Corrected export name
 
             
             // ✅ Added new routes for the sidebar links
-            { path: "/recent", element: <Placeholder title="Recent" /> },
             { path: "/all-files", element: <AllFiles /> },
-            { path: "/tags", element: <Placeholder title="Tags" /> },
-            { path: "/mails", element: <Placeholder title="Mails" /> },
             { path: "/custom-fields", element: <Placeholder title="Custom Fields" /> },
             { path: "/document-types", element: <Placeholder title="Document Types" /> },
             { path: "/assigned-to-me", element: <AssignToMe /> }, 
