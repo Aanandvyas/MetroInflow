@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
+import { supabase } from '../../supabaseClient';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -23,8 +24,28 @@ const Login = () => {
       if (signInError) {
         setError(signInError.message);
       } else {
-        console.log('Login successful:', data);
-        navigate('/'); // Correctly navigate to the root protected route
+        // Check if user is admin
+        const userId = data?.user?.id || data?.id || data?.user?.uuid;
+        if (!userId) {
+          setError("Could not get user ID after login.");
+          setLoading(false);
+          return;
+        }
+        // Fetch user profile from Supabase
+        const { data: userProfile, error: profileError } = await supabase
+          .from("users")
+          .select("isAdmin")
+          .eq("uuid", userId)
+          .maybeSingle();
+
+        if (profileError) {
+          setError("Failed to fetch user profile.");
+        } else if (!userProfile || !userProfile.isAdmin) {
+          setError("Access denied: You are not an admin.");
+        } else {
+          // isAdmin is true, proceed
+          navigate('/admin'); // or navigate to your admin dashboard
+        }
       }
     } catch (e) {
       setError('An unexpected error occurred. Please try again.');
@@ -35,12 +56,12 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-blue-100">
+    <div className="flex items-center justify-center min-h-screen bg-green-100">
       <div className="w-full max-w-md p-8 m-4 bg-white border border-gray-200 rounded-lg shadow-md">
 
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Admin Login</h1>
           <p className="mt-1 text-gray-500">Please sign in to access your account</p>
         </div>
 
@@ -124,13 +145,8 @@ const Login = () => {
 
         {/* Footer */}
         <p className="mt-8 text-sm text-center text-gray-500">
-          Don't have an account?{' '}
-          <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-            Sign Up
-          </Link>
-          <br />
-          <Link to="/admin-login" className="font-medium text-indigo-600 hover:text-indigo-500">
-            Admin Login
+          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            Back to User Login
           </Link>
         </p>
 

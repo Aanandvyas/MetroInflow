@@ -15,6 +15,7 @@ const HomePage = () => {
   const [userDeptIds, setUserDeptIds] = useState([]);
   const [deptCounts, setDeptCounts] = useState({}); // file count per department
   const navigate = useNavigate();
+  const summaryBackendUrl = process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents";
 
   // Fetch recent files (top 10 by time)
   useEffect(() => {
@@ -403,7 +404,10 @@ const HomePage = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
                           className="text-white bg-blue-600 rounded px-3 py-1 text-sm font-medium hover:bg-blue-700"
-                          onClick={() => navigate("/summary")}
+                          onClick={() => {
+                            // Just navigate to /summary with f_uuid, no download/upload
+                            navigate("/summary", { state: { f_uuid: file.f_uuid } });
+                          }}
                         >
                           Summary
                         </button>
@@ -453,12 +457,16 @@ const HomePage = () => {
                           >
                             View
                           </button>
-                          <Link
-                            to="/summary"
+                          <button
+                            type="button"
                             className="inline-flex items-center justify-center h-8 px-3 bg-gray-600 text-white rounded-md text-xs font-medium hover:bg-gray-700"
+                            onClick={() => {
+                              // Just navigate to /summary with f_uuid, no download/upload
+                              navigate("/summary", { state: { f_uuid: file.f_uuid } });
+                            }}
                           >
                             Summary
-                          </Link>
+                          </button>
                         </div>
                       </li>
                     ))}

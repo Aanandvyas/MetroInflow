@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Important() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Renamed state
   const [importants, setImportants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [impBusy, setImpBusy] = useState({});
+  const [summaryLoading, setSummaryLoading] = useState({});
 
   const fetchImportants = async () => {
     if (!user?.id) return;
@@ -82,6 +84,25 @@ export default function Important() {
       setImpBusy((s) => ({ ...s, [id]: false }));
     }
   };
+  
+  // Handle clicking on summary to show loading state and navigate
+  const handleSummaryClick = (fileId) => {
+    if (summaryLoading[fileId]) return; // Prevent multiple clicks
+    
+    // Set loading state for this specific file
+    setSummaryLoading(prev => ({ ...prev, [fileId]: true }));
+    
+    // Short timeout to show loading state before navigation
+    setTimeout(() => {
+      // Navigate to summary page with file UUID in state
+      navigate('/summary', { state: { f_uuid: fileId } });
+      
+      // Reset the loading state after a delay (for when user comes back)
+      setTimeout(() => {
+        setSummaryLoading(prev => ({ ...prev, [fileId]: false }));
+      }, 1000);
+    }, 300); // Short delay to show loading animation
+  };
 
   return (
     <div className="p-8">
@@ -147,12 +168,28 @@ export default function Important() {
                       View
                     </button>
 
-                    <Link
-                      to="/summary"
-                      className="inline-flex items-center justify-center h-9 px-4 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700"
+                    <button
+                      type="button"
+                      onClick={() => handleSummaryClick(file.f_uuid)}
+                      className={`inline-flex items-center justify-center h-9 px-4 ${
+                        summaryLoading[file.f_uuid] 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-gray-600 hover:bg-gray-700'
+                      } text-white rounded-md text-sm font-medium transition-colors`}
+                      disabled={summaryLoading[file.f_uuid]}
                     >
-                      Summary
-                    </Link>
+                      {summaryLoading[file.f_uuid] ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Loading
+                        </>
+                      ) : (
+                        'Summary'
+                      )}
+                    </button>
 
                     <button
                       type="button"
