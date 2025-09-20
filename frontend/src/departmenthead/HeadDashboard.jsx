@@ -20,10 +20,13 @@ import {
     TrendingUpIcon,
     TrendingDownIcon,
     XMarkIcon,
-    DocumentCheckIcon
+    DocumentCheckIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
+import CollabFolders from './CollabFolders';
 
 const HeadDashboard = () => {
     const { user } = useAuth();
@@ -36,8 +39,10 @@ const HeadDashboard = () => {
         pendingTasks: 0
     });
     const [recentDocuments, setRecentDocuments] = useState([]);
+    const [importantDocuments, setImportantDocuments] = useState([]);
     const [departmentFolders, setDepartmentFolders] = useState([]);
     const [sharedFiles, setSharedFiles] = useState([]);
+    const [pendingFiles, setPendingFiles] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Upload modal states
@@ -52,6 +57,11 @@ const HeadDashboard = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [departments, setDepartments] = useState([]);
     const [loadingDepartments, setLoadingDepartments] = useState(true);
+
+    // Horizontal scrolling states
+    const [documentsScrollIndex, setDocumentsScrollIndex] = useState(0);
+    const [foldersScrollIndex, setFoldersScrollIndex] = useState(0);
+    const ITEMS_PER_VIEW = 4;
 
     // Fetch user profile and department data
     useEffect(() => {
@@ -142,188 +152,183 @@ const HeadDashboard = () => {
 
                 // Simplified queries with error handling
                 try {
-                    // Fetch total files in department (try different field names)
-                    const { data: filesData, error: filesError } = await supabase
+                    // Get user's department ID
+                    const departmentId = userProfile.department_id;
+
+                    // Fetch total files in department using proper relationships
+                    const { data: departmentFiles, error: filesError } = await supabase
                         .from('file')
-                        .select('*')
-                        .or(`department_id.eq.${departmentId},d_uuid.eq.${departmentId}`);
+                        .select('f_uuid')
+                        .eq('d_uuid', departmentId);
 
                     // Fetch active users in department
                     const { data: usersData, error: usersError } = await supabase
                         .from('users')
-                        .select('*')
-                        .or(`department_id.eq.${departmentId},d_uuid.eq.${departmentId}`);
+                        .select('uuid')
+                        .eq('d_uuid', departmentId);
 
-                    // Set basic stats with fallback values
+                    // Fetch shared files (files that have been shared with this department)
+                    const { data: notificationFilesData, error: sharedError } = await supabase
+                        .from('notifications')
+                        .select('f_uuid, file:f_uuid(f_name, created_at, users:uuid(name))')
+                        .eq('uuid', user.id)
+                        .eq('is_seen', false);
+
+                    // Fetch pending notifications as tasks
+                    const { data: pendingNotifications, error: notifError } = await supabase
+                        .from('notifications')
+                        .select('notif_id')
+                        .eq('uuid', user.id)
+                        .eq('is_seen', false);
+
+                    // Set real stats
                     setDashboardStats({
-                        totalFiles: filesData?.length || 0,
+                        totalFiles: departmentFiles?.length || 0,
                         activeUsers: usersData?.length || 0,
-                        sharedFiles: Math.floor(Math.random() * 20) + 5, // Mock for now
-                        pendingTasks: Math.floor(Math.random() * 50) + 10
+                        sharedFiles: notificationFilesData?.length || 0,
+                        pendingTasks: pendingNotifications?.length || 0
                     });
 
-                    // Set recent documents with mock data if no real data
-                    if (filesData && filesData.length > 0) {
-                        setRecentDocuments(filesData.slice(0, 4));
+                    // Fetch recent documents from file table
+                    const { data: recentFiles, error: recentError } = await supabase
+                        .from('file')
+                        .select('f_uuid, f_name, created_at, language, users:uuid(name)')
+                        .eq('d_uuid', departmentId)
+                        .order('created_at', { ascending: false })
+                        .limit(4);
+
+                    if (recentFiles && recentFiles.length > 0) {
+                        setRecentDocuments(recentFiles);
                     } else {
-                        // Mock recent documents
-                        setRecentDocuments([
-                            { f_uuid: '1', f_name: 'Project_Plan_Q3.pdf', created_at: new Date().toISOString() },
-                            { f_uuid: '2', f_name: 'Operations_Manual.docx', created_at: new Date().toISOString() },
-                            { f_uuid: '3', f_name: 'HR_Policies_2024.pdf', created_at: new Date().toISOString() },
-                            { f_uuid: '4', f_name: 'Budget_Report.xlsx', created_at: new Date().toISOString() }
-                        ]);
+                        setRecentDocuments([]);
                     }
 
-                    // Mock shared files for the table
-                    setSharedFiles([
-                        {
-                            id: '1',
-                            name: 'Q3_Performance_Report.pdf',
-                            sharedBy: 'Alice Brown',
-                            dateShared: '2024-03-15',
-                            status: 'Done'
-                        },
-                        {
-                            id: '2',
-                            name: 'Project_Apollo_Brief.docx',
-                            sharedBy: 'John Doe',
-                            dateShared: '2024-03-12',
-                            status: 'Pending'
-                        },
-                        {
-                            id: '3',
-                            name: 'Team_Meeting_Minutes.pptx',
-                            sharedBy: 'Jane Smith',
-                            dateShared: '2024-03-10',
-                            status: 'Done'
-                        },
-                        {
-                            id: '4',
-                            name: 'Marketing_Campaign_Plan.xlsx',
-                            sharedBy: 'Robert Johnson',
-                            dateShared: '2024-03-08',
-                            status: 'Pending'
-                        },
-                        {
-                            id: '5',
-                            name: 'Vendor_Contract_Review.pdf',
-                            sharedBy: 'Emily White',
-                            dateShared: '2024-03-06',
-                            status: 'Done'
-                        }
-                    ]);
+                    // Fetch real shared files - files shared WITH this department FROM other departments
+                    const { data: sharedFilesData, error: sharedFilesError } = await supabase
+                        .from('file_department')
+                        .select(`
+                            f_uuid,
+                            created_at,
+                            status,
+                            file:f_uuid (
+                                f_name,
+                                created_at,
+                                d_uuid,
+                                users:uuid (
+                                    name,
+                                    d_uuid,
+                                    department:d_uuid (
+                                        d_name
+                                    )
+                                )
+                            )
+                        `)
+                        .eq('d_uuid', departmentId)
+                        .order('created_at', { ascending: false });
+
+                    if (sharedFilesData && sharedFilesData.length > 0) {
+                        // Filter out self-shares (files uploaded by the same department)
+                        const externalShares = sharedFilesData.filter(item => {
+                            const uploaderDepartment = item.file?.users?.d_uuid;
+                            const targetDepartment = departmentId;
+                            
+                            // Only include if uploader is from a different department
+                            return uploaderDepartment && uploaderDepartment !== targetDepartment;
+                        });
+
+                        // Separate pending and approved files
+                        const pendingFilesList = externalShares
+                            .filter(item => !item.status || item.status === 'pending')
+                            .map((item) => ({
+                                id: item.f_uuid,
+                                name: item.file?.f_name || 'Unknown File',
+                                sharedBy: item.file?.users?.name || 'Unknown User',
+                                dateShared: new Date(item.created_at).toLocaleDateString(),
+                                status: 'Pending',
+                                uploaderDepartment: item.file?.users?.d_uuid,
+                                fromDepartment: item.file?.users?.department?.d_name || 'Unknown Department'
+                            }));
+
+                        const approvedFilesList = externalShares
+                            .filter(item => item.status === 'approved')
+                            .map((item) => ({
+                                id: item.f_uuid,
+                                name: item.file?.f_name || 'Unknown File',
+                                sharedBy: item.file?.users?.name || 'Unknown User',
+                                dateShared: new Date(item.created_at).toLocaleDateString(),
+                                status: 'Approved',
+                                uploaderDepartment: item.file?.users?.d_uuid,
+                                fromDepartment: item.file?.users?.department?.d_name || 'Unknown Department'
+                            }));
+
+                        setPendingFiles(pendingFilesList);
+                        setSharedFiles(approvedFilesList);
+                    } else {
+                        setPendingFiles([]);
+                        setSharedFiles([]);
+                    }
 
                 } catch (dbError) {
                     console.error('Database query error:', dbError);
-                    // Set mock data if database queries fail
+                    // Set empty arrays if database queries fail
                     setDashboardStats({
-                        totalFiles: 24,
-                        activeUsers: 18,
-                        sharedFiles: 12,
-                        pendingTasks: 37
+                        totalFiles: 0,
+                        activeUsers: 0,
+                        sharedFiles: 0,
+                        pendingTasks: 0
                     });
 
-                    setRecentDocuments([
-                        { f_uuid: '1', f_name: 'Project_Plan_Q3.pdf', created_at: new Date().toISOString() },
-                        { f_uuid: '2', f_name: 'Operations_Manual.docx', created_at: new Date().toISOString() },
-                        { f_uuid: '3', f_name: 'HR_Policies_2024.pdf', created_at: new Date().toISOString() },
-                        { f_uuid: '4', f_name: 'Budget_Report.xlsx', created_at: new Date().toISOString() }
-                    ]);
-
-                    setSharedFiles([
-                        {
-                            id: '1',
-                            name: 'Q3_Performance_Report.pdf',
-                            sharedBy: 'Alice Brown',
-                            dateShared: '2024-03-15',
-                            status: 'Done'
-                        },
-                        {
-                            id: '2',
-                            name: 'Project_Apollo_Brief.docx',
-                            sharedBy: 'John Doe',
-                            dateShared: '2024-03-12',
-                            status: 'Pending'
-                        }
-                    ]);
+                    setRecentDocuments([]);
+                    setSharedFiles([]);
                 }
 
-                // Set department folders (mock data based on common departments)
-                setDepartmentFolders([
-                    {
-                        id: 1,
-                        name: 'Operations Department',
-                        description: 'Files for daily operations',
-                        icon: <BuildingOfficeIcon className="h-8 w-8 text-blue-500" />,
-                        count: Math.floor(Math.random() * 100) + 20
-                    },
-                    {
-                        id: 2,
-                        name: 'Finance Department',
-                        description: 'Budget and accounting files',
-                        icon: <CurrencyDollarIcon className="h-8 w-8 text-green-500" />,
-                        count: Math.floor(Math.random() * 80) + 15
-                    },
-                    {
-                        id: 3,
-                        name: 'HR Department',
-                        description: 'Employee records and policies',
-                        icon: <UsersIcon className="h-8 w-8 text-purple-500" />,
-                        count: Math.floor(Math.random() * 60) + 10
-                    },
-                    {
-                        id: 4,
-                        name: 'Marketing Department',
-                        description: 'Campaigns and outreach materials',
-                        icon: <ChartBarIcon className="h-8 w-8 text-orange-500" />,
-                        count: Math.floor(Math.random() * 70) + 12
+                // Fetch real departments and their file counts
+                try {
+                    const { data: allDepartments, error: deptError } = await supabase
+                        .from('department')
+                        .select('d_uuid, d_name');
+
+                    if (allDepartments && allDepartments.length > 0) {
+                        // Get file counts for each department
+                        const departmentWithCounts = await Promise.all(
+                            allDepartments.map(async (dept) => {
+                                const { count, error } = await supabase
+                                    .from('file')
+                                    .select('f_uuid', { count: 'exact' })
+                                    .eq('d_uuid', dept.d_uuid);
+
+                                return {
+                                    id: dept.d_uuid,
+                                    name: dept.d_name,
+                                    description: `Files and documents for ${dept.d_name}`,
+                                    icon: <BuildingOfficeIcon className="h-8 w-8 text-blue-500" />,
+                                    count: count || 0
+                                };
+                            })
+                        );
+
+                        setDepartmentFolders(departmentWithCounts);
+                    } else {
+                        setDepartmentFolders([]);
                     }
-                ]);
+                } catch (deptError) {
+                    console.error('Error fetching departments:', deptError);
+                    setDepartmentFolders([]);
+                }
 
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
-                // Set fallback mock data
+                // Set empty data on error instead of mock data
                 setDashboardStats({
-                    totalFiles: 24,
-                    activeUsers: 18,
-                    sharedFiles: 12,
-                    pendingTasks: 37
+                    totalFiles: 0,
+                    activeUsers: 0,
+                    sharedFiles: 0,
+                    pendingTasks: 0
                 });
 
-                setRecentDocuments([
-                    { f_uuid: '1', f_name: 'Project_Plan_Q3.pdf', created_at: new Date().toISOString() },
-                    { f_uuid: '2', f_name: 'Operations_Manual.docx', created_at: new Date().toISOString() },
-                    { f_uuid: '3', f_name: 'HR_Policies_2024.pdf', created_at: new Date().toISOString() },
-                    { f_uuid: '4', f_name: 'Budget_Report.xlsx', created_at: new Date().toISOString() }
-                ]);
-
-                setSharedFiles([
-                    {
-                        id: '1',
-                        name: 'Q3_Performance_Report.pdf',
-                        sharedBy: 'Alice Brown',
-                        dateShared: '2024-03-15',
-                        status: 'Done'
-                    }
-                ]);
-
-                setDepartmentFolders([
-                    {
-                        id: 1,
-                        name: 'Operations Department',
-                        description: 'Files for daily operations',
-                        icon: <BuildingOfficeIcon className="h-8 w-8 text-blue-500" />,
-                        count: 45
-                    },
-                    {
-                        id: 2,
-                        name: 'Finance Department',
-                        description: 'Budget and accounting files',
-                        icon: <CurrencyDollarIcon className="h-8 w-8 text-green-500" />,
-                        count: 32
-                    }
-                ]);
+                setRecentDocuments([]);
+                setSharedFiles([]);
+                setDepartmentFolders([]);
             } finally {
                 setLoading(false);
             }
@@ -347,6 +352,59 @@ const HeadDashboard = () => {
         };
         fetchDepartments();
     }, []);
+
+    // Fetch top 10 important-marked documents for the current user
+    useEffect(() => {
+        const fetchImportantDocuments = async () => {
+            if (!user?.id) return;
+            try {
+                // Get favorite documents for this user, newest first
+                const { data: favoriteData, error: favoriteError } = await supabase
+                    .from('favorites')
+                    .select('f_uuid, created_at')
+                    .eq('uuid', user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (favoriteError) throw favoriteError;
+
+                if (!favoriteData || favoriteData.length === 0) {
+                    setImportantDocuments([]);
+                    return;
+                }
+
+                // Get the file UUIDs from favorites
+                const ids = favoriteData.map(fav => fav.f_uuid);                // Fetch file metadata for these ids
+                const { data: filesData, error: filesError } = await supabase
+                    .from('file')
+                    .select('f_uuid, f_name, created_at')
+                    .in('f_uuid', ids);
+
+                if (filesError) throw filesError;
+
+                // Order files according to favorites recency
+                const byId = new Map((filesData || []).map(f => [f.f_uuid, f]));
+                const ordered = ids
+                    .map(id => byId.get(id))
+                    .filter(Boolean);
+
+                setImportantDocuments(ordered);
+            } catch (e) {
+                console.error('Error fetching favorite documents:', e);
+                setImportantDocuments([]);
+            }
+        };
+
+        fetchImportantDocuments();
+    }, [user?.id]);
+
+    // Ensure scroll index stays within bounds when important documents change
+    useEffect(() => {
+        setDocumentsScrollIndex(prev => {
+            const maxIndex = Math.max(0, importantDocuments.length - ITEMS_PER_VIEW);
+            return Math.min(prev, maxIndex);
+        });
+    }, [importantDocuments.length]);
 
     // Upload functionality
     const mergeFiles = (current, incoming) => {
@@ -434,6 +492,25 @@ const HeadDashboard = () => {
         setSelectedDepartments(prev => 
             prev.filter(dept => dept.d_uuid !== deptId)
         );
+    };
+
+    // Horizontal scrolling navigation functions
+    const scrollDocumentsLeft = () => {
+        setDocumentsScrollIndex(prev => Math.max(0, prev - 1));
+    };
+
+    const scrollDocumentsRight = () => {
+        const maxIndex = Math.max(0, importantDocuments.length - ITEMS_PER_VIEW);
+        setDocumentsScrollIndex(prev => Math.min(maxIndex, prev + 1));
+    };
+
+    const scrollFoldersLeft = () => {
+        setFoldersScrollIndex(prev => Math.max(0, prev - 1));
+    };
+
+    const scrollFoldersRight = () => {
+        const maxIndex = Math.max(0, departmentFolders.length - ITEMS_PER_VIEW);
+        setFoldersScrollIndex(prev => Math.min(maxIndex, prev + 1));
     };
 
     const handleUploadSubmit = async (e) => {
@@ -856,6 +933,55 @@ const HeadDashboard = () => {
         );
     };
 
+    // Approval functions for pending files
+    const handleApproveFile = async (fileId) => {
+        try {
+            const { error } = await supabase
+                .from('file_department')
+                .update({ status: 'approved' })
+                .eq('f_uuid', fileId)
+                .eq('d_uuid', userProfile?.department_id);
+
+            if (error) throw error;
+
+            // Move file from pending to shared files
+            setPendingFiles(prev => prev.filter(file => file.id !== fileId));
+            
+            // Refresh shared files to include the newly approved file
+            const approvedFile = pendingFiles.find(file => file.id === fileId);
+            if (approvedFile) {
+                setSharedFiles(prev => [...prev, { ...approvedFile, status: 'Approved' }]);
+            }
+
+            // Show success message
+            alert('File approved successfully!');
+        } catch (error) {
+            console.error('Error approving file:', error);
+            alert('Error approving file. Please try again.');
+        }
+    };
+
+    const handleRejectFile = async (fileId) => {
+        try {
+            const { error } = await supabase
+                .from('file_department')
+                .update({ status: 'rejected' })
+                .eq('f_uuid', fileId)
+                .eq('d_uuid', userProfile?.department_id);
+
+            if (error) throw error;
+
+            // Remove file from pending files
+            setPendingFiles(prev => prev.filter(file => file.id !== fileId));
+
+            // Show success message
+            alert('File rejected successfully!');
+        } catch (error) {
+            console.error('Error rejecting file:', error);
+            alert('Error rejecting file. Please try again.');
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -886,65 +1012,91 @@ const HeadDashboard = () => {
 
                 {/* Relevant Documents Section */}
                 <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4">Relevant Documents</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold text-gray-900">Relevant Documents</h2>
+                        {importantDocuments.length > ITEMS_PER_VIEW && (
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={scrollDocumentsLeft}
+                                    disabled={documentsScrollIndex === 0}
+                                    className={`p-2 rounded-full border ${
+                                        documentsScrollIndex === 0 
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                            : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                                    }`}
+                                >
+                                    <ChevronLeftIcon className="h-5 w-5" />
+                                </button>
+                                <button
+                                    onClick={scrollDocumentsRight}
+                                    disabled={documentsScrollIndex >= importantDocuments.length - ITEMS_PER_VIEW}
+                                    className={`p-2 rounded-full border ${
+                                        documentsScrollIndex >= importantDocuments.length - ITEMS_PER_VIEW
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                            : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                                    }`}
+                                >
+                                    <ChevronRightIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {recentDocuments.slice(0, 4).map((doc, index) => {
-                            const titles = ['Project Plans', 'Operational Guidelines', 'HR Policies', 'Budget Reports'];
-                            const descriptions = [
-                                'Access all ongoing project documents',
-                                'Standard operating procedures',
-                                'Human resources related documents',
-                                'Quarterly and annual financial reports'
-                            ];
-                            const icons = [
-                                <ClipboardDocumentListIcon className="h-8 w-8 text-blue-500" />,
-                                <DocumentTextIcon className="h-8 w-8 text-teal-500" />,
-                                <UsersIcon className="h-8 w-8 text-purple-500" />,
-                                <ChartBarIcon className="h-8 w-8 text-green-500" />
-                            ];
-                            
-                            return (
-                                <div key={doc.f_uuid || index} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between mb-4">
-                                        {icons[index]}
-                                        <button className="text-gray-400 hover:text-gray-600">
-                                            <EllipsisHorizontalIcon className="h-5 w-5" />
-                                        </button>
+                        {importantDocuments
+                            .slice(documentsScrollIndex, documentsScrollIndex + ITEMS_PER_VIEW)
+                            .map((doc, index) => {
+                                const actualIndex = documentsScrollIndex + index;
+                                const titles = ['Project Plans', 'Operational Guidelines', 'HR Policies', 'Budget Reports'];
+                                const descriptions = [
+                                    'Access all ongoing project documents',
+                                    'Standard operating procedures',
+                                    'Human resources related documents',
+                                    'Quarterly and annual financial reports'
+                                ];
+                                const icons = [
+                                    <ClipboardDocumentListIcon className="h-8 w-8 text-blue-500" />,
+                                    <DocumentTextIcon className="h-8 w-8 text-teal-500" />,
+                                    <UsersIcon className="h-8 w-8 text-purple-500" />,
+                                    <ChartBarIcon className="h-8 w-8 text-green-500" />
+                                ];
+                                
+                                return (
+                                    <div key={doc.f_uuid || actualIndex} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                                        <div className="flex items-center justify-between mb-4">
+                                            {icons[actualIndex % icons.length]}
+                                            <button className="text-gray-400 hover:text-gray-600">
+                                                <EllipsisHorizontalIcon className="h-5 w-5" />
+                                            </button>
+                                        </div>
+                                        <h3 className="font-semibold text-gray-900 mb-2">
+                                            {actualIndex < titles.length ? titles[actualIndex] : doc.f_name}
+                                        </h3>
+                                        <p className="text-sm text-gray-600">
+    
+                                            {actualIndex < descriptions.length ? descriptions[actualIndex] : `Document: ${doc.f_name}`}
+                                        </p>
                                     </div>
-                                    <h3 className="font-semibold text-gray-900 mb-2">{titles[index]}</h3>
-                                    <p className="text-sm text-gray-600">{descriptions[index]}</p>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                    </div>
+                </div>
+
+                {/* Collab Folders Section */}
+                <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold text-gray-900">Collab Folders</h2>
+                    </div>
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                        {/* Head collab folders: received and sent with status and actions */}
+                        <CollabFolders />
                     </div>
                 </div>
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column - Departmental Folders */}
+                    {/* Left Column - Quick Share */}
                     <div className="lg:col-span-1">
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Departmental Folders</h2>
-                            <div className="space-y-4">
-                                {departmentFolders.map((folder) => (
-                                    <div key={folder.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-                                        <div className="flex items-center space-x-3">
-                                            {folder.icon}
-                                            <div>
-                                                <h3 className="font-medium text-gray-900">{folder.name}</h3>
-                                                <p className="text-sm text-gray-600">{folder.description}</p>
-                                            </div>
-                                        </div>
-                                        <button className="text-gray-400 hover:text-gray-600">
-                                            <EllipsisHorizontalIcon className="h-5 w-5" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Quick Share Section */}
-                        <div className="bg-white rounded-lg border border-gray-200 p-6 mt-6">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Share</h2>
                             <div className="space-y-4">
                                 <div>
@@ -986,15 +1138,23 @@ const HeadDashboard = () => {
                     {/* Right Column - Shared Files */}
                     <div className="lg:col-span-2">
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Shared Files</h2>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-semibold text-gray-900">Shared Files</h2>
+                                {sharedFiles.length > 5 && (
+                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                        {sharedFiles.length} files • Scroll to see more
+                                    </span>
+                                )}
+                            </div>
                             
                             {sharedFiles.length > 0 ? (
-                                <div className="overflow-x-auto">
+                                <div className={`overflow-x-auto ${sharedFiles.length > 5 ? 'max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100' : ''}`}>
                                     <table className="min-w-full">
-                                        <thead>
+                                        <thead className="sticky top-0 bg-white">
                                             <tr className="border-b border-gray-200">
                                                 <th className="text-left py-3 px-4 font-medium text-gray-700">File Name</th>
                                                 <th className="text-left py-3 px-4 font-medium text-gray-700">Shared By</th>
+                                                <th className="text-left py-3 px-4 font-medium text-gray-700">From Department</th>
                                                 <th className="text-left py-3 px-4 font-medium text-gray-700">Date Shared</th>
                                                 <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
                                                 <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
@@ -1010,6 +1170,11 @@ const HeadDashboard = () => {
                                                         </div>
                                                     </td>
                                                     <td className="py-3 px-4 text-sm text-gray-600">{file.sharedBy}</td>
+                                                    <td className="py-3 px-4">
+                                                        <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                                            {file.fromDepartment}
+                                                        </span>
+                                                    </td>
                                                     <td className="py-3 px-4 text-sm text-gray-600">{file.dateShared}</td>
                                                     <td className="py-3 px-4">
                                                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

@@ -43,6 +43,73 @@ const Notifications = () => {
   const [error, setError] = useState(null);
   const [dateGroups, setDateGroups] = useState({});
 
+  // Function to ensure notifications exist for today's files.
+  // Important: Keep side-effects out of the fetch loop to avoid realtime feedback loops.
+  const ensureTodaysNotifications = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Get user's department
+      const { data: userData } = await supabase
+        .from('users')
+        .select('d_uuid')
+        .eq('uuid', user.id)
+        .single();
+
+      if (!userData?.d_uuid) return;
+
+      // Get today's start in ISO format
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString();
+
+      // Get files from user's department created today
+      const { data: todayFiles } = await supabase
+        .from('file')
+        .select(`
+          f_uuid, 
+          created_at,
+          file_department!inner(d_uuid)
+        `)
+        .eq('file_department.d_uuid', userData.d_uuid)
+        .gte('created_at', todayStr);
+
+      if (!todayFiles?.length) return;
+
+      // For each file, check if notification exists - INCLUDING SEEN ONES
+      for (const file of todayFiles) {
+        // Check if ANY notification exists for this file-user pair
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('f_uuid', file.f_uuid)
+          .eq('uuid', user.id);
+
+        if (count === 0) {
+          // Create notification if none exists
+          await supabase
+            .from('notifications')
+            .insert({
+              uuid: user.id,
+              f_uuid: file.f_uuid,
+              is_seen: false,
+              created_at: new Date().toISOString()
+            });
+        } else {
+          // Only update rows that are currently seen to unseen to avoid needless updates (and realtime loops)
+          await supabase
+            .from('notifications')
+            .update({ is_seen: false })
+            .eq('f_uuid', file.f_uuid)
+            .eq('uuid', user.id)
+            .eq('is_seen', true);
+        }
+      }
+    } catch (err) {
+      console.error("Error ensuring today's notifications:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchNotifications = async () => {
       if (!user?.id) {
@@ -60,9 +127,6 @@ const Notifications = () => {
         fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
         fourDaysAgo.setHours(0, 0, 0, 0);
         const fourDaysAgoStr = fourDaysAgo.toISOString();
-        
-        // First check if notifications exist for today's files
-        await ensureTodaysNotifications();
         
         // Basic query with date filter
         const { data, error } = await supabase
@@ -104,13 +168,27 @@ const Notifications = () => {
           fileMap[file.f_uuid] = file;
         });
         
-        // Map notifications to include file details
-        const notificationItems = (data || [])
+        // Deduplicate notifications so only the latest per file is shown
+        const sortedByNewest = (data || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const seenFiles = new Set();
+        const latestPerFile = [];
+        for (const n of sortedByNewest) {
+          if (!seenFiles.has(n.f_uuid)) {
+            seenFiles.add(n.f_uuid);
+            latestPerFile.push(n);
+          }
+        }
+
+        // Map notifications to include file details (with file created_at for display)
+        const notificationItems = latestPerFile
           .filter(notification => fileMap[notification.f_uuid])
           .map(notification => ({
             f_uuid: notification.f_uuid,
             f_name: fileMap[notification.f_uuid]?.f_name || 'Unknown file',
+            // notification timestamp (when the notif row was created/updated)
             created_at: notification.created_at,
+            // file timestamp (when the file was added)
+            file_created_at: fileMap[notification.f_uuid]?.created_at,
             dateGroup: formatDate(notification.created_at)
           }));
         
@@ -131,78 +209,13 @@ const Notifications = () => {
       }
     };
     
-    // Function to ensure notifications exist for today's files
-    const ensureTodaysNotifications = async () => {
-      if (!user?.id) return;
-      
-      try {
-        // Get user's department
-        const { data: userData } = await supabase
-          .from('users')
-          .select('d_uuid')
-          .eq('uuid', user.id)
-          .single();
-        
-        if (!userData?.d_uuid) return;
-        
-        // Get today's start in ISO format
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString();
-        
-        // Get files from user's department created today
-        const { data: todayFiles } = await supabase
-          .from('file')
-          .select(`
-            f_uuid, 
-            created_at,
-            file_department!inner(d_uuid)
-          `)
-          .eq('file_department.d_uuid', userData.d_uuid)
-          .gte('created_at', todayStr);
-        
-        if (!todayFiles?.length) return;
-        
-        // For each file, check if notification exists - INCLUDING SEEN ONES
-        for (const file of todayFiles) {
-          // Check if ANY notification exists for this file-user pair
-          const { count } = await supabase
-            .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('f_uuid', file.f_uuid)
-            .eq('uuid', user.id);
-          
-          if (count === 0) {
-            // Create notification if none exists
-            await supabase
-              .from('notifications')
-              .insert({
-                uuid: user.id,
-                f_uuid: file.f_uuid,
-                is_seen: false,
-                created_at: new Date().toISOString()
-              });
-          } else {
-            // If notification exists but is marked as seen, update it to unseen
-            await supabase
-              .from('notifications')
-              .update({ is_seen: false })
-              .eq('f_uuid', file.f_uuid)
-              .eq('uuid', user.id);
-          }
-        }
-      } catch (err) {
-        console.error("Error ensuring today's notifications:", err);
-      }
-    };
-
     fetchNotifications();
     
     // Set up real-time listeners
     const channel = supabase
       .channel('notifications-changes')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'notifications', filter: `uuid=eq.${user?.id}` },
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `uuid=eq.${user?.id}` },
         () => {
           fetchNotifications();
         }
@@ -212,6 +225,12 @@ const Notifications = () => {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, [user?.id]);
+
+  // Run the ensure step only once per mount/user change to avoid realtime feedback loops
+  useEffect(() => {
+    if (!user?.id) return;
+    ensureTodaysNotifications();
   }, [user?.id]);
 
   return (
@@ -274,7 +293,7 @@ const Notifications = () => {
               <ul className="divide-y divide-gray-100">
                 {groupItems.map(file => (
                   <li 
-                    key={file.f_uuid} 
+                    key={`${file.f_uuid}-${file.created_at}`} 
                     className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -286,7 +305,7 @@ const Notifications = () => {
                           {file.f_name || "Unnamed File"}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Added at {formatTime(file.created_at)}
+                          Added at {formatTime(file.file_created_at || file.created_at)}
                         </p>
                       </div>
                     </div>

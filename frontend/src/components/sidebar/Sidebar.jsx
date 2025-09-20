@@ -31,10 +31,11 @@ const headNavItems = [
   { name: 'Head Dashboard', path: '/head-dashboard', icon: HomeIcon },
   { name: 'All Files', path: '/all-files', icon: PaperAirplaneIcon },
   { name: 'Shared Files', path: '/shared-files', icon: ShareIcon },
+  { name: 'Calendar', path: '/calendar', icon: CalendarIcon },
   { name: 'Notifications', path: '/notifications', icon: EnvelopeIcon },
   { name: 'Important', path: '/important', icon: ArchiveBoxIcon },
   { name: 'Confidential', path: '/confidential', icon: ShieldCheckIcon },
-  { name: 'Calendar', path: '/calendar', icon: CalendarIcon },
+  
 ];
 
 const Sidebar = () => {
