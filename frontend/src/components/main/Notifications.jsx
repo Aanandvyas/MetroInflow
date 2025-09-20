@@ -49,14 +49,17 @@ const Notifications = () => {
     if (!user?.id) return;
 
     try {
-      // Get user's department
-      const { data: userData } = await supabase
+      // Get user's department and position
+      const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('d_uuid')
+        .select('d_uuid, position')
         .eq('uuid', user.id)
         .single();
 
-      if (!userData?.d_uuid) return;
+      if (userError || !userData?.d_uuid) return;
+
+      const userDepartmentId = userData.d_uuid;
+      const isHead = userData.position === 'head';
 
       // Get today's start in ISO format
       const today = new Date();
@@ -64,20 +67,44 @@ const Notifications = () => {
       const todayStr = today.toISOString();
 
       // Get files from user's department created today
-      const { data: todayFiles } = await supabase
+      // These are always visible to department members
+      const { data: todayInternalFiles } = await supabase
         .from('file')
         .select(`
           f_uuid, 
-          created_at,
-          file_department!inner(d_uuid)
+          created_at
         `)
-        .eq('file_department.d_uuid', userData.d_uuid)
+        .eq('d_uuid', userDepartmentId)
         .gte('created_at', todayStr);
 
-      if (!todayFiles?.length) return;
+      // Get files from other departments shared with user's department 
+      const { data: todayExternalFiles } = await supabase
+        .from('file_department')
+        .select(`
+          fd_uuid,
+          f_uuid,
+          is_approved,
+          file:f_uuid(f_uuid, d_uuid)
+        `)
+        .eq('d_uuid', userDepartmentId)
+        .neq('file.d_uuid', userDepartmentId)
+        .gte('created_at', todayStr);
+
+      // Filter external files based on approval status and user position
+      const approvedExternalFiles = todayExternalFiles?.filter(fd => 
+        isHead || fd.is_approved === true
+      ) || [];
+
+      // Combine files that should be visible to this user
+      const allVisibleFiles = [
+        ...(todayInternalFiles || []).map(f => ({ f_uuid: f.f_uuid })),
+        ...approvedExternalFiles.map(fd => ({ f_uuid: fd.f_uuid }))
+      ];
+
+      if (!allVisibleFiles.length) return;
 
       // For each file, check if notification exists - INCLUDING SEEN ONES
-      for (const file of todayFiles) {
+      for (const file of allVisibleFiles) {
         // Check if ANY notification exists for this file-user pair
         const { count } = await supabase
           .from('notifications')
@@ -122,6 +149,22 @@ const Notifications = () => {
       setError(null);
 
       try {
+        // Get user's department
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('d_uuid, position')
+          .eq('uuid', user.id)
+          .single();
+        
+        if (userError) {
+          setError(`User profile error: ${userError.message}`);
+          setLoading(false);
+          return;
+        }
+
+        const userDepartmentId = userData?.d_uuid;
+        const isHead = userData?.position === 'head';
+        
         // Calculate date 4 days ago
         const fourDaysAgo = new Date();
         fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
@@ -153,7 +196,17 @@ const Notifications = () => {
         const fileIds = data.map(n => n.f_uuid);
         const { data: fileData, error: fileError } = await supabase
           .from('file')
-          .select('f_uuid, f_name, created_at')
+          .select(`
+            f_uuid, 
+            f_name, 
+            created_at, 
+            d_uuid,
+            file_department(
+              fd_uuid,
+              d_uuid,
+              is_approved
+            )
+          `)
           .in('f_uuid', fileIds);
         
         if (fileError) {
@@ -180,8 +233,27 @@ const Notifications = () => {
         }
 
         // Map notifications to include file details (with file created_at for display)
+        // And filter based on department and approval status
         const notificationItems = latestPerFile
-          .filter(notification => fileMap[notification.f_uuid])
+          .filter(notification => {
+            const file = fileMap[notification.f_uuid];
+            if (!file) return false;
+            
+            // Files from user's own department are always visible
+            if (file.d_uuid === userDepartmentId) return true;
+            
+            // For files from other departments, check approval status
+            // Department heads see all files from other departments
+            if (isHead) return true;
+            
+            // Regular staff only see approved files from other departments
+            // Find if this file has been shared with user's department and is approved
+            const sharedWithDept = file.file_department?.find(fd => 
+              fd.d_uuid === userDepartmentId && fd.is_approved === true
+            );
+            
+            return !!sharedWithDept;
+          })
           .map(notification => ({
             f_uuid: notification.f_uuid,
             f_name: fileMap[notification.f_uuid]?.f_name || 'Unknown file',
@@ -189,7 +261,9 @@ const Notifications = () => {
             created_at: notification.created_at,
             // file timestamp (when the file was added)
             file_created_at: fileMap[notification.f_uuid]?.created_at,
-            dateGroup: formatDate(notification.created_at)
+            dateGroup: formatDate(notification.created_at),
+            // Check if from user's department
+            fromSameDept: fileMap[notification.f_uuid]?.d_uuid === userDepartmentId
           }));
         
         // Group by date for display
@@ -301,9 +375,20 @@ const Notifications = () => {
                         <DocumentTextIcon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm text-gray-900 font-medium truncate">
-                          {file.f_name || "Unnamed File"}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-900 font-medium truncate">
+                            {file.f_name || "Unnamed File"}
+                          </p>
+                          {file.fromSameDept ? (
+                            <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">
+                              Internal
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              External (Approved)
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-500 mt-0.5">
                           Added at {formatTime(file.file_created_at || file.created_at)}
                         </p>

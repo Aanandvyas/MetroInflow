@@ -51,15 +51,21 @@ const SharedFiles = () => {
                         created_at,
                         file:f_uuid (
                             f_name,
-                            created_at
+                            created_at,
+                            d_uuid,
+                            users:uuid (
+                                name,
+                                d_uuid,
+                                position
+                            )
                         )
                     `)
                     .eq('d_uuid', profile.d_uuid)
                     .order('created_at', { ascending: false });
 
-                // Staff see only approved
+                // Staff see only approved files from other departments or any files from their own department
                 if (!isHead) {
-                    query = query.eq('is_approved', true);
+                    query = query.or(`is_approved.eq.true,file.d_uuid.eq.${profile.d_uuid}`);
                 }
 
                 const { data, error } = await query;
@@ -74,6 +80,10 @@ const SharedFiles = () => {
                         shared_at: r.created_at,
                         f_name: r.file?.f_name || 'Unnamed File',
                         file_created_at: r.file?.created_at,
+                        source_dept_uuid: r.file?.d_uuid, // Source department
+                        is_same_department: r.file?.d_uuid === profile.d_uuid, // Flag if from same department
+                        uploader_name: r.file?.users?.name || 'Unknown',
+                        uploader_position: r.file?.users?.position || 'Unknown',
                     }));
                 setRows(mapped);
             } catch (e) {
@@ -128,8 +138,14 @@ const SharedFiles = () => {
 
     return (
         <div className="p-6 max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col mb-6">
                 <h1 className="text-2xl font-semibold">Shared Files</h1>
+                <p className="text-sm text-gray-600 mt-1">
+                    {isHead 
+                        ? "Files from other departments require your approval before they're visible to your staff. Files from within your department are automatically shared." 
+                        : "You can see all files from your department and approved files from other departments."
+                    }
+                </p>
             </div>
 
             {error && (
@@ -139,7 +155,18 @@ const SharedFiles = () => {
             {loading ? (
                 <div className="flex items-center gap-2 text-gray-600"><ClockIcon className="h-5 w-5 animate-spin" /> Loading…</div>
             ) : rows.length === 0 ? (
-                <div className="text-gray-600">No shared files{isHead ? '' : ' approved for your department yet'}.</div>
+                <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+                    <div className="mx-auto h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                        <DocumentTextIcon className="h-6 w-6 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No shared files found</h3>
+                    <p className="text-gray-600">
+                        {isHead 
+                            ? "You'll see files shared with your department here, including those requiring your approval." 
+                            : "You'll see files from your department and approved files from other departments here."
+                        }
+                    </p>
+                </div>
             ) : (
                 <ul className="divide-y divide-gray-200 bg-white border rounded">
                     {rows.map(item => {
@@ -154,11 +181,24 @@ const SharedFiles = () => {
                                                 {item.f_name}
                                             </a>
                                             <span className={`text-xs px-2 py-0.5 rounded border ${meta.color}`}>{meta.label}</span>
+                                            {item.is_same_department && (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">
+                                                    Internal
+                                                </span>
+                                            )}
+                                            {!item.is_same_department && (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                    External
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="text-xs text-gray-500 mt-0.5">Shared on {new Date(item.shared_at).toLocaleString()}</div>
+                                        <div className="text-xs text-gray-500 mt-0.5 flex flex-col">
+                                            <span>Shared on {new Date(item.shared_at).toLocaleString()}</span>
+                                            <span>From: {item.uploader_name} ({item.uploader_position === 'head' ? 'Department Head' : 'Staff'})</span>
+                                        </div>
                                     </div>
                                 </div>
-                                {isHead && (
+                                {isHead && !item.is_same_department && (
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                         <button
                                             onClick={() => approve(item.fd_uuid)}
