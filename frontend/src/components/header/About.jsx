@@ -8,6 +8,7 @@ const teamMembers = [
   'Yash Rathore',
   'Aditya Teja',
   'Vaishnavi Parashar',
+  'Ayush Mann'
 ];
 
 function About() {
