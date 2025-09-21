@@ -22,7 +22,6 @@ import SharedFiles from "./departmenthead/SharedFiles";
 import Confidential from "./departmenthead/Confidential";
 import Calendar from "./departmenthead/Calendar";
 import CollabDepartment from "./departmenthead/CollabDepartment";
-import TestCollabFolders from "./departmenthead/TestCollabFolders";
 
 // ✅ Simple placeholder component for pages that are not yet built
 const Placeholder = ({ title }) => (
@@ -111,10 +110,6 @@ export const Router = createBrowserRouter([ // Corrected export name
                     </RoleProtectedRoute>
                 ) 
             },
-            {
-                path: "/test-collab-folders",
-                element: <TestCollabFolders />
-            }
         ],
     },
     { path: "/login", element: <Login /> },

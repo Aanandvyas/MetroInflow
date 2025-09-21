@@ -5,8 +5,8 @@ import { supabase } from '../supabaseClient';
 
 // Helper for status label/color
 const statusMeta = (isApproved) => {
-    if (isApproved === true) return { label: 'Approved', color: 'text-green-700 bg-green-50 border-green-200' };
-    if (isApproved === false) return { label: 'Rejected', color: 'text-red-700 bg-red-50 border-red-200' };
+    if (isApproved === 'approved') return { label: 'Approved', color: 'text-green-700 bg-green-50 border-green-200' };
+    if (isApproved === 'rejected') return { label: 'Rejected', color: 'text-red-700 bg-red-50 border-red-200' };
     return { label: 'Pending', color: 'text-amber-700 bg-amber-50 border-amber-200' };
 };
 
@@ -34,12 +34,18 @@ const SharedFiles = () => {
         load();
     }, [user?.id, getUserProfile]);
 
-    // Fetch shared files for this department
+    // Fetch shared files for this department - only last 7 days
     useEffect(() => {
         const fetchRows = async () => {
             if (!profile?.d_uuid) { setRows([]); setLoading(false); return; }
             setLoading(true);
             setError(null);
+            
+            // Calculate date 7 days ago
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const sevenDaysAgoISOString = sevenDaysAgo.toISOString();
+            
             try {
                 let query = supabase
                     .from('file_department')
@@ -61,18 +67,30 @@ const SharedFiles = () => {
                         )
                     `)
                     .eq('d_uuid', profile.d_uuid)
+                    .gte('created_at', sevenDaysAgoISOString) // Only get files shared in the last 7 days
                     .order('created_at', { ascending: false });
 
                 // Staff see only approved files from other departments or any files from their own department
                 if (!isHead) {
-                    query = query.or(`is_approved.eq.true,file.d_uuid.eq.${profile.d_uuid}`);
+                    query = query.or(`is_approved.eq.approved,file.d_uuid.eq.${profile.d_uuid}`);
                 }
 
                 const { data, error } = await query;
                 if (error) throw error;
 
+                // Filter and map the data
                 const mapped = (data || [])
-                    .filter(r => r.file) // ensure joined file exists
+                    .filter(r => {
+                        // Ensure joined file exists
+                        if (!r.file) return false;
+                        
+                        // For department heads, hide approved files that are not from their own department
+                        if (isHead && r.is_approved === 'approved' && r.file.d_uuid !== profile.d_uuid) {
+                            return false;
+                        }
+                        
+                        return true;
+                    })
                     .map(r => ({
                         fd_uuid: r.fd_uuid,
                         f_uuid: r.f_uuid,
@@ -110,11 +128,11 @@ const SharedFiles = () => {
         try {
             const { error } = await supabase
                 .from('file_department')
-                .update({ is_approved: true })
+                .update({ is_approved: 'approved' })
                 .eq('fd_uuid', fd_uuid);
             if (error) throw error;
             // Optimistic update
-            setRows(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: true } : r));
+            setRows(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: 'approved' } : r));
         } catch (e) {
             console.error('Approve failed', e);
             setError(e.message || 'Failed to approve');
@@ -125,11 +143,11 @@ const SharedFiles = () => {
         try {
             const { error } = await supabase
                 .from('file_department')
-                .update({ is_approved: false })
+                .update({ is_approved: 'rejected' })
                 .eq('fd_uuid', fd_uuid);
             if (error) throw error;
             // Optimistic update
-            setRows(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: false } : r));
+            setRows(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: 'rejected' } : r));
         } catch (e) {
             console.error('Reject failed', e);
             setError(e.message || 'Failed to reject');
@@ -142,8 +160,8 @@ const SharedFiles = () => {
                 <h1 className="text-2xl font-semibold">Shared Files</h1>
                 <p className="text-sm text-gray-600 mt-1">
                     {isHead 
-                        ? "Files from other departments require your approval before they're visible to your staff. Files from within your department are automatically shared." 
-                        : "You can see all files from your department and approved files from other departments."
+                        ? "Files shared in the last 7 days that require your approval. Once approved, files will be removed from this list." 
+                        : "You can see files from your department and approved files from other departments shared in the last 7 days."
                     }
                 </p>
             </div>
@@ -162,8 +180,8 @@ const SharedFiles = () => {
                     <h3 className="text-lg font-medium text-gray-900 mb-1">No shared files found</h3>
                     <p className="text-gray-600">
                         {isHead 
-                            ? "You'll see files shared with your department here, including those requiring your approval." 
-                            : "You'll see files from your department and approved files from other departments here."
+                            ? "You'll see pending files from the last 7 days that require your approval." 
+                            : "You'll see files from your department and approved files from other departments shared in the last 7 days."
                         }
                     </p>
                 </div>
@@ -198,24 +216,48 @@ const SharedFiles = () => {
                                         </div>
                                     </div>
                                 </div>
-                                {isHead && !item.is_same_department && (
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <button
-                                            onClick={() => approve(item.fd_uuid)}
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-green-600 text-green-700 hover:bg-green-50"
-                                            disabled={item.is_approved === true}
-                                        >
-                                            <CheckCircleIcon className="h-4 w-4" /> Approve
-                                        </button>
-                                        <button
-                                            onClick={() => reject(item.fd_uuid)}
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-red-600 text-red-700 hover:bg-red-50"
-                                            disabled={item.is_approved === false}
-                                        >
-                                            <XCircleIcon className="h-4 w-4" /> Reject
-                                        </button>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    {/* View and Summary buttons always visible */}
+                                    <a
+                                        href={`/file/${item.f_uuid}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-blue-600 text-blue-700 hover:bg-blue-50"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                                        </svg> View
+                                    </a>
+                                    <a
+                                        href={`/summary/${item.f_uuid}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg> Summary
+                                    </a>
+                                    
+                                    {/* Approval buttons only shown for files that are still pending and eligible for decision */}
+                                    {isHead && !item.is_same_department && item.is_approved !== 'approved' && item.is_approved !== 'rejected' && (
+                                        <>
+                                            <button
+                                                onClick={() => approve(item.fd_uuid)}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-green-600 text-green-700 hover:bg-green-50"
+                                            >
+                                                <CheckCircleIcon className="h-4 w-4" /> Approve
+                                            </button>
+                                            <button
+                                                onClick={() => reject(item.fd_uuid)}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-red-600 text-red-700 hover:bg-red-50"
+                                            >
+                                                <XCircleIcon className="h-4 w-4" /> Reject
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             </li>
                         );
                     })}

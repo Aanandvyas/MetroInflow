@@ -4,6 +4,12 @@ import { ShieldExclamationIcon, DocumentTextIcon } from '@heroicons/react/24/out
 const Confidential = () => {
     return (
         <div className="max-w-7xl mx-auto p-6">
+            {/* Work in Progress Banner */}
+            <div className="bg-yellow-100 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg shadow-sm">
+                <p className="text-yellow-700 font-bold">WORK IN PROGRESS</p>
+                <p className="text-yellow-600 text-sm">This page is currently under development and may contain incomplete information.</p>
+            </div>
+            
             <div className="my-8">
                 <h1 className="text-4xl font-bold text-gray-900 mb-2">
                     Confidential Information

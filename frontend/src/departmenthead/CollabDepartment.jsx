@@ -16,13 +16,13 @@ import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 
 // Status pill component
 const StatusPill = ({ value }) => {
-  const meta = value === true
+  const meta = value === 'approved'
     ? { 
         label: 'Approved', 
         cls: 'text-green-700 bg-green-50 border-green-200',
         icon: <CheckCircleIcon className="w-3 h-3 mr-1" />
       }
-    : value === false
+    : value === 'rejected'
     ? { 
         label: 'Rejected', 
         cls: 'text-red-700 bg-red-50 border-red-200',
@@ -141,38 +141,62 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
                     )}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    From: <span className="font-medium">{r.senderName}</span> 
+                    <span className="font-medium">{r.senderName}</span>
                     <span className="inline-flex ml-1 items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       Department Head
-                    </span> 
-                    {/* Show the department of the sender if available */}
+                    </span>
                     {departmentNames[r.senderDeptId] && (
                       <span className="ml-1">
-                        of <span className="font-medium">{departmentNames[r.senderDeptId]}</span>
+                        shared from <span className="font-medium">{departmentNames[r.senderDeptId]}</span> department
                       </span>
                     )}
-                    • {new Date(r.shared_at).toLocaleString()}
+                    <span className="mx-1">•</span>
+                    {new Date(r.shared_at).toLocaleString()}
                   </div>
                 </div>
               </div>
-              {isHead && r.canDecide && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button 
-                    onClick={() => onApprove(r.fd_uuid)} 
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-green-600 text-green-700 hover:bg-green-50" 
-                    disabled={r.is_approved === true}
-                  >
-                    <CheckCircleIcon className="h-4 w-4" /> Approve
-                  </button>
-                  <button 
-                    onClick={() => onReject(r.fd_uuid)} 
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-red-600 text-red-700 hover:bg-red-50" 
-                    disabled={r.is_approved === false}
-                  >
-                    <XCircleIcon className="h-4 w-4" /> Reject
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* View and Summary buttons always visible */}
+                <a
+                  href={`/file/${r.f_uuid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-blue-600 text-blue-700 hover:bg-blue-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                  </svg> View
+                </a>
+                <a
+                  href={`/summary/${r.f_uuid}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg> Summary
+                </a>
+                
+                {/* Approval buttons only shown for files that are still pending and can be decided */}
+                {isHead && r.canDecide && r.is_approved !== 'approved' && r.is_approved !== 'rejected' && (
+                  <>
+                    <button 
+                      onClick={() => onApprove(r.fd_uuid)} 
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-green-600 text-green-700 hover:bg-green-50"
+                    >
+                      <CheckCircleIcon className="h-4 w-4" /> Approve
+                    </button>
+                    <button 
+                      onClick={() => onReject(r.fd_uuid)} 
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-red-600 text-red-700 hover:bg-red-50"
+                    >
+                      <XCircleIcon className="h-4 w-4" /> Reject
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -305,29 +329,23 @@ const CollabDepartment = () => {
         const anyFilesFromDept = (recData || []).some(r => r.file && r.file.d_uuid === departmentId);
         console.log(`DEBUG: Are there any files from this department? ${anyFilesFromDept ? 'YES' : 'NO'}`);
         
-        // MODIFIED FILTER - If no files are found from this department, show ALL files shared with us
-        // This ensures the user sees some data instead of nothing
+        // Only show files from the selected department
         const recMapped = (recData || [])
           .filter(r => {
-            // If we found files from this department, filter for them
-            if (anyFilesFromDept) {
-              return r.file && r.file.d_uuid === departmentId;
-            } 
-            // Otherwise, just check that the file exists
-            return r.file != null;
+            // Check both the file's department and the sender's department
+            return r.file && (r.file.d_uuid === departmentId || r.file.users?.d_uuid === departmentId);
           })
           .map(r => {
-            // The user who uploaded the file (creator) might be from a different department than the file itself
-            // For department collaboration, we need to know which department SENT the file, not which created it
+            // We need to determine BOTH the department where the file was created AND the department that shared it
             
             // The file's department is where it was originally created
             const fileDeptId = r.file?.d_uuid;
             
             // The sender's department (may be different from the file's department)
+            // The user who shared it might be from a department that didn't create the file
             const senderDeptId = r.file?.users?.d_uuid;
             
-            // Determine the actual source department - prioritize the sender's department
-            // because they're the ones who shared it, even if file was created elsewhere
+            // For collaboration purposes, the sender's department is most important since they're the ones sharing
             const sourceDeptId = senderDeptId || fileDeptId;
             let other_d_uuid = sourceDeptId;
             
@@ -359,28 +377,30 @@ const CollabDepartment = () => {
 
         console.log(`DEBUG: Final files to display: ${recMapped.length}`);
         
-        // Show a more helpful message when files exist but are filtered out
+        // Show a helpful message when there are no files from this department
         if (recData && recData.length > 0 && recMapped.length === 0) {
-          console.log("DEBUG: Files exist but all were filtered out");
+          console.log("DEBUG: No files found from this department");
           setError(`No files from ${department?.d_name || 'this department'} have been shared with your department yet. Check with the department head if you're expecting files.`);
-        } else if (recMapped.length > 0 && !recData.some(r => r.file?.d_uuid === departmentId)) {
-          // If we're showing files but they're not from the selected department
-          console.log("DEBUG: Showing files from other departments as fallback");
-          setError(`No files from ${department?.d_name || 'this department'} were found. Showing files from other departments instead.`);
+        } else if (recMapped.length === 0) {
+          // If we're not showing any files
+          console.log("DEBUG: No files from this department to show");
+          setError(`No files from ${department?.d_name || 'this department'} have been shared with your department yet.`);
           
-          // If we're showing other departments, get a list of unique departments
-          // so we can show the department names in the UI
-          const deptIds = new Set(recMapped.filter(f => f.actual_dept_uuid).map(f => f.actual_dept_uuid));
+          // If we're showing other departments, gather a list of unique departments from both sender and file departments
+          // This ensures we include both the departments where files were created AND departments that shared them
+          const fileDeptIds = new Set(recMapped.filter(f => f.fileDeptId).map(f => f.fileDeptId));
+          const senderDeptIds = new Set(recMapped.filter(f => f.senderDeptId).map(f => f.senderDeptId));
+          const allDeptIds = new Set([...Array.from(fileDeptIds), ...Array.from(senderDeptIds)]);
           
-          if (deptIds.size > 0) {
-            console.log(`DEBUG: Files are from ${deptIds.size} other departments:`, Array.from(deptIds));
+          if (allDeptIds.size > 0) {
+            console.log(`DEBUG: Files are from ${allDeptIds.size} other departments:`, Array.from(allDeptIds));
             
-            // Fetch department names if needed
+            // Fetch department names for all relevant departments
             const fetchDeptNames = async () => {
               const { data } = await supabase
                 .from('department')
                 .select('d_uuid, d_name')
-                .in('d_uuid', Array.from(deptIds));
+                .in('d_uuid', Array.from(allDeptIds));
                 
               if (data) {
                 console.log("DEBUG: Department names fetched:", data);
@@ -447,14 +467,14 @@ const CollabDepartment = () => {
     try {
       const { error } = await supabase
         .from('file_department')
-        .update({ is_approved: true })
+        .update({ is_approved: 'approved' })
         .eq('fd_uuid', fd_uuid);
         
       if (error) throw error;
       
       // Update UI optimistically
       setReceived(prev => prev.map(r => 
-        r.fd_uuid === fd_uuid ? { ...r, is_approved: true } : r
+        r.fd_uuid === fd_uuid ? { ...r, is_approved: 'approved' } : r
       ));
     } catch (e) {
       setError(e.message || 'Approve failed');
@@ -465,14 +485,14 @@ const CollabDepartment = () => {
     try {
       const { error } = await supabase
         .from('file_department')
-        .update({ is_approved: false })
+        .update({ is_approved: 'rejected' })
         .eq('fd_uuid', fd_uuid);
         
       if (error) throw error;
       
       // Update UI optimistically
       setReceived(prev => prev.map(r => 
-        r.fd_uuid === fd_uuid ? { ...r, is_approved: false } : r
+        r.fd_uuid === fd_uuid ? { ...r, is_approved: 'rejected' } : r
       ));
     } catch (e) {
       setError(e.message || 'Reject failed');
@@ -490,15 +510,16 @@ const CollabDepartment = () => {
       // Apply status filter
       const statusMatch = 
         filter === 'all' ? true :
-        filter === 'pending' ? file.is_approved === null :
-        filter === 'approved' ? file.is_approved === true :
-        filter === 'rejected' ? file.is_approved === false : 
+        filter === 'pending' ? file.is_approved === 'pending' || file.is_approved === null :
+        filter === 'approved' ? file.is_approved === 'approved' :
+        filter === 'rejected' ? file.is_approved === 'rejected' : 
         true;
       
-      // Apply department filter
+      // Apply department filter - match either sender department or file department
+      // This makes sure we can filter by either "who sent it" or "where it was created"
       const deptMatch = 
         deptFilter === 'all' ? true :
-        file.actual_dept_uuid === deptFilter;
+        file.senderDeptId === deptFilter || file.fileDeptId === deptFilter;
       
       return statusMatch && deptMatch;
     });

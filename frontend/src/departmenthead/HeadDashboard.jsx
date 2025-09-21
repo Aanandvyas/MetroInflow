@@ -282,6 +282,12 @@ const DepartmentGrid = () => {
                     return acc;
                 }, {});
                 
+                // Create a map of department IDs to their names for easier reference
+                const deptIdToNameMap = {};
+                allDepartments.forEach(dept => {
+                    deptIdToNameMap[dept.d_uuid] = dept.d_name;
+                });
+                
                 console.log("Department map:", departmentMap);
                 
                 // Step 4: Get the source department information for each file
@@ -300,14 +306,35 @@ const DepartmentGrid = () => {
                 
                 // Create a map of file to source department
                 const fileSourceMap = {};
+                
+                // Group all entries by file ID to find all departments associated with each file
+                const fileToDeptsMap = {};
                 sourceFileDepts.forEach(entry => {
-                    // Only consider entries where the department is not the user's department
-                    if (entry.d_uuid !== userProfile.d_uuid) {
-                        fileSourceMap[entry.f_uuid] = entry.d_uuid;
+                    if (!fileToDeptsMap[entry.f_uuid]) {
+                        fileToDeptsMap[entry.f_uuid] = [];
                     }
+                    fileToDeptsMap[entry.f_uuid].push(entry.d_uuid);
                 });
                 
-                console.log("File source map:", fileSourceMap);
+                // For each file, determine the source department (the one that's not the user's department)
+                for (const [fileId, deptIds] of Object.entries(fileToDeptsMap)) {
+                    // If there are multiple departments, find one that's not the user's department
+                    const sourceDept = deptIds.find(deptId => deptId !== userProfile.d_uuid);
+                    
+                    // If we found a non-user department, use it as the source
+                    if (sourceDept) {
+                        fileSourceMap[fileId] = sourceDept;
+                    } 
+                    // Otherwise, use the file's actual department from filesData
+                    else {
+                        const fileData = filesData.find(f => f.f_uuid === fileId);
+                        if (fileData && fileData.d_uuid && fileData.d_uuid !== userProfile.d_uuid) {
+                            fileSourceMap[fileId] = fileData.d_uuid;
+                        }
+                    }
+                }
+                
+                console.log("File source map (improved):", fileSourceMap);
                 
                 // Step 5: If users are not loaded properly, fetch them separately
                 let usersData = {};
@@ -340,8 +367,20 @@ const DepartmentGrid = () => {
                     // Get the user info either from the joined data or our separately fetched data
                     const user = fileDetails.users || usersData[fileDetails.uuid];
                     
-                    // Get the source department from our map instead of the file's d_uuid
-                    const sourceDeptId = fileSourceMap[fileDept.f_uuid];
+                    // First try to get source from our map, then from the file itself
+                    let sourceDeptId = fileSourceMap[fileDept.f_uuid];
+                    
+                    // If no source department found, use the file's original department
+                    if (!sourceDeptId && fileDetails) {
+                        sourceDeptId = fileDetails.d_uuid;
+                        // Only if it's not the current user's department
+                        if (sourceDeptId === userProfile.d_uuid) {
+                            sourceDeptId = null;
+                        }
+                    }
+                    
+                    // If we have a department name, use it; otherwise mark as Unknown
+                    const sourceDeptName = sourceDeptId ? deptIdToNameMap[sourceDeptId] || "Unknown Department" : "Unknown Department";
                     
                     return {
                         fd_uuid: fileDept.fd_uuid,
@@ -349,6 +388,7 @@ const DepartmentGrid = () => {
                         is_approved: fileDept.is_approved,
                         source_d_uuid: sourceDeptId,
                         source_department: sourceDeptId ? departmentMap[sourceDeptId] : null,
+                        source_dept_name: sourceDeptName,
                         file: {
                             ...fileDetails,
                             uploader: user
@@ -369,24 +409,24 @@ const DepartmentGrid = () => {
                 // Get the first department as a default for null or missing department IDs
                 const defaultDepartment = filteredDepartments.length > 0 ? filteredDepartments[0].d_uuid : null;
                 
-                // Create a special "Unknown" department if it doesn't exist
-                let hasUnknownDept = false;
-                if (filteredDepartments.length > 0) {
-                    const unknownDeptExists = filteredDepartments.some(dept => dept.d_name.toLowerCase().includes('unknown') || dept.d_name.toLowerCase().includes('other'));
-                    
-                    if (!unknownDeptExists) {
-                        // Use the first department as fallback for unknown sources
-                        hasUnknownDept = true;
-                        filesBySourceDept["unknown"] = [];
-                        console.log("Added 'Unknown' department for files with missing department info");
-                    }
-                }
+                // Always create an "Unknown" department for files that can't be assigned
+                let hasUnknownDept = true;
+                filesBySourceDept["unknown"] = [];
+                console.log("Added 'Unknown' department for files with missing department info");
+                
+                console.log("DEBUG: File distribution starting with departments:", 
+                    Object.keys(filesBySourceDept).map(id => 
+                        `${id}: ${id === "unknown" ? "Unknown Source" : (deptIdToNameMap[id] || 'Unknown')}`
+                    )
+                );
                 
                 // Organize files by the source department
                 sharedFilesData.forEach(fileData => {
-                    // The source department comes from our file_department mapping
+                    // Use the source department we determined earlier
                     let sourceDeptId = fileData.source_d_uuid;
-                    let sourceDeptName = fileData.source_department?.d_name || "Unknown";
+                    let sourceDeptName = fileData.source_dept_name || "Unknown Department";
+                    
+                    console.log(`DEBUG: Assigning file ${fileData.file.f_name || 'Unnamed'} to dept: ${sourceDeptId || 'unknown'} (${sourceDeptName})`);
                     
                     console.log("Processing file:", fileData.file.f_name, 
                               "from department:", sourceDeptId, 
@@ -401,68 +441,41 @@ const DepartmentGrid = () => {
                         uploaderPosition = fileData.file.uploader.position || "Unknown";
                     }
                     
-                    // Handle null or unknown departments
-                    if (!sourceDeptId || sourceDeptId === userProfile.d_uuid) {
-                        // If source is null/undefined or is the user's own department, use the unknown department
-                        if (hasUnknownDept) {
-                            sourceDeptId = "unknown";
-                        } else if (defaultDepartment && defaultDepartment !== userProfile.d_uuid) {
-                            // Fallback to the first available department that's not the user's
-                            sourceDeptId = defaultDepartment;
-                        } else {
-                            // Last resort - pick any department that's available
-                            for (const deptId in filesBySourceDept) {
-                                if (deptId !== userProfile.d_uuid) {
-                                    sourceDeptId = deptId;
-                                    break;
-                                }
-                            }
-                        }
-                        console.log("Reassigned file to department:", sourceDeptId);
+                    // Handle department assignment logic 
+                    if (!sourceDeptId) {
+                        // No source department specified
+                        console.log(`File ${fileData.file.f_name || fileData.f_uuid} has no source department. Assigning to unknown.`);
+                        sourceDeptId = "unknown";
+                        sourceDeptName = "Unknown Source";
+                    } else if (sourceDeptId === userProfile.d_uuid) {
+                        // File is from user's own department - should not show up here
+                        console.log(`File ${fileData.file.f_name || fileData.f_uuid} is from user's own department. Assigning to unknown.`);
+                        sourceDeptId = "unknown";
+                        sourceDeptName = "Unknown Source";
+                    } else if (!filesBySourceDept.hasOwnProperty(sourceDeptId)) {
+                        // Department not in our tracked departments
+                        console.log(`File ${fileData.file.f_name || fileData.f_uuid} has untracked department ID: ${sourceDeptId}. Assigning to unknown.`);
+                        sourceDeptId = "unknown";
+                        sourceDeptName = "Unknown Source";
                     }
                     
-                    // Only include if the source department is one we're tracking (not the user's own department)
-                    if (filesBySourceDept.hasOwnProperty(sourceDeptId)) {
-                        filesBySourceDept[sourceDeptId].push({
-                            fd_uuid: fileData.fd_uuid,
-                            f_uuid: fileData.f_uuid,
-                            is_approved: fileData.is_approved,
-                            fileName: fileData.file.f_name,
-                            createdAt: fileData.file.created_at,
-                            uploadedBy: uploaderName,
-                            uploaderPosition: uploaderPosition,
-                            sourceDepartment: sourceDeptName
-                        });
-                    } else if (sourceDeptId === "unknown" && hasUnknownDept) {
-                        filesBySourceDept["unknown"].push({
-                            fd_uuid: fileData.fd_uuid,
-                            f_uuid: fileData.f_uuid,
-                            is_approved: fileData.is_approved,
-                            fileName: fileData.file.f_name,
-                            createdAt: fileData.file.created_at,
-                            uploadedBy: uploaderName,
-                            uploaderPosition: uploaderPosition,
-                            sourceDepartment: "Unknown"
-                        });
-                    } else {
-                        console.log("Department not tracked or is user's own department:", sourceDeptId);
-                        
-                        // Try to find any other department to place this file in
-                        const anyOtherDeptId = Object.keys(filesBySourceDept).find(id => id !== userProfile.d_uuid);
-                        if (anyOtherDeptId) {
-                            console.log("Assigning file to another department as fallback:", anyOtherDeptId);
-                            filesBySourceDept[anyOtherDeptId].push({
-                                fd_uuid: fileData.fd_uuid,
-                                f_uuid: fileData.f_uuid,
-                                is_approved: fileData.is_approved,
-                                fileName: fileData.file.f_name,
-                                createdAt: fileData.file.created_at,
-                                uploadedBy: uploaderName,
-                                uploaderPosition: uploaderPosition,
-                                sourceDepartment: sourceDeptName
-                            });
-                        }
-                    }
+                    // Add file to appropriate department bucket
+                    const fileEntry = {
+                        fd_uuid: fileData.fd_uuid,
+                        f_uuid: fileData.f_uuid,
+                        is_approved: fileData.is_approved,
+                        fileName: fileData.file.f_name,
+                        createdAt: fileData.file.created_at,
+                        uploadedBy: uploaderName,
+                        uploaderPosition: uploaderPosition,
+                        sourceDepartment: sourceDeptName,
+                        // Include original data for debugging
+                        originalSourceId: fileData.source_d_uuid,
+                        fileDeptId: fileData.file.d_uuid
+                    };
+                    
+                    console.log(`Adding file ${fileData.file.f_name} to department group: ${sourceDeptId}`);
+                    filesBySourceDept[sourceDeptId].push(fileEntry);
                 });
                 
                 console.log("Files organized by source department:", filesBySourceDept);
@@ -471,10 +484,10 @@ const DepartmentGrid = () => {
                 let departmentsWithFiles = filteredDepartments.map((dept, index) => {
                     const deptFiles = filesBySourceDept[dept.d_uuid] || [];
                     
-                    // Count by approval status
-                    const pendingCount = deptFiles.filter(f => f.is_approved === null).length;
-                    const approvedCount = deptFiles.filter(f => f.is_approved === true).length;
-                    const rejectedCount = deptFiles.filter(f => f.is_approved === false).length;
+                    // Count by approval status (using the new text-based status)
+                    const pendingCount = deptFiles.filter(f => f.is_approved === 'pending' || f.is_approved === null).length;
+                    const approvedCount = deptFiles.filter(f => f.is_approved === 'approved').length;
+                    const rejectedCount = deptFiles.filter(f => f.is_approved === 'rejected').length;
                     
                     return {
                         id: dept.d_uuid,
@@ -492,9 +505,9 @@ const DepartmentGrid = () => {
                 // Add Unknown department for files with missing department info if it exists
                 if (filesBySourceDept["unknown"] && filesBySourceDept["unknown"].length > 0) {
                     const unknownFiles = filesBySourceDept["unknown"];
-                    const pendingCount = unknownFiles.filter(f => f.is_approved === null).length;
-                    const approvedCount = unknownFiles.filter(f => f.is_approved === true).length;
-                    const rejectedCount = unknownFiles.filter(f => f.is_approved === false).length;
+                    const pendingCount = unknownFiles.filter(f => f.is_approved === 'pending' || f.is_approved === null).length;
+                    const approvedCount = unknownFiles.filter(f => f.is_approved === 'approved').length;
+                    const rejectedCount = unknownFiles.filter(f => f.is_approved === 'rejected').length;
                     
                     departmentsWithFiles.push({
                         id: "unknown",
@@ -511,8 +524,23 @@ const DepartmentGrid = () => {
                     console.log("Added Unknown department with", unknownFiles.length, "files");
                 }
                 
+                // Sort files within each department by date (newest first)
+                Object.keys(filesBySourceDept).forEach(deptId => {
+                    filesBySourceDept[deptId].sort((a, b) => 
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                    );
+                });
+                
                 // Sort departments by number of files (most files first)
-                departmentsWithFiles = departmentsWithFiles.sort((a, b) => b.totalFiles - a.totalFiles);
+                // But ensure "Unknown Source" is always at the end
+                departmentsWithFiles = departmentsWithFiles.sort((a, b) => {
+                    // If one of them is the "Unknown Source" department
+                    if (a.id === "unknown") return 1; // Move 'a' to the end
+                    if (b.id === "unknown") return -1; // Move 'b' to the end
+                    
+                    // For normal departments, sort by number of files
+                    return b.totalFiles - a.totalFiles;
+                });
 
                 setDepartments(departmentsWithFiles);
             } catch (e) {
@@ -1638,7 +1666,7 @@ const HeadDashboard = () => {
         try {
             const { error } = await supabase
                 .from('file_department')
-                .update({ status: 'approved' })
+                .update({ is_approved: 'approved' })
                 .eq('f_uuid', fileId)
                 .eq('d_uuid', userProfile?.department_id);
 
@@ -1665,7 +1693,7 @@ const HeadDashboard = () => {
         try {
             const { error } = await supabase
                 .from('file_department')
-                .update({ status: 'rejected' })
+                .update({ is_approved: 'rejected' })
                 .eq('f_uuid', fileId)
                 .eq('d_uuid', userProfile?.department_id);
 

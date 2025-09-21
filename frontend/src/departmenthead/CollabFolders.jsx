@@ -1072,7 +1072,7 @@ const CollabFolders = () => {
         received: recByDept[id] || [],
         sent: sentByDept[id] || [],
       }))
-      .filter(dept => dept.received.length > 0 || dept.sent.length > 0) // Filter out empty departments
+      .filter(dept => dept.received.length > 0) // Only include departments with received files
       .sort((a, b) => a.name.localeCompare(b.name));
     
     console.log("DEBUG: Final cards data:", result);
@@ -1364,7 +1364,7 @@ const CollabFolders = () => {
             `}</style>
             {cards.map(card => {
               const isSel = card.id === selectedDeptId;
-              const count = (card.received?.length || 0) + (card.sent?.length || 0);
+              const count = card.received?.length || 0;
               return (
                 <button
                   key={card.id}
@@ -1433,7 +1433,7 @@ const CollabFolders = () => {
                 </div>
               </div>
               
-              {filteredCard.received.length === 0 && filteredCard.sent.length === 0 ? (
+              {filteredCard.received.length === 0 ? (
                 <div className="p-8 text-center">
                   {searchQuery || filterStatus !== 'all' ? (
                     <>
@@ -1446,35 +1446,22 @@ const CollabFolders = () => {
                   ) : (
                     <>
                       <DocumentTextIcon className="h-10 w-10 mx-auto text-gray-400 mb-2" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">No files shared with this department</h3>
-                      <p className="text-gray-500">There are currently no files shared between your department and {filteredCard.name}</p>
+                      <h3 className="text-lg font-medium text-gray-900 mb-1">No files received from this department</h3>
+                      <p className="text-gray-500">There are currently no files received from {filteredCard.name}</p>
                     </>
                   )}
                 </div>
               ) : (
-                <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div>
-                    <CollabList
-                      title={`Received from this department (${filteredCard.received.length})`}
-                      rows={filteredCard.received}
-                      isHead={isHead}
-                      onApprove={approve}
-                      onReject={reject}
-                      importantMap={importantMap}
-                      toggleImportant={toggleImportant}
-                    />
-                  </div>
-                  <div>
-                    <CollabList
-                      title={`Shared to this department (${filteredCard.sent.length})`}
-                      rows={filteredCard.sent}
-                      isHead={false}
-                      onApprove={() => {}}
-                      onReject={() => {}}
-                      importantMap={importantMap}
-                      toggleImportant={toggleImportant}
-                    />
-                  </div>
+                <div className="p-3">
+                  <CollabList
+                    title={`Files from ${filteredCard.name} (${filteredCard.received.length})`}
+                    rows={filteredCard.received}
+                    isHead={isHead}
+                    onApprove={approve}
+                    onReject={reject}
+                    importantMap={importantMap}
+                    toggleImportant={toggleImportant}
+                  />
                 </div>
               )}
             </div>
