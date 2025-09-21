@@ -214,11 +214,18 @@ const CollabFolders = () => {
   const [testResults, setTestResults] = useState(null);
   const [showTestResults, setShowTestResults] = useState(false);
   const [debugLog, setDebugLog] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [summaryVisible, setSummaryVisible] = useState(false);
   
   // Add a debug log entry with timestamp
   const addDebugLog = (message) => {
     const timestamp = new Date().toISOString();
     setDebugLog(prev => [...prev, `[${timestamp}] ${message}`]);
+  };
+
+  const toggleSummary = (file) => {
+    setSelectedFile(file);
+    setSummaryVisible(!summaryVisible);
   };
 
   const isHead = useMemo(() => profile?.position === 'head', [profile]);
@@ -400,22 +407,55 @@ const CollabFolders = () => {
 
   useEffect(() => {
     const load = async () => {
-      if (!user?.id) return;
+      console.log("NETWORK TEST: Starting profile fetch");
+      
+      if (!user?.id) {
+        console.error("NETWORK TEST: No user ID available, cannot fetch profile");
+        return;
+      }
+      
       try {
+        console.log("NETWORK TEST: Attempting to fetch user profile for ID:", user.id);
         const data = await getUserProfile(user.id);
+        console.log("NETWORK TEST: Profile fetch result:", data);
         setProfile(data);
       } catch (e) {
-        setError('Failed to load profile');
+        console.error("NETWORK TEST: Profile fetch error:", e);
+        setError('Failed to load profile: ' + e.message);
       }
     };
+    
+    // Network diagnostics
+    console.log("NETWORK TEST: Component mounted, checking network status");
+    
+    // Test basic network connectivity
+    fetch('https://www.google.com/favicon.ico')
+      .then(res => {
+        console.log("NETWORK TEST: Basic internet connectivity test passed:", res.status);
+      })
+      .catch(err => {
+        console.error("NETWORK TEST: Basic internet connectivity test failed:", err);
+      });
+      
+    // Check if Supabase is defined and configured
+    if (supabase) {
+      console.log("NETWORK TEST: Supabase client exists");
+      console.log("NETWORK TEST: Supabase URL:", supabase.supabaseUrl);
+      console.log("NETWORK TEST: Supabase auth session:", !!supabase.auth.session());
+    } else {
+      console.error("NETWORK TEST: Supabase client is not properly initialized");
+    }
+    
     load();
   }, [user?.id, getUserProfile]);
 
   useEffect(() => {
     const fetchData = async () => {
+      console.log("FETCH TEST: Starting main data fetch");
+      
       if (!profile?.d_uuid) { 
         addDebugLog("No department UUID found in profile");
-        console.log("DEBUG: No department UUID found in profile", profile);
+        console.log("FETCH TEST: No department UUID in profile:", profile);
         setReceived([]); 
         setSent([]); 
         setLoading(false); 
@@ -423,25 +463,39 @@ const CollabFolders = () => {
       }
       
       addDebugLog(`Fetching data for department ${profile.d_uuid}`);
-      console.log("DEBUG: Fetching data for department", profile.d_uuid);
+      console.log("FETCH TEST: Fetching data for department", profile.d_uuid);
       setLoading(true);
       setError(null);
       
       try {
         // Step 1: Fetch all departments for lookup information
-        const { data: departmentsData, error: deptError } = await supabase
-          .from('department')
-          .select('d_uuid, d_name');
+        console.log("FETCH TEST: Step 1 - Fetching departments");
+        let departmentMap = {}; // Declare departmentMap in the outer scope
+        let departmentsData = []; // Declare departmentsData in the outer scope
+        
+        try {
+          const { data: deptData, error: deptError } = await supabase
+            .from('department')
+            .select('d_uuid, d_name');
+            
+          if (deptError) {
+            console.error("FETCH TEST: Department fetch error:", deptError);
+            throw deptError;
+          }
           
-        if (deptError) throw deptError;
-        
-        console.log("DEBUG: All departments:", departmentsData);
-        
-        // Create a department lookup map
-        const departmentMap = {};
-        departmentsData.forEach(dept => {
-          departmentMap[dept.d_uuid] = dept;
-        });
+          departmentsData = deptData; // Assign to the outer scope variable
+          console.log("FETCH TEST: Successfully fetched departments:", departmentsData);
+          
+          // Create a department lookup map
+          departmentsData.forEach(dept => {
+            departmentMap[dept.d_uuid] = dept;
+          });
+          
+          console.log("FETCH TEST: Created department map:", departmentMap);
+        } catch (deptErr) {
+          console.error("FETCH TEST: Error in department fetch:", deptErr);
+          throw new Error("Failed to fetch departments: " + deptErr.message);
+        }
         
         // Step 2: Get all file_department entries for current user's department
         const { data: fileDeptEntries, error: fileDeptError } = await supabase
@@ -509,21 +563,32 @@ const CollabFolders = () => {
         // For each file shared with this department, determine its source department
         const fileSourceDepts = {};
         
+        // Log total files we've found
+        console.log(`DEBUG: Starting source department identification for ${Object.keys(fileSharing).length} files`);
+        addDebugLog(`Processing ${Object.keys(fileSharing).length} shared files`);
+        
         // For each file, try to determine source department (not this department)
         Object.keys(fileSharing).forEach(fileId => {
           const deptIds = fileSharing[fileId];
+          console.log(`DEBUG: File ${fileId} is shared with departments:`, deptIds);
+          
           // Look for the source department - this is the department that created the file
           // We need to check the file.d_uuid to determine the original source
           const fileDetails = filesData.find(f => f.f_uuid === fileId);
           if (fileDetails && fileDetails.d_uuid) {
             // The source is the department that created the file (not necessarily in file_department)
             const sourceDeptId = fileDetails.d_uuid;
-            if (sourceDeptId && sourceDeptId !== profile.d_uuid) {
-              fileSourceDepts[fileId] = {
-                deptId: sourceDeptId,
-                deptName: departmentMap[sourceDeptId]?.d_name || "Unknown"
-              };
-            }
+            console.log(`DEBUG: File ${fileId} has source department: ${sourceDeptId}, my dept: ${profile.d_uuid}, match: ${sourceDeptId === profile.d_uuid}`);
+            
+            // Include files regardless of source - we'll filter later
+            // This matches the HeadDashboard approach which shows all files
+            fileSourceDepts[fileId] = {
+              deptId: sourceDeptId,
+              deptName: departmentMap[sourceDeptId]?.d_name || "Unknown",
+              isFromMyDept: sourceDeptId === profile.d_uuid
+            };
+          } else {
+            console.log(`DEBUG: File ${fileId} has no source department in details:`, fileDetails);
           }
         });
         
@@ -561,16 +626,26 @@ const CollabFolders = () => {
         // Step 6: Process received files (shared with my department)
         const receivedFiles = fileDeptEntries.map(fileDept => {
           const fileDetails = filesData.find(f => f.f_uuid === fileDept.f_uuid);
-          if (!fileDetails) return null;
+          if (!fileDetails) {
+            console.log(`DEBUG: Could not find file details for ${fileDept.f_uuid}`);
+            return null;
+          }
           
           // Get the source department - this is the department that created the file
           const sourceDeptId = fileDetails.d_uuid;
-          let sourceDeptName = departmentMap[sourceDeptId]?.d_name || 'Unknown Department';
+          let sourceDeptName = '';
           
-          // Skip files from our own department (these shouldn't be in received)
+          // Look up the department name using our departmentMap
+          if (departmentMap[sourceDeptId]) {
+            sourceDeptName = departmentMap[sourceDeptId].d_name || 'Unknown Department';
+          } else {
+            sourceDeptName = 'Unknown Department';
+          }
+          
+          // Log all files instead of skipping them
           if (sourceDeptId === profile.d_uuid) {
-            addDebugLog(`Skipping file ${fileDept.f_uuid} as it's from our own department`);
-            return null;
+            addDebugLog(`File ${fileDept.f_uuid} is from our own department, including it`);
+            // Don't return null here, include the file
           }
           
           // Get user info
@@ -663,6 +738,18 @@ const CollabFolders = () => {
         });
         setDeptMap(deptNameMap);
         
+        // Print comparison of our results vs expected results
+        console.log("RESULT COMPARISON: ==================");
+        console.log(`Files in system total: ${filesData.length}`);
+        console.log(`Files shared with my department: ${fileDeptEntries.length}`);
+        console.log(`Files we identified sources for: ${Object.keys(fileSourceDepts).length}`);
+        console.log(`Files in received array: ${receivedFiles.length}`);
+        console.log(`Files in sent array: ${sentFiles.length}`);
+        console.log("RESULT COMPARISON: ==================");
+        
+        // Log detailed information about receivedFiles for debugging
+        console.log("Received Files Structure:", receivedFiles.slice(0, 2));
+        
         // Set the received and sent arrays
         setReceived(receivedFiles);
         setSent(sentFiles);
@@ -690,12 +777,77 @@ const CollabFolders = () => {
   const persistImportant = (next) => {
     try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
+  
   const toggleImportant = (fd_uuid) => {
     setImportantMap(prev => {
       const next = { ...prev, [fd_uuid]: !prev[fd_uuid] };
       persistImportant(next);
       return next;
     });
+  };
+
+  // Basic connection test
+  const testSupabaseConnection = async () => {
+    setTestResults("Running basic Supabase connection test...");
+    
+    try {
+      console.log("CONNECTION TEST: Testing Supabase connection");
+      
+      // Check if supabase client exists
+      if (!supabase) {
+        console.error("CONNECTION TEST: Supabase client not initialized");
+        setTestResults("ERROR: Supabase client not initialized");
+        return;
+      }
+      
+      // Try to get Supabase auth status
+      try {
+        const { data: authData, error: authError } = await supabase.auth.getSession();
+        if (authError) {
+          console.error("CONNECTION TEST: Auth check failed", authError);
+          setTestResults(`Auth check failed: ${authError.message}`);
+          return;
+        }
+        
+        console.log("CONNECTION TEST: Auth check succeeded", authData);
+        
+        if (!authData?.session) {
+          setTestResults("WARNING: No active session found. You may need to log in again.");
+          return;
+        }
+      } catch (authErr) {
+        console.error("CONNECTION TEST: Auth check exception", authErr);
+        setTestResults(`Auth check exception: ${authErr.message}`);
+        return;
+      }
+      
+      // Try a simple query to verify database access
+      try {
+        const startTime = performance.now();
+        const { data, error } = await supabase
+          .from('department')
+          .select('count')
+          .limit(1);
+          
+        const endTime = performance.now();
+        const duration = (endTime - startTime).toFixed(2);
+        
+        if (error) {
+          console.error("CONNECTION TEST: Database query failed", error);
+          setTestResults(`Database query failed: ${error.message}`);
+          return;
+        }
+        
+        console.log("CONNECTION TEST: Database query succeeded", data);
+        setTestResults(`Connection test PASSED!\nDatabase query completed in ${duration}ms.\nYou have a valid session and can access the database.`);
+      } catch (dbErr) {
+        console.error("CONNECTION TEST: Database query exception", dbErr);
+        setTestResults(`Database query exception: ${dbErr.message}`);
+      }
+    } catch (e) {
+      console.error("CONNECTION TEST: Test failed with exception", e);
+      setTestResults(`Test failed with exception: ${e.message}`);
+    }
   };
 
   // Test using HeadDashboard.jsx's exact approach for debugging
@@ -928,6 +1080,7 @@ const CollabFolders = () => {
   }, [deptMap, received, sent]);
 
   const [selectedDeptId, setSelectedDeptId] = useState(null);
+  
   useEffect(() => {
     if (!selectedDeptId && cards.length > 0) {
       console.log("DEBUG: Auto-selecting first department:", cards[0].id);
@@ -1018,6 +1171,12 @@ const CollabFolders = () => {
           <h3 className="text-md font-medium">Collaboration Files Diagnostics</h3>
           <div className="flex gap-2">
             <button
+              onClick={testSupabaseConnection}
+              className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
+            >
+              Test Connection
+            </button>
+            <button
               onClick={runDatabaseTest}
               className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
             >
@@ -1025,9 +1184,9 @@ const CollabFolders = () => {
             </button>
             <button
               onClick={testHeadDashboardApproach}
-              className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
+              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded"
             >
-              Test HeadDashboard Method
+              Test HeadDashboard
             </button>
             <button
               onClick={() => setShowTestResults(!showTestResults)}
@@ -1074,6 +1233,36 @@ const CollabFolders = () => {
             <div>Loading collaboration folders…</div>
           </div>
         </div>
+      ) : cards.length === 0 && (received.length > 0 || sent.length > 0) ? (
+        <div className="border rounded bg-white p-8 text-center">
+          <BuildingOfficeIcon className="h-12 w-12 mx-auto text-amber-400 mb-4" />
+          <h3 className="text-lg font-medium text-amber-900 mb-2">Files Found But Not Categorized</h3>
+          <p className="text-amber-800 mb-4">
+            We found {received.length + sent.length} files in the database, but could not categorize them by department.
+            This could be because the source department information is missing.
+          </p>
+          <div className="flex justify-center space-x-2">
+            <button
+              onClick={() => {
+                setTestResults(JSON.stringify({
+                  receivedSample: received.slice(0, 3),
+                  sentSample: sent.slice(0, 3),
+                  totalReceived: received.length,
+                  totalSent: sent.length
+                }, null, 2));
+              }}
+              className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
+            >
+              Show First 3 Files
+            </button>
+            <button
+              onClick={runDatabaseTest}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Run Detailed Test
+            </button>
+          </div>
+        </div>
       ) : cards.length === 0 ? (
         <div className="border rounded bg-white p-8 text-center">
           <BuildingOfficeIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
@@ -1095,7 +1284,13 @@ const CollabFolders = () => {
               <li>Files received: {received.length} / Files sent: {sent.length}</li>
             </ul>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex gap-3 justify-center">
+            <button 
+              onClick={testSupabaseConnection}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Test Database Connection
+            </button>
             <button 
               onClick={testHeadDashboardApproach}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -1119,12 +1314,27 @@ const CollabFolders = () => {
             </div>
           ) : (
             <div className="mt-4">
-              <button
-                onClick={runDatabaseTest}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Run Diagnostic Test
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={runDatabaseTest}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Run Diagnostic Test
+                </button>
+                <button
+                  onClick={() => {
+                    setTestResults(JSON.stringify({
+                      received: received,
+                      sent: sent,
+                      totalReceived: received.length,
+                      totalSent: sent.length
+                    }, null, 2));
+                  }}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Show Current Files
+                </button>
+              </div>
               <p className="text-sm text-gray-500 mt-2">
                 Debug info: Profile d_uuid: {profile?.d_uuid || 'not set'}, User ID: {user?.id || 'not set'}, 
                 Position: {profile?.position || 'not set'}
