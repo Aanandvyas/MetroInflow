@@ -97,7 +97,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRegistrationStatus({
         loading: false,
         success: false,
-        error: "Passwords do not match."
+        error: "Not all fields are filled"
       });
       return;
     }
@@ -106,7 +106,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRegistrationStatus({
         loading: false,
         success: false,
-        error: "Please select a role for the department."
+        error: "Not all fields are filled"
       });
       return;
     }
@@ -218,7 +218,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRegistrationStatus({
         loading: false,
         success: false,
-        error: err.message || "Unexpected error. Please try again."
+        error: "Not all fields are filled"
       });
     }
   };
@@ -228,42 +228,14 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4 sm:mb-6">Register New User</h3>
       
       {registrationStatus.success && (
-        <div className="mb-6 p-4 sm:p-6 bg-green-50 text-green-700 border border-green-200 rounded-lg shadow-sm">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-green-800">
-                User registered successfully!
-              </h3>
-              <div className="mt-2 text-sm text-green-700">
-                <p>The user has been created and will receive an email to confirm their account.</p>
-              </div>
-            </div>
-          </div>
+        <div className="mb-6 p-4 bg-green-100 text-green-800 border border-green-300 rounded-md">
+          User registered successfully!
         </div>
       )}
       
       {registrationStatus.error && (
-        <div className="mb-6 p-4 sm:p-6 bg-red-50 text-red-700 border border-red-200 rounded-lg shadow-sm">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">
-                Registration Failed
-              </h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{registrationStatus.error}</p>
-              </div>
-            </div>
-          </div>
+        <div className="mb-6 p-4 bg-red-100 text-red-800 border border-red-300 rounded-md">
+          {registrationStatus.error}
         </div>
       )}
       

@@ -21,20 +21,16 @@ const DashboardStats = ({ users, departments }) => {
         <p className="text-3xl font-bold mt-2">{departments.length}</p>
         <p className="text-sm text-gray-500 mt-1">Active departments</p>
       </div>
-
+      
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-800">System Status</h3>
-          <ChartBarIcon className="h-8 w-8 text-green-500" />
+          <h3 className="text-lg font-semibold text-gray-800">Recent Updates</h3>
+          <ChartBarIcon className="h-8 w-8 text-blue-500" />
         </div>
         <div className="mt-2">
-          <div className="flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-            <span className="text-sm text-gray-600">All systems operational</span>
-          </div>
+          <p className="text-sm text-gray-500">No recent updates</p>
         </div>
       </div>
-
     </div>
   );
 };
