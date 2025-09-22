@@ -24,7 +24,7 @@ func checkDBConnection() {
 		return
 	}
 
-	endpoint := fmt.Sprintf("%s/rest/v1/documents?limit=1", url)
+	endpoint := fmt.Sprintf("%s/rest/v1/test_connection?limit=1", url)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -46,26 +46,27 @@ func checkDBConnection() {
 		return
 	}
 
-	var docs []map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&docs); err != nil {
+	var rows []map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
 		log.Printf("❌ Could not decode DB response: %v\n", err)
 		return
 	}
 
-	log.Println("✅ Successfully connected to Supabase DB")
+	if len(rows) == 0 {
+		log.Println("✅ Connected to Supabase, but no rows in test_connection table yet")
+	} else {
+		log.Printf("✅ Connected! Found a row: %+v\n", rows[0])
+	}
 }
 
 func main() {
-	// 1️⃣ Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️ No .env file found, falling back to system environment")
 	}
 
-	// 2️⃣ Initialize config (Supabase client)
 	config.InitConfig()
 	log.Println("✅ Config initialized.")
 
-	// 3️⃣ Test DB connection
 	checkDBConnection()
 
 	connStr := os.Getenv("DATABASE_URL")
@@ -73,7 +74,7 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
-	// 4️⃣ Define HTTP routes
+	// 1. Define HTTP routes
 	http.HandleFunc("/v1/documents", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -92,7 +93,7 @@ func main() {
 	// http.HandleFunc("/v1/files/", handlers.GetFileHandler)
 	// http.HandleFunc("/v1/departments", handlers.ListDepartmentsHandler)
 
-	// 5️⃣ Health check
+	// 2. CORS Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -104,7 +105,7 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	// 6️⃣ Start notification polling goroutine
+	// 3. Start notification polling goroutine
 	go func() {
 		for {
 			rows, err := config.DB.Query(`SELECT notif_id, uuid, f_uuid FROM notifications WHERE is_sent = false`)
@@ -147,7 +148,79 @@ func main() {
 		}
 	}()
 
-	// 7️⃣ Start HTTP server
+	// 7️⃣ Start quick share notification polling goroutine
+	go func() {
+		for {
+			log.Println("[QUICK_SHARE] Polling for new quick_share entries...")
+			rows, err := config.DB.Query(`SELECT qs_uuid, d_uuid, data FROM quick_share WHERE is_sent = false`)
+			if err != nil {
+				log.Println("[QUICK_SHARE] DB query error:", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			for rows.Next() {
+				var qsUUID, dUUID string
+				var data string
+				if err := rows.Scan(&qsUUID, &dUUID, &data); err != nil {
+					log.Println("[QUICK_SHARE] Row scan error:", err)
+					continue
+				}
+				log.Printf("[QUICK_SHARE] Processing qs_uuid: %s, d_uuid: %s", qsUUID, dUUID)
+
+				// Parse the JSON data
+				var dataMap map[string]interface{}
+				if err := json.Unmarshal([]byte(data), &dataMap); err != nil {
+					log.Printf("[QUICK_SHARE] Failed to parse data JSON: %v", err)
+					continue
+				}
+
+				// Format the content
+				formatted := "You have received a quick share:\n\n"
+				for k, v := range dataMap {
+					formatted += fmt.Sprintf("%s: %v\n", k, v)
+				}
+
+				rows2, err := config.DB.Query("SELECT position, email FROM users WHERE d_uuid = $1", dUUID)
+				if err != nil {
+					log.Printf("[QUICK_SHARE] User lookup error for d_uuid %s: %v", dUUID, err)
+					continue
+				}
+				sent := false
+				for rows2.Next() {
+					var position, email string
+					if err := rows2.Scan(&position, &email); err != nil {
+						log.Printf("[QUICK_SHARE] User scan error: %v", err)
+						continue
+					}
+					log.Printf("[QUICK_SHARE] User position: %s, email: %s", position, email)
+					if position == "head" && email != "" {
+						subject := "Quick Share Notification"
+						body := formatted
+						log.Printf("[QUICK_SHARE] Sending email to %s...", email)
+						if err := utils.SendGmailNotification(email, subject, body); err != nil {
+							log.Println("[QUICK_SHARE] Failed to send email:", err)
+						} else {
+							log.Printf("[QUICK_SHARE] Email sent to: %s", email)
+							sent = true
+						}
+					}
+				}
+				rows2.Close()
+				if sent {
+					_, err := config.DB.Exec("UPDATE quick_share SET is_sent = true WHERE qs_uuid = $1", qsUUID)
+					if err != nil {
+						log.Println("[QUICK_SHARE] Failed to update is_sent:", err)
+					} else {
+						log.Printf("[QUICK_SHARE] Marked qs_uuid %s as sent.", qsUUID)
+					}
+				}
+			}
+			rows.Close()
+			time.Sleep(10 * time.Second)
+		}
+	}()
+
+	// 8️⃣ Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

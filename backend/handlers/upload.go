@@ -145,10 +145,10 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println("[DEBUG] Failed to insert OCR result:", err)
 			}
 
-			log.Println("[DEBUG] Triggering summary for:", fuuid)
+			// log.Println("[DEBUG] Triggering summary for:", fuuid) // summary trigger removed
 			summaryText, err := services.RunSummarizer(ocrText)
 			if err != nil {
-				log.Println("[DEBUG] Summary error:", err)
+				// log.Println("[DEBUG] Summary error:", err) // summary error logging removed
 				return
 			}
 			log.Println("[DEBUG] Summary generated:", summaryText)
