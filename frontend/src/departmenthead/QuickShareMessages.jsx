@@ -23,7 +23,7 @@ const QuickShareMessages = ({ userProfile }) => {
                 .from('quick_share')
                 .select(`
                     *,
-                    sender:uuid(name, position, department:d_uuid(d_name)),
+                    users!uuid(name, position, department:d_uuid(d_name)),
                     department:d_uuid(d_name)
                 `)
                 .eq('d_uuid', userProfile.d_uuid)
@@ -37,7 +37,7 @@ const QuickShareMessages = ({ userProfile }) => {
                 .from('quick_share')
                 .select(`
                     *,
-                    sender:uuid(name, position, department:d_uuid(d_name)),
+                    users!uuid(name, position, department:d_uuid(d_name)),
                     department:d_uuid(d_name)
                 `)
                 .eq('uuid', userProfile.uuid)
@@ -139,13 +139,13 @@ const QuickShareMessages = ({ userProfile }) => {
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${
                                 isSentMessage(message) ? 'bg-blue-500' : 'bg-gray-600'
                             }`}>
-                                {message.sender?.name?.charAt(0)?.toUpperCase() || '?'}
+                                {message.users?.name?.charAt(0)?.toUpperCase() || '?'}
                             </div>
                             <div className="ml-2">
                                 <p className="font-medium text-gray-900">
                                     {isSentMessage(message) 
                                         ? `You → ${message.department?.d_name || 'Unknown Department'}`
-                                        : `${message.sender?.name || 'Unknown User'} (${message.sender?.department?.d_name || 'Unknown Dept'})`
+                                        : `${message.users?.name || 'Unknown User'} (${message.users?.department?.d_name || 'Unknown Dept'})`
                                     }
                                 </p>
                                 <p className="text-xs text-gray-500 flex items-center mt-0.5">

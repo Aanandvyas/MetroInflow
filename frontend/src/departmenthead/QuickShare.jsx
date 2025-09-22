@@ -113,7 +113,6 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
             const jsonData = {
                 message: message,
                 timestamp: new Date().toISOString(),
-                sender: userProfile.name || "Unknown User",
                 priority: "normal"
             };
             
@@ -125,7 +124,6 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
                         data: jsonData,
                         d_uuid: selectedDepartment.d_uuid, // Using the correct d_uuid field from schema
                         uuid: userProfile.id, // Using the id field from profile which contains the UUID
-                        is_sent: true,
                         created_at: new Date().toISOString()
                     }
                 ]);

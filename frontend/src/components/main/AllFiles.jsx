@@ -79,6 +79,7 @@ const AllFiles = () => {
       uploader:uuid(name),
       file_department${selectedDepartment ? "!inner" : ""} (
         d_uuid,
+        is_approved,
         department:d_uuid ( d_uuid, d_name )
       )
     `;
@@ -93,6 +94,9 @@ const AllFiles = () => {
     if (selectedDepartment) {
       fileQuery = fileQuery.eq("file_department.d_uuid", selectedDepartment);
     }
+
+    // Only show approved files
+    fileQuery = fileQuery.eq("file_department.is_approved", "approved");
 
     // Language
     if (selectedLanguage) {

@@ -11,6 +11,7 @@ const DepartmentFiles = () => {
     const { user } = useAuth();
     const [files, setFiles] = useState([]);
     const [department, setDepartment] = useState(null);
+    const [isOwnDepartment, setIsOwnDepartment] = useState(false);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState('');
@@ -62,9 +63,10 @@ const DepartmentFiles = () => {
     // Fetch department details
     useEffect(() => {
         const fetchDepartmentData = async () => {
-            if (!d_uuid) return;
+            if (!d_uuid || !user?.id) return;
             
             try {
+                // Get department info
                 const { data: deptData, error: deptError } = await supabase
                     .from("department")
                     .select("d_name")
@@ -77,6 +79,17 @@ const DepartmentFiles = () => {
                     return;
                 }
                 
+                // Get user's department to check if this is their own
+                const { data: userProfile, error: userError } = await supabase
+                    .from("users")
+                    .select("d_uuid")
+                    .eq("uuid", user.id)
+                    .single();
+                
+                if (!userError && userProfile) {
+                    setIsOwnDepartment(d_uuid === userProfile.d_uuid);
+                }
+                
                 setDepartment(deptData);
             } catch (err) {
                 console.error("Error fetching department:", err);
@@ -85,7 +98,7 @@ const DepartmentFiles = () => {
         };
 
         fetchDepartmentData();
-    }, [d_uuid]);
+    }, [d_uuid, user?.id]);
 
     // Fetch files with pagination
     const fetchFiles = useCallback(async (pageNum = 1, append = false) => {
@@ -98,22 +111,69 @@ const DepartmentFiles = () => {
             setLoadingMore(true);
         }
 
+        // Get current user's department
+        const { data: userProfile, error: userError } = await supabase
+            .from("users")
+            .select("d_uuid")
+            .eq("uuid", user?.id)
+            .single();
+            
+        if (userError || !userProfile?.d_uuid) {
+            setError("Could not determine your department.");
+            setLoading(false);
+            setLoadingMore(false);
+            return;
+        }
+
         const from = (pageNum - 1) * FILES_PER_PAGE;
         const to = from + FILES_PER_PAGE - 1;
 
         try {
-            const { data: filesData, error: filesError, count } = await supabase
-                .from("file")
-                .select(`
-                    f_uuid, f_name, language, file_path, created_at, uuid,
-                    uploader:uuid(name),
-                    file_department!inner (
-                      d_uuid
-                    )
-                `, { count: 'exact' })
-                .eq("file_department.d_uuid", d_uuid)
-                .order("created_at", { ascending: false })
-                .range(from, to);
+            let filesData, filesError, count;
+
+            if (d_uuid === userProfile.d_uuid) {
+                // User's own department - show files uploaded by same department employees
+                const result = await supabase
+                    .from("file")
+                    .select(`
+                        f_uuid, f_name, language, file_path, created_at, uuid,
+                        uploader:uuid(name, d_uuid),
+                        file_department!inner (
+                          d_uuid,
+                          is_approved
+                        )
+                    `, { count: 'exact' })
+                    .eq("file_department.d_uuid", userProfile.d_uuid)
+                    .eq("uploader.d_uuid", userProfile.d_uuid)
+                    .eq("file_department.is_approved", "approved")
+                    .order("created_at", { ascending: false })
+                    .range(from, to);
+                    
+                filesData = result.data;
+                filesError = result.error;
+                count = result.count;
+            } else {
+                // Other department - show files sent from that department to user's department
+                const result = await supabase
+                    .from("file")
+                    .select(`
+                        f_uuid, f_name, language, file_path, created_at, uuid,
+                        uploader:uuid(name, d_uuid),
+                        file_department!inner (
+                          d_uuid,
+                          is_approved
+                        )
+                    `, { count: 'exact' })
+                    .eq("file_department.d_uuid", userProfile.d_uuid)
+                    .eq("file_department.is_approved", "approved")
+                    .eq("uploader.d_uuid", d_uuid)
+                    .order("created_at", { ascending: false })
+                    .range(from, to);
+                    
+                filesData = result.data;
+                filesError = result.error;
+                count = result.count;
+            }
 
             if (filesError) {
                 console.error("Files fetch error:", filesError);
@@ -141,7 +201,7 @@ const DepartmentFiles = () => {
             setLoading(false);
             setLoadingMore(false);
         }
-    }, [d_uuid, FILES_PER_PAGE]);
+    }, [d_uuid, user?.id, FILES_PER_PAGE]);
 
     // Load more files when page changes
     const loadMoreFiles = useCallback(() => {
@@ -199,7 +259,10 @@ const DepartmentFiles = () => {
             ) : null}
             
             <h1 className="text-3xl font-bold text-gray-800 mb-8">
-                {department ? department.d_name : 'Department'} Files
+                {isOwnDepartment 
+                    ? `${department ? department.d_name : 'Department'} Files`
+                    : `Files from ${department ? department.d_name : 'Department'}`
+                }
             </h1>
 
             {files.length > 0 ? (
@@ -277,8 +340,21 @@ const DepartmentFiles = () => {
                 </>
             ) : (
                 <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-700">No Documents Found</h2>
-                    <p className="text-gray-500 mt-2">There are no files uploaded to this department yet.</p>
+                    <h2 className="text-xl font-semibold text-gray-700">
+                        {isOwnDepartment ? "No Documents Found" : "No Files Received"}
+                    </h2>
+                    <p className="text-gray-500 mt-2">
+                        {isOwnDepartment 
+                            ? "There are no files uploaded by your department yet."
+                            : `There are no approved files sent from ${department?.d_name || 'this department'} to your department yet.`
+                        }
+                    </p>
+                    <p className="text-gray-400 text-sm mt-1">
+                        {isOwnDepartment 
+                            ? "Files uploaded by your department appear here automatically."
+                            : `Files sent from ${department?.d_name || 'this department'} need to be approved by your department head before they appear here.`
+                        }
+                    </p>
                 </div>
             )}
         </div>

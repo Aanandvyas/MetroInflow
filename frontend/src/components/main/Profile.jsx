@@ -4,29 +4,64 @@ import { useNavigate } from "react-router-dom";
 import { UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 
 const Profile = () => {
-    const { user, getUserProfile, signOutUser } = useAuth();
+    const { user, getUserProfile, signOutUser, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (user) {
-                const profileData = await getUserProfile(user.id);
-                setProfile(profileData);
+            // Wait for auth to finish loading
+            if (authLoading) return;
+            
+            // If no user after auth loading is complete, redirect to login
+            if (!user) {
+                navigate('/login');
+                return;
             }
-            setLoading(false);
+
+            try {
+                const profileData = await getUserProfile(user.id);
+                if (profileData) {
+                    setProfile(profileData);
+                } else {
+                    setError("Could not load profile data.");
+                }
+            } catch (err) {
+                console.error("Error fetching profile:", err);
+                setError("Failed to load profile data.");
+            } finally {
+                setLoading(false);
+            }
         };
+        
         fetchData();
-    }, [user, getUserProfile]);
+    }, [user, getUserProfile, navigate, authLoading]);
 
     const handleSignOut = async () => {
         await signOutUser();
         navigate('/login');
     };
 
-    if (loading) {
+    // Show loading while auth is loading
+    if (authLoading || loading) {
         return <p className="text-center p-10">Loading profile...</p>;
+    }
+    
+    // Show error if there's an error
+    if (error) {
+        return (
+            <div className="text-center p-10">
+                <p className="text-red-600">{error}</p>
+                <button 
+                    onClick={() => navigate('/login')}
+                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                    Go to Login
+                </button>
+            </div>
+        );
     }
     
     if (!profile) {

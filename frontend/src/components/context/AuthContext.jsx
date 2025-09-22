@@ -103,18 +103,26 @@ export const AuthProvider = ({ children }) => {
 
   // ✅ Get profile from user table
   const getUserProfile = async (uuid) => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*, department(d_name)")
-      .eq("uuid", uuid)   // <-- use "uuid" instead of "u_id"
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select(`
+          *, 
+          department(d_name, d_uuid),
+          role(r_name, r_uuid)
+        `)
+        .eq("uuid", uuid)
+        .maybeSingle();
 
-
-    if (error) {
-      console.error("Error fetching user profile:", error.message);
+      if (error) {
+        console.error("Error fetching user profile:", error.message);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.error("Error in getUserProfile:", err);
       return null;
     }
-    return data;
   };
 
   // ✅ Update user role

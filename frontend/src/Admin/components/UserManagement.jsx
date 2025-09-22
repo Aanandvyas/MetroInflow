@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../supabaseClient';
+import { supabaseAdmin } from '../../supabaseAdmin';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -190,13 +191,71 @@ const UserManagement = () => {
     setIsSubmitting(true);
     
     try {
+      let authError = null;
+      
+      console.log('Starting user deletion for UUID:', userToDelete.uuid);
+      console.log('User email:', userToDelete.email);
+      
+      // First, try to delete the user from Supabase Auth
+      if (supabaseAdmin) {
+        console.log('Checking if user exists in Supabase Auth...');
+        
+        // First, try to get the user to see if it exists
+        const { data: authUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(
+          userToDelete.uuid
+        );
+        
+        if (getUserError) {
+          console.log('User not found in auth or error getting user:', getUserError);
+          // User might not exist in auth, or might be using email as identifier
+          
+          // Try to list users by email to find the correct auth user
+          const { data: userList, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+          
+          if (!listError && userList?.users) {
+            const authUserByEmail = userList.users.find(u => u.email === userToDelete.email);
+            if (authUserByEmail) {
+              console.log('Found user in auth by email:', authUserByEmail.id);
+              // Delete using the auth user's ID
+              const result = await supabaseAdmin.auth.admin.deleteUser(authUserByEmail.id);
+              authError = result.error;
+            } else {
+              console.log('User not found in Supabase Auth by email either');
+              authError = new Error('User not found in authentication system');
+            }
+          } else {
+            authError = getUserError;
+          }
+        } else {
+          console.log('User found in auth, proceeding with deletion...');
+          // User exists, proceed with deletion using the UUID
+          const result = await supabaseAdmin.auth.admin.deleteUser(userToDelete.uuid);
+          authError = result.error;
+        }
+        
+        if (authError) {
+          console.error('Error deleting user from auth:', authError);
+        } else {
+          console.log('Successfully deleted user from Supabase Auth');
+        }
+      } else {
+        console.warn('Supabase admin client not available, skipping auth deletion');
+        authError = new Error('Admin client not initialized');
+      }
+      
       // Delete the user from the database
-      const { error } = await supabase
+      console.log('Attempting to delete from database...');
+      const { error: dbError } = await supabase
         .from('users')
         .delete()
         .eq('uuid', userToDelete.uuid);
       
-      if (error) throw error;
+      if (dbError) {
+        console.error('Database deletion error:', dbError);
+        throw dbError;
+      } else {
+        console.log('Successfully deleted user from database');
+      }
       
       // Update local state to remove the deleted user
       setUsers(users.filter(user => user.uuid !== userToDelete.uuid));
@@ -204,7 +263,9 @@ const UserManagement = () => {
       setNotification({
         show: true,
         type: 'success',
-        message: 'User deleted successfully!'
+        message: authError 
+          ? 'User deleted from database (auth deletion failed - may require manual cleanup)'
+          : 'User deleted successfully from both database and authentication!'
       });
       
       // Close the confirmation dialog

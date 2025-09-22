@@ -12,6 +12,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
     password: "",
     confirmPassword: "",
     departmentName: "",
+    departmentUuid: "", // Add this to store department UUID
     roleUuid: "",
     position: "regular", // Default position
   });
@@ -83,8 +84,19 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       const selectedDept = departments.find(dept => dept.name === value);
       if (selectedDept) {
         fetchRolesForDepartment(selectedDept.uuid);
-        // Reset selected role when department changes
-        setFormData(prev => ({ ...prev, roleUuid: "" }));
+        // Reset selected role when department changes and store department UUID
+        setFormData(prev => ({ 
+          ...prev, 
+          roleUuid: "", 
+          departmentUuid: selectedDept.uuid 
+        }));
+      } else {
+        // Clear department UUID if no department selected
+        setFormData(prev => ({ 
+          ...prev, 
+          roleUuid: "", 
+          departmentUuid: "" 
+        }));
       }
     }
   };
@@ -102,7 +114,9 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       return;
     }
 
-    if (formData.departmentName && formData.position !== "head" && !formData.roleUuid) {
+    // Only require role selection if department is selected and position is not head
+    // Allow users without departments or heads without roles
+    if (formData.departmentName && formData.position === "regular" && roles.length > 0 && !formData.roleUuid) {
       setRegistrationStatus({
         loading: false,
         success: false,
@@ -127,6 +141,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         gender,
         address,
         departmentName,
+        departmentUuid,
         roleUuid,
         position,
       } = formData;
@@ -144,22 +159,8 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         throw new Error(error.message);
       }
 
-      let d_uuid = null;
-
-      // 2. Get department uuid from department table
-      if (departmentName) {
-        const { data: deptData, error: deptError } = await supabase
-          .from("department")
-          .select("d_uuid")
-          .ilike("d_name", departmentName)
-          .single();
-
-        if (deptError) {
-          throw new Error(deptError.message);
-        }
-
-        d_uuid = deptData?.d_uuid || null;
-      }
+      // Use the stored departmentUuid directly
+      let d_uuid = departmentUuid || null;
 
       // 3. Insert into "user" table
       if (data.user) {
@@ -204,6 +205,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         password: "",
         confirmPassword: "",
         departmentName: "",
+        departmentUuid: "",
         roleUuid: "",
         position: "regular",
       });
@@ -341,7 +343,11 @@ const UserRegistrationForm = ({ onUserAdded }) => {
               }`}
             >
               <option value="">
-                {loadingRoles ? "Loading roles..." : "Select a role"}
+                {loadingRoles 
+                  ? "Loading roles..." 
+                  : roles.length === 0 
+                  ? "No roles available for this department" 
+                  : "Select a role (optional)"}
               </option>
               {roles.map((role) => (
                 <option key={role.r_uuid} value={role.r_uuid}>
@@ -349,6 +355,11 @@ const UserRegistrationForm = ({ onUserAdded }) => {
                 </option>
               ))}
             </select>
+            {roles.length === 0 && !loadingRoles && (
+              <p className="text-xs text-gray-500 mt-1">
+                No roles have been created for this department yet. User can be registered without a role.
+              </p>
+            )}
           </div>
         )}
         

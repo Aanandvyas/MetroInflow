@@ -24,7 +24,14 @@ const HomePage = () => {
 
       const { data: files, error: filesError } = await supabase
         .from("file")
-        .select("f_uuid, f_name, language, created_at")
+        .select(`
+          f_uuid, f_name, language, created_at,
+          file_department!inner (
+            f_uuid,
+            is_approved
+          )
+        `)
+        .eq("file_department.is_approved", "approved")
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -66,6 +73,7 @@ const HomePage = () => {
   useEffect(() => {
     const fetchDepartments = async () => {
       setLoading(true);
+      
       const { data, error } = await supabase
         .from("department")
         .select("d_uuid, d_name");
@@ -77,17 +85,45 @@ const HomePage = () => {
       }
       setDepartments(data || []);
 
+      // Get user's department
+      const user = (await supabase.auth.getUser()).data.user;
+      let userDeptId = null;
+      if (user) {
+        const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
+        userDeptId = profile?.d_uuid;
+      }
+
+      // Count files differently for user's own dept vs other depts
       const { data: links, error: linksErr } = await supabase
         .from("file_department")
-        .select("d_uuid");
+        .select(`
+          d_uuid,
+          file:f_uuid(
+            uuid,
+            users:uuid(d_uuid)
+          )
+        `)
+        .eq("is_approved", "approved");
       if (linksErr) {
         console.error("Error fetching department file counts:", linksErr);
         setLoading(false);
         return;
       }
+      
       const counts = {};
       (links || []).forEach((row) => {
-        counts[row.d_uuid] = (counts[row.d_uuid] || 0) + 1;
+        const senderDeptId = row.file?.users?.d_uuid;
+        const receiverDeptId = row.d_uuid;
+        
+        if (receiverDeptId === userDeptId) {
+          if (senderDeptId === userDeptId) {
+            // Own department files - count under own department
+            counts[userDeptId] = (counts[userDeptId] || 0) + 1;
+          } else {
+            // Files from other departments - count under sender department
+            counts[senderDeptId] = (counts[senderDeptId] || 0) + 1;
+          }
+        }
       });
       setDeptCounts(counts);
       setLoading(false);
@@ -121,7 +157,8 @@ const HomePage = () => {
       const { data, error } = await supabase
         .from("file_department")
         .select("department:department ( d_uuid, d_name )")
-        .eq("f_uuid", f_uuid);
+        .eq("f_uuid", f_uuid)
+        .eq("is_approved", "approved");
       if (error) return [];
       return (data || []).map((r) => r.department).filter(Boolean);
     };
@@ -156,26 +193,52 @@ const HomePage = () => {
     const fdChannel = supabase
       .channel("home-fd-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "file_department" }, async (payload) => {
-        const { f_uuid, d_uuid } = payload.new || {};
-        // increment badge count
-        setDeptCounts((prev) => ({ ...prev, [d_uuid]: (prev[d_uuid] || 0) + 1 }));
-        // if file in recent list, append department chip
-        const { data: dept } = await supabase
-          .from("department")
-          .select("d_uuid, d_name")
-          .eq("d_uuid", d_uuid)
-          .single();
-        if (!dept) return;
-        setRecentFiles((prev) => {
-          const idx = prev.findIndex((f) => f.f_uuid === f_uuid);
-          if (idx === -1) return prev;
-          const exists = prev[idx].departments?.some((d) => d.d_uuid === d_uuid);
-          if (exists) return prev;
-          const copy = [...prev];
-          const depts = (copy[idx].departments || []).concat(dept);
-          copy[idx] = { ...copy[idx], departments: depts };
-          return copy;
-        });
+        const { f_uuid, d_uuid, is_approved } = payload.new || {};
+        // Only update counts if the file is approved
+        if (is_approved === "approved") {
+          // Get file sender's department and current user's department
+          const { data: fileData } = await supabase
+            .from("file")
+            .select("users:uuid(d_uuid)")
+            .eq("f_uuid", f_uuid)
+            .single();
+            
+          const senderDeptId = fileData?.users?.d_uuid;
+          const user = (await supabase.auth.getUser()).data.user;
+          let userDeptId = null;
+          if (user) {
+            const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
+            userDeptId = profile?.d_uuid;
+          }
+          
+          if (d_uuid === userDeptId) {
+            if (senderDeptId === userDeptId) {
+              // Same department file - count under own department
+              setDeptCounts((prev) => ({ ...prev, [userDeptId]: (prev[userDeptId] || 0) + 1 }));
+            } else {
+              // File from another department - count under sender department
+              setDeptCounts((prev) => ({ ...prev, [senderDeptId]: (prev[senderDeptId] || 0) + 1 }));
+            }
+            
+            // Update recent files department chips
+            const { data: dept } = await supabase
+              .from("department")
+              .select("d_uuid, d_name")
+              .eq("d_uuid", senderDeptId === userDeptId ? userDeptId : senderDeptId)
+              .single();
+            if (!dept) return;
+            setRecentFiles((prev) => {
+              const idx = prev.findIndex((f) => f.f_uuid === f_uuid);
+              if (idx === -1) return prev;
+              const exists = prev[idx].departments?.some((d) => d.d_uuid === dept.d_uuid);
+              if (exists) return prev;
+              const copy = [...prev];
+              const depts = (copy[idx].departments || []).concat(dept);
+              copy[idx] = { ...copy[idx], departments: depts };
+              return copy;
+            });
+          }
+        }
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "file_department" }, (payload) => {
         const { f_uuid, d_uuid } = payload.old || {};

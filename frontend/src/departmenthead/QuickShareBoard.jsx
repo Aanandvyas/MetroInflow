@@ -56,7 +56,8 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
                     data,
                     d_uuid,
                     is_sent,
-                    uuid
+                    uuid,
+                    users!uuid(name)
                 `)
                 .eq('uuid', userProfile.id) // Using id field from the profile which contains the UUID
                 .order('created_at', { ascending: false })
@@ -134,7 +135,7 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
             return `Department ID: ${message.d_uuid ? message.d_uuid.substring(0, 8) : 'Unknown'}`;
         } else {
             // When someone else sent the message to the current user
-            return `From: ${message.data?.sender || 'User ' + (message.uuid ? message.uuid.substring(0, 8) : 'Unknown')}`;
+            return `From: ${message.users?.name || 'User ' + (message.uuid ? message.uuid.substring(0, 8) : 'Unknown')}`;
         }
     };
 
@@ -222,7 +223,7 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${
                                         isSentMessage(message) ? 'bg-blue-500' : 'bg-gray-600'
                                     }`}>
-                                        {message.sender?.name?.charAt(0)?.toUpperCase() || <UserIcon className="h-4 w-4" />}
+                                        {message.users?.name?.charAt(0)?.toUpperCase() || <UserIcon className="h-4 w-4" />}
                                     </div>
                                     <div className="ml-2">
                                         <p className="font-medium text-gray-900">

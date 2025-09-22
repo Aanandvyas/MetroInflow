@@ -41,10 +41,12 @@ const UploadedDocsContainer = () => {
             uploader:uuid(name),
             file_department!inner (
               d_uuid,
+              is_approved,
               department:d_uuid ( d_uuid, d_name )
             )
           `)
           .eq("file_department.d_uuid", userData.d_uuid)
+          .eq("file_department.is_approved", "approved")
           .order("created_at", { ascending: false });
 
         if (filesError) throw filesError;
