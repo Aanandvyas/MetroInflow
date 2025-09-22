@@ -215,7 +215,6 @@ const DocumentUpload = () => {
             console.error("Backend summary request failed.");
           } else {
             const summaryData = await response.json();
-            console.log("Summary backend response:", summaryData);
           }
         } catch (backendErr) {
           console.error("Error sending file to summary backend:", backendErr);

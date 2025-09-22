@@ -52,15 +52,12 @@ const Header = () => {
                 .gte("created_at", fourDaysAgoStr);
 
             if (error) {
-                console.error("Error fetching notification count:", error);
                 setError(error.message);
                 return;
             }
 
-            console.log("Notification count:", count);
             setNotificationCount(count || 0);
         } catch (err) {
-            console.error("Exception in fetchNotificationCount:", err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -75,7 +72,6 @@ const Header = () => {
             return;
         }
 
-        console.log("Fetching notification count - location or user changed");
         fetchNotificationCount();
 
         // Listen for changes in notifications
@@ -87,7 +83,6 @@ const Header = () => {
                 table: 'notifications',
                 filter: `uuid=eq.${user.id}`
             }, () => {
-                console.log("Notification change detected via subscription");
                 fetchNotificationCount();
             })
             .subscribe();
@@ -102,7 +97,6 @@ const Header = () => {
         if (!user?.id) return;
 
         const handleFocus = () => {
-            console.log("Window focus detected, refreshing notification count");
             fetchNotificationCount();
         };
 

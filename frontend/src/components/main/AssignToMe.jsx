@@ -121,7 +121,6 @@ const AssignToMe = () => {
         prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: true } : f))
       );
     } catch (e) {
-      console.error("Failed to mark Important:", e);
       alert("Could not mark Important. Please try again.");
     } finally {
       setImpBusy((s) => ({ ...s, [f_uuid]: false }));

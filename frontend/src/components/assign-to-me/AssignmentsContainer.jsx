@@ -16,12 +16,10 @@ const AssignmentsContainer = () => {
 
       // DEBUG 1: Check if the user object is available
       if (!user) {
-        console.log("Debug Step 1: No user found. Waiting for user session.");
         setDebugMessage("Waiting for user session...");
         setLoading(false);
         return;
       }
-      console.log("Debug Step 1: User found with ID:", user.id);
       setDebugMessage("User found. Fetching profile...");
 
       try {
@@ -39,10 +37,7 @@ const AssignmentsContainer = () => {
         }
         
         const userDeptId = userData.d_uuid;
-        console.log("Debug Step 2: User profile fetched. Department ID:", userDeptId);
-        
         if (!userDeptId) {
-            console.log("Debug Step 2: User does not have a department assigned.");
             setDebugMessage("You are not assigned to a department.");
             setDepartmentFiles([]);
             setLoading(false);
@@ -64,7 +59,6 @@ const AssignmentsContainer = () => {
             throw error;
         }
 
-        console.log(`Debug Step 3: Successfully fetched ${data.length} files for the department.`);
         setDepartmentFiles(data);
         setDebugMessage(''); // Clear message on success
 

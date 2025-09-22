@@ -38,7 +38,7 @@ const Calendar = () => {
             const startDate = startOfMonth.toISOString().split('T')[0];
             const endDate = endOfMonth.toISOString().split('T')[0];
             
-            console.log(`Fetching calendar data for department ${departmentId} from ${startDate} to ${endDate}`);
+           
             
             // Fetch uploaded files from the department
             const { data: uploadedFiles, error: uploadError } = await supabase
@@ -53,7 +53,7 @@ const Calendar = () => {
 
             if (uploadError) throw uploadError;
             
-            console.log("Fetched uploaded files:", uploadedFiles);
+           
 
             // Fetch shared files (files shared TO this department)
             const { data: sharedFiles, error: sharedError } = await supabase
@@ -69,7 +69,7 @@ const Calendar = () => {
 
             if (sharedError) throw sharedError;
             
-            console.log("Fetched shared files:", sharedFiles);
+            
             
             // Now get user information for these files in a separate query
             if (sharedFiles && sharedFiles.length > 0) {
@@ -80,7 +80,7 @@ const Calendar = () => {
                         .select('uuid, name, email, position')
                         .in('uuid', fileIds);
                     
-                    console.log("Fetched file users:", fileUsers);
+                   
                     
                     // Attach user info to the shared files
                     if (fileUsers && fileUsers.length > 0) {
@@ -110,7 +110,7 @@ const Calendar = () => {
 
             if (receivedError) throw receivedError;
             
-            console.log("Fetched received files:", receivedFiles);
+           
             
             // Filter files that are not from this department
             const filteredReceivedFiles = receivedFiles?.filter(fileRef => {
@@ -130,7 +130,7 @@ const Calendar = () => {
                         .select('uuid, name, email, position, d_uuid')
                         .in('uuid', fileUserIds);
                         
-                    console.log("Fetched received file users:", fileUsers);
+                    
                     
                     // Attach user info to the received files
                     if (fileUsers && fileUsers.length > 0) {

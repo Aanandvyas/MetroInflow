@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircleIcon, XCircleIcon, ClockIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 // Helper for status label/color
 const statusMeta = (isApproved) => {
@@ -11,6 +12,7 @@ const statusMeta = (isApproved) => {
 };
 
 const SharedFiles = () => {
+    const navigate = useNavigate();
     const { user, getUserProfile } = useAuth();
     const [profile, setProfile] = useState(null);
     const [rows, setRows] = useState([]);
@@ -229,16 +231,17 @@ const SharedFiles = () => {
                                             <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                                         </svg> View
                                     </a>
-                                    <a
-                                        href={`/summary/${item.f_uuid}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        onClick={() => {
+                                          // Just navigate to /summary with f_uuid, no download/upload
+                                          navigate("/summary", { state: { f_uuid: item.f_uuid } });
+                                        }}
                                         className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                                         </svg> Summary
-                                    </a>
+                                    </button>
                                     
                                     {/* Approval buttons only shown for files that are still pending and eligible for decision */}
                                     {isHead && !item.is_same_department && item.is_approved !== 'approved' && item.is_approved !== 'rejected' && (

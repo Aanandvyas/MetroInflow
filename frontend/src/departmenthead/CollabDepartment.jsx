@@ -43,6 +43,7 @@ const StatusPill = ({ value }) => {
 
 // File list component
 const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, toggleImportant }) => {
+  const navigate = useNavigate();
   const [departmentNames, setDepartmentNames] = useState({});
   
   // Fetch department names when rows change
@@ -168,16 +169,17 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
                     <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                   </svg> View
                 </a>
-                <a
-                  href={`/summary/${r.f_uuid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => {
+                    // Just navigate to /summary with f_uuid, no download/upload
+                    navigate("/summary", { state: { f_uuid: r.f_uuid } });
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                   </svg> Summary
-                </a>
+                </button>
                 
                 {/* Approval buttons only shown for files that are still pending and can be decided */}
                 {isHead && r.canDecide && r.is_approved !== 'approved' && r.is_approved !== 'rejected' && (
@@ -303,31 +305,24 @@ const CollabDepartment = () => {
         
         if (recErr) throw recErr;
 
-        // Log raw data received from the database
-        console.log(`DEBUG: Files data received for department ${departmentId}:`, recData);
-        console.log(`DEBUG: Total files before filtering: ${recData?.length || 0}`);
         
         // Before filtering, check what we have
         const sourceDeptFiles = (recData || []).filter(r => 
           r.file && r.file.d_uuid === departmentId
         );
-        console.log(`DEBUG: Files from department ${departmentId}: ${sourceDeptFiles.length}`);
         
         // Check how many have user data
         const filesWithUserData = (recData || []).filter(r => 
           r.file && r.file.users
         );
-        console.log(`DEBUG: Files with user data: ${filesWithUserData.length}`);
         
         // Check how many are from department heads
         const headFiles = (recData || []).filter(r => 
           r.file && r.file.users?.position === 'head'
         );
-        console.log(`DEBUG: Files from department heads: ${headFiles.length}`);
         
         // Check if any file is shared BY the selected department
         const anyFilesFromDept = (recData || []).some(r => r.file && r.file.d_uuid === departmentId);
-        console.log(`DEBUG: Are there any files from this department? ${anyFilesFromDept ? 'YES' : 'NO'}`);
         
         // Only show files from the selected department
         const recMapped = (recData || [])
@@ -356,7 +351,6 @@ const CollabDepartment = () => {
               other_d_uuid = 'other-departments';
             }
             
-            console.log(`DEBUG: File ${r.f_uuid} - File dept: ${fileDeptId}, Sender dept: ${senderDeptId}, Using: ${sourceDeptId}`);
             
             return {
               fd_uuid: r.fd_uuid,
@@ -375,15 +369,12 @@ const CollabDepartment = () => {
             };
           });
 
-        console.log(`DEBUG: Final files to display: ${recMapped.length}`);
         
         // Show a helpful message when there are no files from this department
         if (recData && recData.length > 0 && recMapped.length === 0) {
-          console.log("DEBUG: No files found from this department");
           setError(`No files from ${department?.d_name || 'this department'} have been shared with your department yet. Check with the department head if you're expecting files.`);
         } else if (recMapped.length === 0) {
           // If we're not showing any files
-          console.log("DEBUG: No files from this department to show");
           setError(`No files from ${department?.d_name || 'this department'} have been shared with your department yet.`);
           
           // If we're showing other departments, gather a list of unique departments from both sender and file departments
@@ -393,7 +384,6 @@ const CollabDepartment = () => {
           const allDeptIds = new Set([...Array.from(fileDeptIds), ...Array.from(senderDeptIds)]);
           
           if (allDeptIds.size > 0) {
-            console.log(`DEBUG: Files are from ${allDeptIds.size} other departments:`, Array.from(allDeptIds));
             
             // Fetch department names for all relevant departments
             const fetchDeptNames = async () => {
@@ -403,7 +393,7 @@ const CollabDepartment = () => {
                 .in('d_uuid', Array.from(allDeptIds));
                 
               if (data) {
-                console.log("DEBUG: Department names fetched:", data);
+               
                 // Store department list for filtering
                 setDepartmentList(data);
               }

@@ -23,11 +23,9 @@ const KebabMenu = ({ open, anchorEl, onClose, children, width = 180 }) => {
   useEffect(() => {
     if (!open || !onClose) return;
     
-    console.log("KebabMenu opened, adding scroll listeners");
     
     // Function that will be called on scroll
     const handleScroll = () => {
-      console.log("Scroll detected, closing menu");
       onClose();
     };
     
@@ -44,7 +42,6 @@ const KebabMenu = ({ open, anchorEl, onClose, children, width = 180 }) => {
     document.addEventListener('touchmove', handleScroll, { capture: true });
     
     return () => {
-      console.log("Removing scroll listeners");
       window.removeEventListener('scroll', handleScroll, { capture: true });
       document.removeEventListener('scroll', handleScroll, { capture: true });
       window.removeEventListener('wheel', handleScroll, { capture: true });

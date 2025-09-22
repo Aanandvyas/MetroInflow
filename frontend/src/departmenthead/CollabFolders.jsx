@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircleIcon, XCircleIcon, DocumentTextIcon, StarIcon as StarOutline, BuildingOfficeIcon, EyeIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 
@@ -112,7 +113,10 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
                   <EyeIcon className="h-4 w-4" /> View
                 </button>
                 <button 
-                  onClick={() => window.open(`/summary/${r.f_uuid}`, '_blank')} 
+                  onClick={() => {
+                    // Just navigate to /summary with f_uuid, no download/upload
+                    navigate("/summary", { state: { f_uuid: r.f_uuid } });
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-purple-600 text-purple-700 hover:bg-purple-50"
                 >
                   <DocumentChartBarIcon className="h-4 w-4" /> Summary
@@ -168,7 +172,10 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
                   <EyeIcon className="h-4 w-4" /> View
                 </button>
                 <button 
-                  onClick={() => window.open(`/summary/${r.f_uuid}`, '_blank')}
+                  onClick={() => {
+                    // Just navigate to /summary with f_uuid, no download/upload
+                    navigate("/summary", { state: { f_uuid: r.f_uuid } });
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-purple-600 text-purple-700 hover:bg-purple-50 flex-grow text-center justify-center"
                 >
                   <DocumentChartBarIcon className="h-4 w-4" /> Summary
@@ -193,7 +200,8 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
 };
 
 const CollabFolders = () => {
-  console.log("INITIAL MOUNT: CollabFolders component starting to render");
+  const navigate = useNavigate();
+
   
   const { user, getUserProfile } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -211,17 +219,11 @@ const CollabFolders = () => {
       return {};
     }
   });
-  const [testResults, setTestResults] = useState(null);
-  const [showTestResults, setShowTestResults] = useState(false);
-  const [debugLog, setDebugLog] = useState([]);
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [summaryVisible, setSummaryVisible] = useState(false);
   
-  // Add a debug log entry with timestamp
-  const addDebugLog = (message) => {
-    const timestamp = new Date().toISOString();
-    setDebugLog(prev => [...prev, `[${timestamp}] ${message}`]);
-  };
+
 
   const toggleSummary = (file) => {
     setSelectedFile(file);
@@ -233,13 +235,10 @@ const CollabFolders = () => {
   // Original comprehensive database test function
   const runDatabaseTest = async () => {
     if (!user?.id) {
-      setTestResults("ERROR: No user ID available");
       return;
     }
     
     try {
-      setTestResults("Running comprehensive database tests...");
-      addDebugLog("Starting comprehensive database tests");
       
       // Test 1: Check user profile
       const userData = await getUserProfile(user.id);
@@ -407,43 +406,35 @@ const CollabFolders = () => {
 
   useEffect(() => {
     const load = async () => {
-      console.log("NETWORK TEST: Starting profile fetch");
       
       if (!user?.id) {
-        console.error("NETWORK TEST: No user ID available, cannot fetch profile");
         return;
       }
       
       try {
-        console.log("NETWORK TEST: Attempting to fetch user profile for ID:", user.id);
         const data = await getUserProfile(user.id);
-        console.log("NETWORK TEST: Profile fetch result:", data);
         setProfile(data);
       } catch (e) {
-        console.error("NETWORK TEST: Profile fetch error:", e);
         setError('Failed to load profile: ' + e.message);
       }
     };
     
     // Network diagnostics
-    console.log("NETWORK TEST: Component mounted, checking network status");
     
     // Test basic network connectivity
     fetch('https://www.google.com/favicon.ico')
       .then(res => {
-        console.log("NETWORK TEST: Basic internet connectivity test passed:", res.status);
+        // Connectivity successful
       })
       .catch(err => {
-        console.error("NETWORK TEST: Basic internet connectivity test failed:", err);
+        // Connection failed
       });
       
     // Check if Supabase is defined and configured
     if (supabase) {
-      console.log("NETWORK TEST: Supabase client exists");
-      console.log("NETWORK TEST: Supabase URL:", supabase.supabaseUrl);
-      console.log("NETWORK TEST: Supabase auth session:", !!supabase.auth.session());
+      // Supabase client exists
     } else {
-      console.error("NETWORK TEST: Supabase client is not properly initialized");
+      // Supabase client is not properly initialized
     }
     
     load();
@@ -451,25 +442,20 @@ const CollabFolders = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log("FETCH TEST: Starting main data fetch");
       
       if (!profile?.d_uuid) { 
-        addDebugLog("No department UUID found in profile");
-        console.log("FETCH TEST: No department UUID in profile:", profile);
         setReceived([]); 
         setSent([]); 
         setLoading(false); 
         return; 
       }
       
-      addDebugLog(`Fetching data for department ${profile.d_uuid}`);
-      console.log("FETCH TEST: Fetching data for department", profile.d_uuid);
+      
       setLoading(true);
       setError(null);
       
       try {
         // Step 1: Fetch all departments for lookup information
-        console.log("FETCH TEST: Step 1 - Fetching departments");
         let departmentMap = {}; // Declare departmentMap in the outer scope
         let departmentsData = []; // Declare departmentsData in the outer scope
         
@@ -484,16 +470,13 @@ const CollabFolders = () => {
           }
           
           departmentsData = deptData; // Assign to the outer scope variable
-          console.log("FETCH TEST: Successfully fetched departments:", departmentsData);
           
           // Create a department lookup map
           departmentsData.forEach(dept => {
             departmentMap[dept.d_uuid] = dept;
           });
           
-          console.log("FETCH TEST: Created department map:", departmentMap);
         } catch (deptErr) {
-          console.error("FETCH TEST: Error in department fetch:", deptErr);
           throw new Error("Failed to fetch departments: " + deptErr.message);
         }
         
@@ -504,14 +487,10 @@ const CollabFolders = () => {
           .eq('d_uuid', profile.d_uuid);
         
         if (fileDeptError) {
-          console.error("DEBUG: Error fetching file_department entries:", fileDeptError);
           throw fileDeptError;
         }
         
-        console.log("DEBUG: File department entries shared with this department:", fileDeptEntries);
-        
         if (!fileDeptEntries || fileDeptEntries.length === 0) {
-          console.log("DEBUG: No files have been shared with this department");
           setReceived([]);
           setSent([]);
           setLoading(false);
@@ -520,7 +499,6 @@ const CollabFolders = () => {
         
         // Step 3: Get all files shared with this department
         const fileIds = fileDeptEntries.map(entry => entry.f_uuid);
-        addDebugLog(`Found ${fileIds.length} files shared with this department`);
         
         const { data: filesData, error: filesError } = await supabase
           .from('file')
@@ -528,13 +506,10 @@ const CollabFolders = () => {
           .in('f_uuid', fileIds);
         
         if (filesError) {
-          addDebugLog(`Error fetching file details: ${filesError.message}`);
           console.error("DEBUG: Error fetching file details:", filesError);
           throw filesError;
         }
         
-        addDebugLog(`Retrieved ${filesData.length} file records from database`);
-        console.log("DEBUG: Files data:", filesData);
         
         // Step 4: Get all file_department entries for these files to find source departments
         const { data: sourceFileDepts, error: sourceFileDeptsError } = await supabase
@@ -547,7 +522,6 @@ const CollabFolders = () => {
           throw sourceFileDeptsError;
         }
         
-        console.log("DEBUG: All file_department entries for shared files:", sourceFileDepts);
         
         // Group the entries by file_uuid to see all departments each file is shared with
         const fileSharing = {};
@@ -558,19 +532,15 @@ const CollabFolders = () => {
           fileSharing[entry.f_uuid].push(entry.d_uuid);
         });
         
-        console.log("DEBUG: File sharing map (which files are shared with which departments):", fileSharing);
         
         // For each file shared with this department, determine its source department
         const fileSourceDepts = {};
         
         // Log total files we've found
-        console.log(`DEBUG: Starting source department identification for ${Object.keys(fileSharing).length} files`);
-        addDebugLog(`Processing ${Object.keys(fileSharing).length} shared files`);
         
         // For each file, try to determine source department (not this department)
         Object.keys(fileSharing).forEach(fileId => {
           const deptIds = fileSharing[fileId];
-          console.log(`DEBUG: File ${fileId} is shared with departments:`, deptIds);
           
           // Look for the source department - this is the department that created the file
           // We need to check the file.d_uuid to determine the original source
@@ -578,7 +548,6 @@ const CollabFolders = () => {
           if (fileDetails && fileDetails.d_uuid) {
             // The source is the department that created the file (not necessarily in file_department)
             const sourceDeptId = fileDetails.d_uuid;
-            console.log(`DEBUG: File ${fileId} has source department: ${sourceDeptId}, my dept: ${profile.d_uuid}, match: ${sourceDeptId === profile.d_uuid}`);
             
             // Include files regardless of source - we'll filter later
             // This matches the HeadDashboard approach which shows all files
@@ -587,16 +556,12 @@ const CollabFolders = () => {
               deptName: departmentMap[sourceDeptId]?.d_name || "Unknown",
               isFromMyDept: sourceDeptId === profile.d_uuid
             };
-          } else {
-            console.log(`DEBUG: File ${fileId} has no source department in details:`, fileDetails);
-          }
+          } 
         });
         
-        console.log("DEBUG: Determined source departments for shared files:", fileSourceDepts);
         
         // Check how many files we can properly categorize
         const filesToShow = Object.keys(fileSourceDepts).length;
-        console.log(`DEBUG: ${filesToShow} out of ${fileIds.length} files can be shown in department folders`);
         
         // Step 5: If users are not loaded properly, fetch them separately
         let usersData = {};
@@ -618,7 +583,6 @@ const CollabFolders = () => {
                 return acc;
               }, {});
               
-              console.log("DEBUG: User data fetched separately:", usersData);
             }
           }
         }
@@ -627,7 +591,6 @@ const CollabFolders = () => {
         const receivedFiles = fileDeptEntries.map(fileDept => {
           const fileDetails = filesData.find(f => f.f_uuid === fileDept.f_uuid);
           if (!fileDetails) {
-            console.log(`DEBUG: Could not find file details for ${fileDept.f_uuid}`);
             return null;
           }
           
@@ -644,7 +607,6 @@ const CollabFolders = () => {
           
           // Log all files instead of skipping them
           if (sourceDeptId === profile.d_uuid) {
-            addDebugLog(`File ${fileDept.f_uuid} is from our own department, including it`);
             // Don't return null here, include the file
           }
           
@@ -667,8 +629,6 @@ const CollabFolders = () => {
           };
         }).filter(Boolean);
         
-        console.log("DEBUG: Processed received files:", receivedFiles);
-        addDebugLog(`Processed ${receivedFiles.length} received files`);
         
         // Step 7: Handle sent files - files from my department shared with others
         // Get all files from my department
@@ -682,8 +642,6 @@ const CollabFolders = () => {
           throw myFilesError;
         }
         
-        console.log("DEBUG: Files from my department:", myDeptFiles);
-        addDebugLog(`Found ${myDeptFiles.length} files from my department`);
         
         // If there are files from my department, find where they're shared
         const sentFiles = [];
@@ -703,8 +661,6 @@ const CollabFolders = () => {
             throw sentError;
           }
           
-          console.log("DEBUG: Sent file entries:", sentEntries);
-          addDebugLog(`Found ${sentEntries.length} file entries shared with other departments`);
           
           // Process each sent entry
           sentEntries.forEach(entry => {
@@ -728,8 +684,6 @@ const CollabFolders = () => {
           });
         }
         
-        addDebugLog(`Processed ${sentFiles.length} sent files and ${receivedFiles.length} received files`);
-        console.log("DEBUG: Processed sent files:", sentFiles);
         
         // Update the department map with names
         const deptNameMap = {};
@@ -738,24 +692,13 @@ const CollabFolders = () => {
         });
         setDeptMap(deptNameMap);
         
-        // Print comparison of our results vs expected results
-        console.log("RESULT COMPARISON: ==================");
-        console.log(`Files in system total: ${filesData.length}`);
-        console.log(`Files shared with my department: ${fileDeptEntries.length}`);
-        console.log(`Files we identified sources for: ${Object.keys(fileSourceDepts).length}`);
-        console.log(`Files in received array: ${receivedFiles.length}`);
-        console.log(`Files in sent array: ${sentFiles.length}`);
-        console.log("RESULT COMPARISON: ==================");
-        
-        // Log detailed information about receivedFiles for debugging
-        console.log("Received Files Structure:", receivedFiles.slice(0, 2));
+  
         
         // Set the received and sent arrays
         setReceived(receivedFiles);
         setSent(sentFiles);
         
       } catch (e) {
-        console.error("DEBUG: Error in fetchData", e);
         setError(e.message || 'Failed to load collaboration data');
       } finally {
         setLoading(false);
@@ -791,7 +734,6 @@ const CollabFolders = () => {
     setTestResults("Running basic Supabase connection test...");
     
     try {
-      console.log("CONNECTION TEST: Testing Supabase connection");
       
       // Check if supabase client exists
       if (!supabase) {
@@ -809,7 +751,6 @@ const CollabFolders = () => {
           return;
         }
         
-        console.log("CONNECTION TEST: Auth check succeeded", authData);
         
         if (!authData?.session) {
           setTestResults("WARNING: No active session found. You may need to log in again.");
@@ -833,19 +774,15 @@ const CollabFolders = () => {
         const duration = (endTime - startTime).toFixed(2);
         
         if (error) {
-          console.error("CONNECTION TEST: Database query failed", error);
           setTestResults(`Database query failed: ${error.message}`);
           return;
         }
         
-        console.log("CONNECTION TEST: Database query succeeded", data);
         setTestResults(`Connection test PASSED!\nDatabase query completed in ${duration}ms.\nYou have a valid session and can access the database.`);
       } catch (dbErr) {
-        console.error("CONNECTION TEST: Database query exception", dbErr);
         setTestResults(`Database query exception: ${dbErr.message}`);
       }
     } catch (e) {
-      console.error("CONNECTION TEST: Test failed with exception", e);
       setTestResults(`Test failed with exception: ${e.message}`);
     }
   };
@@ -859,7 +796,6 @@ const CollabFolders = () => {
     
     try {
       setTestResults("Testing with HeadDashboard approach...");
-      addDebugLog("Starting HeadDashboard approach test");
       
       // Get user profile first
       const userProfile = await getUserProfile(user.id);
@@ -981,7 +917,6 @@ const CollabFolders = () => {
       }).filter(Boolean);
       
       // Update UI
-      addDebugLog(`Using HeadDashboard approach to update received files: ${receivedFiles.length} files`);
       setReceived(receivedFiles);
     } catch (e) {
       setTestResults(`Test ERROR: ${e.message}`);
@@ -1011,7 +946,6 @@ const CollabFolders = () => {
     const s = new Set();
     received.forEach(r => r.other_d_uuid && s.add(r.other_d_uuid));
     sent.forEach(r => r.other_d_uuid && s.add(r.other_d_uuid));
-    console.log("DEBUG: Collected department IDs:", Array.from(s));
     return Array.from(s);
   }, [received, sent]);
 
@@ -1020,13 +954,10 @@ const CollabFolders = () => {
   useEffect(() => {
     if (Object.keys(deptMap).length === 0 && deptIds.length > 0) {
       const fetchDeptNames = async () => {
-        console.log("DEBUG: Fetching missing department names for:", deptIds);
         const { data, error } = await supabase.from('department').select('d_uuid, d_name').in('d_uuid', deptIds);
         if (error) { 
-          console.warn('DEBUG: Failed to fetch department names', error); 
           return; 
         }
-        console.log("DEBUG: Department data received:", data);
         const map = {};
         (data || []).forEach(d => { map[d.d_uuid] = d.d_name; });
         setDeptMap(prevMap => ({...prevMap, ...map}));
@@ -1042,7 +973,6 @@ const CollabFolders = () => {
     // Process received files - categorize by source department
     received.forEach(r => {
       if (!r.other_d_uuid) {
-        console.log("DEBUG: File missing source department:", r);
         return;
       }
       const k = r.other_d_uuid;
@@ -1053,7 +983,6 @@ const CollabFolders = () => {
     // Process sent files - categorize by target department
     sent.forEach(srow => {
       if (!srow.other_d_uuid) {
-        console.log("DEBUG: Sent file missing target department:", srow);
         return;
       }
       const k = srow.other_d_uuid;
@@ -1062,8 +991,6 @@ const CollabFolders = () => {
     });
     
     const ids = new Set([...Object.keys(recByDept), ...Object.keys(sentByDept)]);
-    console.log("DEBUG: Department groups - received:", recByDept, "sent:", sentByDept);
-    addDebugLog(`Grouped files into ${ids.size} departments (${Object.keys(recByDept).length} with received, ${Object.keys(sentByDept).length} with sent)`);
     
     const result = Array.from(ids)
       .map(id => ({
@@ -1075,7 +1002,6 @@ const CollabFolders = () => {
       .filter(dept => dept.received.length > 0) // Only include departments with received files
       .sort((a, b) => a.name.localeCompare(b.name));
     
-    console.log("DEBUG: Final cards data:", result);
     return result;
   }, [deptMap, received, sent]);
 
@@ -1083,27 +1009,21 @@ const CollabFolders = () => {
   
   useEffect(() => {
     if (!selectedDeptId && cards.length > 0) {
-      console.log("DEBUG: Auto-selecting first department:", cards[0].id);
       setSelectedDeptId(cards[0].id);
     } else if (cards.length === 0) {
-      console.log("DEBUG: No cards available to select");
     }
   }, [cards, selectedDeptId]);
 
   // Filter and search
   const filteredCard = useMemo(() => {
     if (!selectedDeptId || !cards.length) {
-      console.log("DEBUG: No filtered card available - selectedDeptId:", selectedDeptId, "cards length:", cards.length);
       return null;
     }
     
     const card = cards.find(c => c.id === selectedDeptId);
     if (!card) {
-      console.log("DEBUG: Could not find card with id:", selectedDeptId);
       return null;
     }
-    
-    console.log("DEBUG: Filtering card:", card, "with filter status:", filterStatus, "and search query:", searchQuery);
     
     // Apply search and filters
     const filterFn = (file) => {
@@ -1133,7 +1053,6 @@ const CollabFolders = () => {
       sent: card.sent.filter(filterFn)
     };
     
-    console.log("DEBUG: Filtered result:", filteredResult);
     return filteredResult;
   }, [cards, selectedDeptId, filterStatus, searchQuery]);
   
@@ -1151,8 +1070,8 @@ const CollabFolders = () => {
         // Navigate to file viewer
         window.open(`/file/${fd_uuid}`, '_blank');
       } else if (action === 'summary') {
-        // Navigate to summary view
-        window.open(`/summary/${fd_uuid}`, '_blank');
+        // Navigate to summary view using state
+        navigate("/summary", { state: { f_uuid: fd_uuid } });
       }
     } catch (err) {
       setError(err.message || 'Operation failed');
@@ -1169,58 +1088,10 @@ const CollabFolders = () => {
       <div className="mb-4 bg-gray-100 p-3 rounded border">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-md font-medium">Collaboration Files Diagnostics</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={testSupabaseConnection}
-              className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
-            >
-              Test Connection
-            </button>
-            <button
-              onClick={runDatabaseTest}
-              className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
-            >
-              Basic DB Test
-            </button>
-            <button
-              onClick={testHeadDashboardApproach}
-              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded"
-            >
-              Test HeadDashboard
-            </button>
-            <button
-              onClick={() => setShowTestResults(!showTestResults)}
-              className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
-            >
-              {showTestResults ? 'Hide Debug Data' : 'Show Debug Data'}
-            </button>
-          </div>
+
         </div>
         
-        {/* Show debug info */}
-        {showTestResults && (
-          <div className="mt-2">
-            <div className="mb-3">
-              <h4 className="text-sm font-medium mb-1">Debug Log:</h4>
-              <div className="bg-gray-900 text-gray-100 p-2 rounded text-xs font-mono h-24 overflow-y-auto">
-                {debugLog.length === 0 ? (
-                  <div className="text-gray-500">No debug logs recorded yet</div>
-                ) : (
-                  debugLog.map((log, idx) => <div key={idx}>{log}</div>)
-                )}
-              </div>
-            </div>
-            
-            {testResults && (
-              <div>
-                <h4 className="text-sm font-medium mb-1">Test Results:</h4>
-                <div className="bg-gray-900 text-gray-100 p-2 rounded text-xs font-mono h-64 overflow-y-auto whitespace-pre-wrap">
-                  {testResults}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
       
       {loading ? (
@@ -1285,62 +1156,15 @@ const CollabFolders = () => {
             </ul>
           </div>
           <div className="mt-4 flex gap-3 justify-center">
-            <button 
-              onClick={testSupabaseConnection}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Test Database Connection
-            </button>
-            <button 
-              onClick={testHeadDashboardApproach}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Try HeadDashboard Approach
-            </button>
+
           </div>
           
-          {testResults ? (
-            <div className="mt-4 p-4 bg-gray-50 border rounded text-left">
-              <h4 className="font-medium mb-2 text-gray-900">Test Results</h4>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap overflow-auto max-h-60">
-                {testResults}
-              </pre>
-              <button
-                onClick={() => setTestResults(null)} 
-                className="mt-2 inline-flex items-center px-2.5 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Hide Results
-              </button>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <div className="flex space-x-2">
-                <button
-                  onClick={runDatabaseTest}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Run Diagnostic Test
-                </button>
-                <button
-                  onClick={() => {
-                    setTestResults(JSON.stringify({
-                      received: received,
-                      sent: sent,
-                      totalReceived: received.length,
-                      totalSent: sent.length
-                    }, null, 2));
-                  }}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  Show Current Files
-                </button>
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Debug info: Profile d_uuid: {profile?.d_uuid || 'not set'}, User ID: {user?.id || 'not set'}, 
-                Position: {profile?.position || 'not set'}
-              </p>
-            </div>
-          )}
+
+          <div className="mt-4">
+            <p className="text-sm text-gray-500 mt-2">
+              Department d_uuid: {profile?.d_uuid || 'not set'}
+            </p>
+          </div>
         </div>
       ) : (
         <div>

@@ -291,10 +291,8 @@ const AllFiles = () => {
     e.stopPropagation(); // Prevent any parent handlers
     
     if (user) {
-      console.log("View clicked for file:", fileUuid);
       try {
         const success = await markNotificationAsSeen(fileUuid, user.id);
-        console.log("Notification marked as seen:", success);
         
         // Now navigate programmatically
         window.location.href = `/file/${fileUuid}`;

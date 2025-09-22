@@ -7,7 +7,6 @@ export const markNotificationAsSeen = async (fileUuid, userId) => {
   }
   
   try {
-    console.log(`Marking notification as seen for file ${fileUuid} and user ${userId}`);
     
     const { data, error } = await supabase
       .from('notifications')

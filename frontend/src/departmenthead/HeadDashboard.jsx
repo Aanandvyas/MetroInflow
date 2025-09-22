@@ -30,6 +30,9 @@ import {
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import QuickShare from './QuickShare';
+import QuickShareBoard from './QuickShareBoard';
+import QuickShareIntegration from './QuickShareIntegration';
 
 // Department Grid Component for Collab Folders
 const DepartmentGrid = () => {
@@ -43,14 +46,15 @@ const DepartmentGrid = () => {
     // Get the current user's profile
     useEffect(() => {
         const fetchUserProfile = async () => {
-            if (!user?.id) return;
+            if (!user?.id) {
+                console.warn("HeadDashboard: user.id is missing");
+                return;
+            }
             try {
                 const profile = await getUserProfile(user.id);
-                setUserProfile(profile);
                 
-                // Test function to directly check for shared files
-                if (profile?.d_uuid) {
-                    testSharedFiles(profile.d_uuid);
+                if (profile) {
+                    setUserProfile(profile);
                 }
             } catch (err) {
                 console.error("Error fetching user profile:", err);
@@ -60,148 +64,7 @@ const DepartmentGrid = () => {
         fetchUserProfile();
     }, [user?.id, getUserProfile]);
     
-    // Test function to directly query for shared files
-    const testSharedFiles = async (deptId) => {
-        try {
-            console.log("Testing shared files for department:", deptId);
-            
-            // Get all users to identify department ownership
-            const { data: users, error: usersError } = await supabase
-                .from('users')
-                .select('uuid, name, d_uuid');
-                
-            if (usersError) {
-                console.error("Error fetching users:", usersError);
-            } else {
-                console.log("Users data:", users);
-            }
-            
-            // Get all departments
-            const { data: allDepts, error: allDeptsError } = await supabase
-                .from('department')
-                .select('*');
-                
-            if (allDeptsError) {
-                console.error("Error fetching departments:", allDeptsError);
-            } else {
-                console.log("All departments:", allDepts);
-            }
-            
-            // Simple query to get all file_department entries
-            const { data: allFileDepts, error: allFileDeptsError } = await supabase
-                .from('file_department')
-                .select('*');
-                
-            if (allFileDeptsError) {
-                console.error("Error querying file_department:", allFileDeptsError);
-            } else {
-                console.log("All file_department entries:", allFileDepts);
-                
-                // Check if there are any entries at all for this department
-                const entriesForThisDept = allFileDepts.filter(entry => entry.d_uuid === deptId);
-                console.log(`Found ${entriesForThisDept.length} file_department entries for this department`);
-            }
-            
-                // Check file table for actual files
-                const { data: fileSample, error: fileSampleError } = await supabase
-                    .from('file')
-                    .select('*')
-                    .limit(10);
-                    
-                if (fileSampleError) {
-                    console.error("Error fetching files:", fileSampleError);
-                } else {
-                    console.log(`Found ${fileSample.length} files in the file table:`, fileSample);
-                    
-                    // Now let's check the file_department table to find out which files are shared with this dept
-                    const { data: fileDeptShared, error: fileDeptError } = await supabase
-                        .from('file_department')
-                        .select('*')
-                        .eq('d_uuid', deptId);
-                        
-                    if (fileDeptError) {
-                        console.error("Error checking file_department:", fileDeptError);
-                    } else {
-                        console.log(`Found ${fileDeptShared.length} file_department entries for this department:`, fileDeptShared);
-                        
-                        if (fileDeptShared.length > 0) {
-                            // Get all the file_department entries for the files shared with this department
-                            // to determine their source departments
-                            const sharedFileIds = fileDeptShared.map(fd => fd.f_uuid);
-                            
-                            const { data: allFileDeptEntries, error: allFDError } = await supabase
-                                .from('file_department')
-                                .select('*')
-                                .in('f_uuid', sharedFileIds);
-                                
-                            if (allFDError) {
-                                console.error("Error checking all file_department entries:", allFDError);
-                            } else {
-                                console.log("All file_department entries for shared files:", allFileDeptEntries);
-                                
-                                // Group the entries by file_uuid to see all departments each file is shared with
-                                const fileSharing = {};
-                                allFileDeptEntries.forEach(entry => {
-                                    if (!fileSharing[entry.f_uuid]) {
-                                        fileSharing[entry.f_uuid] = [];
-                                    }
-                                    fileSharing[entry.f_uuid].push(entry.d_uuid);
-                                });
-                                
-                                console.log("File sharing map (which files are shared with which departments):", fileSharing);
-                                
-                                // For each file shared with this department, determine its source department
-                                const { data: allDepts, error: allDeptsError } = await supabase
-                                    .from('department')
-                                    .select('*');
-                                    
-                                if (allDeptsError) {
-                                    console.error("Error fetching departments:", allDeptsError);
-                                } else {
-                                    // Create lookup maps
-                                    const deptMap = {};
-                                    allDepts.forEach(d => deptMap[d.d_uuid] = d.d_name);
-                                    
-                                    const fileSourceDepts = {};
-                                    
-                                    // For each file, try to determine source department (not this department)
-                                    Object.keys(fileSharing).forEach(fileId => {
-                                        const deptIds = fileSharing[fileId];
-                                        const sourceDeptId = deptIds.find(did => did !== deptId);
-                                        if (sourceDeptId) {
-                                            fileSourceDepts[fileId] = {
-                                                deptId: sourceDeptId,
-                                                deptName: deptMap[sourceDeptId] || "Unknown"
-                                            };
-                                        }
-                                    });
-                                    
-                                    console.log("Determined source departments for shared files:", fileSourceDepts);
-                                    
-                                    // Check how many files we can properly categorize
-                                    const filesToShow = Object.keys(fileSourceDepts).length;
-                                    console.log(`${filesToShow} out of ${sharedFileIds.length} files can be shown in department folders`);
-                                    
-                                    if (filesToShow === 0) {
-                                        console.log("PROBLEM: None of the shared files can be categorized by source department!");
-                                        console.log("SOLUTION: Make sure files are shared between at least two departments.");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Suggest creating test data if no files found
-                    if (fileSample.length === 0 || !fileDeptShared || fileDeptShared.length === 0) {
-                        console.log("SUGGESTION: No shared files found. You may need to create test data.");
-                        console.log("1. Create files in different departments (set d_uuid in the file table)");
-                        console.log("2. Share files between departments by adding entries to file_department table");
-                        console.log("3. Each entry in file_department should have f_uuid (file) and d_uuid (target department)");
-                    }
-                }        } catch (e) {
-            console.error("Error in test query:", e);
-        }
-    };
+
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -219,7 +82,7 @@ const DepartmentGrid = () => {
 
                 // Filter out the department that the current user belongs to
                 const filteredDepartments = departmentsData.filter(dept => dept.d_uuid !== userProfile.d_uuid);
-                console.log("Filtered departments (excluding user's department):", filteredDepartments);
+
                 
                 // Step 1: Get all shared files for the current user's department
                 const { data: fileDeptEntries, error: fileDeptError } = await supabase
@@ -232,10 +95,10 @@ const DepartmentGrid = () => {
                     throw fileDeptError;
                 }
                 
-                console.log("File department entries shared with this department:", fileDeptEntries);
+
                 
                 if (!fileDeptEntries || fileDeptEntries.length === 0) {
-                    console.log("No files have been shared with this department");
+    
                     setDepartments(filteredDepartments.map((dept, index) => ({
                         id: dept.d_uuid,
                         name: dept.d_name,
@@ -264,7 +127,7 @@ const DepartmentGrid = () => {
                     throw filesError;
                 }
                 
-                console.log("Files data:", filesData);
+
                 
                 // Step 3: Fetch information about all departments to look up source departments
                 const { data: allDepartments, error: allDeptsError } = await supabase
@@ -288,7 +151,7 @@ const DepartmentGrid = () => {
                     deptIdToNameMap[dept.d_uuid] = dept.d_name;
                 });
                 
-                console.log("Department map:", departmentMap);
+
                 
                 // Step 4: Get the source department information for each file
                 // We need to get the original department (source) for each file
@@ -302,7 +165,7 @@ const DepartmentGrid = () => {
                     throw sourceFileDeptsError;
                 }
                 
-                console.log("Source file departments:", sourceFileDepts);
+
                 
                 // Create a map of file to source department
                 const fileSourceMap = {};
@@ -334,7 +197,7 @@ const DepartmentGrid = () => {
                     }
                 }
                 
-                console.log("File source map (improved):", fileSourceMap);
+
                 
                 // Step 5: If users are not loaded properly, fetch them separately
                 let usersData = {};
@@ -396,7 +259,7 @@ const DepartmentGrid = () => {
                     };
                 }).filter(Boolean);
                 
-                console.log("Processed shared files data:", sharedFilesData);
+
                 
                 // Step 5: Group files by their source department
                 const filesBySourceDept = {};
@@ -412,13 +275,6 @@ const DepartmentGrid = () => {
                 // Always create an "Unknown" department for files that can't be assigned
                 let hasUnknownDept = true;
                 filesBySourceDept["unknown"] = [];
-                console.log("Added 'Unknown' department for files with missing department info");
-                
-                console.log("DEBUG: File distribution starting with departments:", 
-                    Object.keys(filesBySourceDept).map(id => 
-                        `${id}: ${id === "unknown" ? "Unknown Source" : (deptIdToNameMap[id] || 'Unknown')}`
-                    )
-                );
                 
                 // Organize files by the source department
                 sharedFilesData.forEach(fileData => {
@@ -426,11 +282,7 @@ const DepartmentGrid = () => {
                     let sourceDeptId = fileData.source_d_uuid;
                     let sourceDeptName = fileData.source_dept_name || "Unknown Department";
                     
-                    console.log(`DEBUG: Assigning file ${fileData.file.f_name || 'Unnamed'} to dept: ${sourceDeptId || 'unknown'} (${sourceDeptName})`);
-                    
-                    console.log("Processing file:", fileData.file.f_name, 
-                              "from department:", sourceDeptId, 
-                              "(" + sourceDeptName + ")");
+
                     
                     // Get uploader info if available
                     let uploaderName = "Unknown";
@@ -444,17 +296,17 @@ const DepartmentGrid = () => {
                     // Handle department assignment logic 
                     if (!sourceDeptId) {
                         // No source department specified
-                        console.log(`File ${fileData.file.f_name || fileData.f_uuid} has no source department. Assigning to unknown.`);
+
                         sourceDeptId = "unknown";
                         sourceDeptName = "Unknown Source";
                     } else if (sourceDeptId === userProfile.d_uuid) {
                         // File is from user's own department - should not show up here
-                        console.log(`File ${fileData.file.f_name || fileData.f_uuid} is from user's own department. Assigning to unknown.`);
+
                         sourceDeptId = "unknown";
                         sourceDeptName = "Unknown Source";
                     } else if (!filesBySourceDept.hasOwnProperty(sourceDeptId)) {
                         // Department not in our tracked departments
-                        console.log(`File ${fileData.file.f_name || fileData.f_uuid} has untracked department ID: ${sourceDeptId}. Assigning to unknown.`);
+
                         sourceDeptId = "unknown";
                         sourceDeptName = "Unknown Source";
                     }
@@ -474,11 +326,11 @@ const DepartmentGrid = () => {
                         fileDeptId: fileData.file.d_uuid
                     };
                     
-                    console.log(`Adding file ${fileData.file.f_name} to department group: ${sourceDeptId}`);
+
                     filesBySourceDept[sourceDeptId].push(fileEntry);
                 });
                 
-                console.log("Files organized by source department:", filesBySourceDept);
+
                 
                 // Generate department objects with their files and stats
                 let departmentsWithFiles = filteredDepartments.map((dept, index) => {
@@ -521,7 +373,7 @@ const DepartmentGrid = () => {
                         rejectedCount
                     });
                     
-                    console.log("Added Unknown department with", unknownFiles.length, "files");
+
                 }
                 
                 // Sort files within each department by date (newest first)
@@ -744,9 +596,6 @@ const HeadDashboard = () => {
     const [sharedFiles, setSharedFiles] = useState([]);
     const [pendingFiles, setPendingFiles] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [quickShareDeptSearch, setQuickShareDeptSearch] = useState('');
-    const [quickShareFilteredDepts, setQuickShareFilteredDepts] = useState([]);
-    const [selectedQuickShareDept, setSelectedQuickShareDept] = useState(null);
 
 
 
@@ -788,7 +637,6 @@ const HeadDashboard = () => {
                             userData = data;
                         }
                     } catch (err) {
-                        console.log('Method 1 failed, trying alternative...');
                     }
 
                     // Method 2: Try simple user query
@@ -804,7 +652,6 @@ const HeadDashboard = () => {
                                 userData = data;
                             }
                         } catch (err) {
-                            console.log('Method 2 failed, using fallback...');
                         }
                     }
 
@@ -826,7 +673,6 @@ const HeadDashboard = () => {
 
                     setUserProfile(userData);
                 } catch (error) {
-                    console.error('Error fetching user profile:', error);
                     // Set fallback profile
                     setUserProfile({
                         id: user.id,
@@ -1637,30 +1483,6 @@ const HeadDashboard = () => {
         );
     };
 
-    // Handle department search for Quick Share
-    useEffect(() => {
-        if (quickShareDeptSearch && quickShareDeptSearch.trim() !== '') {
-            const fetchDepartments = async () => {
-                try {
-                    const { data, error } = await supabase
-                        .from('department')
-                        .select('d_uuid, d_name')
-                        .ilike('d_name', `%${quickShareDeptSearch}%`);
-                    
-                    if (error) throw error;
-                    setQuickShareFilteredDepts(data || []);
-                } catch (error) {
-                    console.error('Error searching departments:', error);
-                    setQuickShareFilteredDepts([]);
-                }
-            };
-            
-            fetchDepartments();
-        } else {
-            setQuickShareFilteredDepts([]);
-        }
-    }, [quickShareDeptSearch]);
-
     // Approval functions for pending files
     const handleApproveFile = async (fileId) => {
         try {
@@ -1721,10 +1543,10 @@ const HeadDashboard = () => {
         );
     }
 
+    
+
     return (
         <div className="min-h-screen bg-gray-50">
-
-
             <div className="p-6">
                 {/* Dashboard Title */}
                 <div className="mb-6 flex justify-between items-center">
@@ -1828,450 +1650,16 @@ const HeadDashboard = () => {
                     </div>
                 </div>
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column - Quick Share */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-semibold text-gray-900">Quick Share</h2>
-                                <div className="p-1.5 rounded-full bg-teal-50 text-teal-600">
-                                    <ShareIcon className="h-5 w-5" />
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Department Head</label>
-                                    {/* Department Search */}
-                                    <div className="relative mb-3">
-                                        <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search departments..."
-                                            value={quickShareDeptSearch || ''}
-                                            onChange={(e) => setQuickShareDeptSearch(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        
-                                        {/* Department search results dropdown */}
-                                        {quickShareDeptSearch && quickShareFilteredDepts.length > 0 && (
-                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                                                {quickShareFilteredDepts.map(dept => (
-                                                    <div 
-                                                        key={dept.d_uuid} 
-                                                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                                        onClick={() => {
-                                                            setSelectedQuickShareDept(dept);
-                                                            setQuickShareDeptSearch('');
-                                                        }}
-                                                    >
-                                                        {dept.d_name}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Selected department display */}
-                                    {selectedQuickShareDept && (
-                                        <div className="flex items-center mt-2 bg-blue-50 px-3 py-2 rounded-md">
-                                            <BuildingOfficeIcon className="h-4 w-4 text-blue-600 mr-2" />
-                                            <span className="text-sm text-blue-700">{selectedQuickShareDept.d_name}</span>
-                                            <button
-                                                type="button"
-                                                className="ml-auto text-blue-500 hover:text-blue-700"
-                                                onClick={() => setSelectedQuickShareDept(null)}
-                                            >
-                                                <XMarkIcon className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-                                    <div className="relative">
-                                        <select className="w-full border border-gray-300 rounded-md px-3 py-2 appearance-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white pr-10">
-                                            <option value="">General</option>
-                                            <option value="emergency">Emergency</option>
-                                            <option value="budget">Budget</option>
-                                            <option value="hr">Policy Update</option>
-                                            <option value="general">Important</option>
-                                        </select>
-                                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-                                            <ChevronDownIcon className="h-5 w-5" />
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                                    <textarea
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 h-20 resize-none"
-                                        placeholder="Add a urgent message..."
-                                    ></textarea>
-                                </div>
-                                <button 
-                                    className={`w-full py-2.5 px-4 rounded-md font-medium flex items-center justify-center gap-2 transition-colors shadow-sm ${
-                                        selectedQuickShareDept 
-                                            ? 'bg-teal-600 hover:bg-teal-700 text-white' 
-                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    }`}
-                                    disabled={!selectedQuickShareDept}
-                                >
-                                    <ShareIcon className="h-4 w-4" />
-                                    Share Message
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column - Shared Files */}
-                    <div className="lg:col-span-2">
-                        <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center">
-                                    <h2 className="text-xl font-semibold text-gray-900">Shared Files</h2>
-                                    {sharedFiles.length > 0 && (
-                                        <span className="ml-3 text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                            {sharedFiles.length} files
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            placeholder="Search files..."
-                                            className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
-                                        />
-                                        <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {sharedFiles.length > 0 ? (
-                                <div className="border border-gray-200 rounded-md overflow-hidden">
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
-                                                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shared By</th>
-                                                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                                                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {sharedFiles.map((file) => (
-                                                    <tr key={file.id} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            <div className="flex items-center">
-                                                                <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center">
-                                                                    {getFileTypeIcon(file.name)}
-                                                                </div>
-                                                                <div className="ml-3">
-                                                                    <div className="text-sm font-medium text-gray-900 line-clamp-1 max-w-[180px]">{file.name}</div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{file.sharedBy}</td>
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                                                                {file.fromDepartment}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{file.dateShared}</td>
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${file.status === 'Done'
-                                                                    ? 'bg-green-50 text-green-700 border border-green-100'
-                                                                    : 'bg-amber-50 text-amber-700 border border-amber-100'
-                                                                }`}>
-                                                                {file.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            <div className="flex space-x-2">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => window.open(`/file/${file.id}`, "_blank", "noopener,noreferrer")}
-                                                                    className="inline-flex items-center px-2 py-1 text-xs border border-gray-300 rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                                >
-                                                                    <EyeIcon className="h-3.5 w-3.5 mr-1" />
-                                                                    View
-                                                                </button>
-                                                                <button
-                                                                    className="inline-flex items-center px-2 py-1 text-xs border border-blue-300 rounded-md shadow-sm bg-blue-50 text-blue-700 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                                    onClick={() => {
-                                                                        navigate("/summary", { state: { f_uuid: file.id } });
-                                                                    }}
-                                                                >
-                                                                    <DocumentTextIcon className="h-3.5 w-3.5 mr-1" />
-                                                                    Summary
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center py-10 bg-gray-50 rounded-md border border-gray-200">
-                                    <DocumentArrowDownIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                                    <p className="text-gray-600 font-medium">No shared files found</p>
-                                    <p className="text-xs text-gray-500 mt-1">Files shared with you will appear here</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                {/* QuickShare Integration */}
+                <div className="mb-8">
+                    <QuickShareIntegration userProfile={userProfile} />
                 </div>
+
+                
             </div>
 
-            {/* Upload Modal */}
-            {showUploadModal && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-                        <div className="mt-3">
-                            {/* Modal Header */}
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-semibold text-gray-900">Upload Documents</h3>
-                                <button
-                                    onClick={() => setShowUploadModal(false)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    <XMarkIcon className="h-6 w-6" />
-                                </button>
-                            </div>
-
-                            {/* Upload Form */}
-                            <form onSubmit={handleUploadSubmit} className="space-y-6">
-                                {/* Title Input */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Document Title
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        disabled={files.length > 1}
-                                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${files.length > 1 ? 'bg-gray-100 cursor-not-allowed' : ''
-                                            }`}
-                                        placeholder={files.length > 1 ? "Multiple files - using individual file names" : "Enter document title"}
-                                        required={files.length === 1}
-                                    />
-                                    {files.length > 1 && (
-                                        <p className="mt-1 text-sm text-gray-500">
-                                            When multiple files are selected, each file will use its own filename as the title
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Language Selection */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Language
-                                    </label>
-                                    <select
-                                        value={language}
-                                        onChange={(e) => setLanguage(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        required
-                                    >
-                                        <option value="">Select Language</option>
-                                        <option value="English">English</option>
-                                        <option value="Hindi">Hindi</option>
-                                        <option value="Urdu">Urdu</option>
-                                        <option value="Bengali">Bengali</option>
-                                        <option value="Tamil">Tamil</option>
-                                        <option value="Telugu">Telugu</option>
-                                        <option value="Marathi">Marathi</option>
-                                        <option value="Gujarati">Gujarati</option>
-                                        <option value="Kannada">Kannada</option>
-                                        <option value="Malayalam">Malayalam</option>
-                                        <option value="Punjabi">Punjabi</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-
-                                {/* File Upload Area */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Upload Files
-                                    </label>
-                                    <div
-                                        className={`border-2 border-dashed rounded-lg p-6 text-center ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                                            }`}
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            setIsDragging(true);
-                                        }}
-                                        onDragLeave={() => setIsDragging(false)}
-                                        onDrop={handleDrop}
-                                    >
-                                        <input
-                                            type="file"
-                                            multiple
-                                            onChange={handleFileSelect}
-                                            className="hidden"
-                                            id="file-upload"
-                                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                                        />
-                                        <label htmlFor="file-upload" className="cursor-pointer">
-                                            <ArrowUpTrayIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                            <p className="text-lg font-medium text-gray-900 mb-2">
-                                                Drop files here or click to browse
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                Supports: PDF, DOC, DOCX, TXT, JPG, PNG (Max 10MB each)
-                                            </p>
-                                        </label>
-                                    </div>
-
-                                    {/* Selected Files */}
-                                    {files.length > 0 && (
-                                        <div className="mt-4">
-                                            <h4 className="text-sm font-medium text-gray-700 mb-2">
-                                                Selected Files ({files.length})
-                                            </h4>
-                                            <div className="space-y-2">
-                                                {files.map((file, index) => (
-                                                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                                        <div className="flex items-center">
-                                                            <DocumentCheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                                                            <span className="text-sm text-gray-700">{file.name}</span>
-                                                            <span className="text-xs text-gray-500 ml-2">
-                                                                ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeFile(index)}
-                                                            className="text-red-500 hover:text-red-700"
-                                                        >
-                                                            <XMarkIcon className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Department Selection */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Share with Departments
-                                    </label>
-
-                                    {/* Department Search */}
-                                    <div className="relative mb-3">
-                                        <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search departments..."
-                                            value={departmentSearch}
-                                            onChange={(e) => setDepartmentSearch(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-
-                                    {/* Department List */}
-                                    <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-md">
-                                        {loadingDepartments ? (
-                                            <div className="p-4 text-center text-gray-500">Loading departments...</div>
-                                        ) : (
-                                            filteredDepartments.map((dept) => (
-                                                <label key={dept.id} className="flex items-center p-3 hover:bg-gray-50 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedDepartments.some(d => d.d_uuid === dept.d_uuid)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedDepartments([...selectedDepartments, dept]);
-                                                            } else {
-                                                                setSelectedDepartments(selectedDepartments.filter(d => d.d_uuid !== dept.d_uuid));
-                                                            }
-                                                        }}
-                                                        className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                    />
-                                                    <span className="text-sm text-gray-700">{dept.d_name}</span>
-                                                </label>
-                                            ))
-                                        )}
-                                    </div>
-
-                                    {/* Selected Departments */}
-                                    {selectedDepartments.length > 0 && (
-                                        <div className="mt-3">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">
-                                                Selected ({selectedDepartments.length}):
-                                            </p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {selectedDepartments.map((dept) => (
-                                                    <span
-                                                        key={dept.d_uuid}
-                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                                    >
-                                                        {dept.d_name}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedDepartments(selectedDepartments.filter(d => d.d_uuid !== dept.d_uuid))}
-                                                            className="ml-1 text-blue-600 hover:text-blue-800"
-                                                        >
-                                                            <XMarkIcon className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Status Message */}
-                                {uploadStatus.message && (
-                                    <div className={`p-3 rounded-md ${uploadStatus.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-                                        }`}>
-                                        {uploadStatus.message}
-                                    </div>
-                                )}
-
-                                {/* Submit Buttons */}
-                                <div className="flex justify-end space-x-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowUploadModal(false)}
-                                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                                        disabled={uploading}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={uploading || files.length === 0}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                                    >
-                                        {uploading ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                                Uploading...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <ArrowUpTrayIcon className="h-4 w-4 mr-2" />
-                                                Upload Files
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Upload Modal Component */}
+            {showUploadModal && UploadModal()}
         </div>
     );
 };

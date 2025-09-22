@@ -25,7 +25,6 @@ const Profile = () => {
             .eq("d_uuid", d_uuid)
             .order("r_name", { ascending: true });
         if (error) {
-            console.error("Failed to load roles for department:", error);
             setRoles([]);
             return;
         }
