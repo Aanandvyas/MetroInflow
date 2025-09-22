@@ -1,7 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
 import Login from "./components/authpage/Login";
-import Register from "./components/authpage/Register";
 import HomePage from "./components/main/HomePage";
 import Profile from "./components/main/Profile"; 
 import DocumentUpload from "./components/main/DocumentUpload";
@@ -15,6 +14,7 @@ import Summary from "./components/main/Summary";
 import Important from "./components/main/Important";
 import Notifications from "./components/main/Notifications";
 import About from "./components/header/About";
+import AdminDashboard from "./Admin/AdminDashboard";
 
 // Department Head components
 import HeadDashboard from "./departmenthead/HeadDashboard";
@@ -113,5 +113,6 @@ export const Router = createBrowserRouter([ // Corrected export name
         ],
     },
     { path: "/login", element: <Login /> },
-    { path: "/register", element: <Register /> },
+    { path: "/admin-dashboard", element: <AdminDashboard /> },
+    { path: "/admin", element: <AdminDashboard /> },
 ]);
