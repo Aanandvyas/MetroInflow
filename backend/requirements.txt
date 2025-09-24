@@ -11,3 +11,8 @@ requests
 python-dotenv
 nltk
 gevent
+#check if needed or not
+jinja2
+fitz
+numpy
+PyMuPDF

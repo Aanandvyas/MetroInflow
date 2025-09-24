@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from paddleocr import PaddleOCR
 from PIL import Image
@@ -7,8 +8,17 @@ import io
 import numpy as np
 import fitz  # PyMuPDF
 from pydantic import BaseModel
+import tempfile
+import os
 
 app = FastAPI(title="OCR Service")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize OCR once
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
@@ -71,25 +81,49 @@ async def ocr_endpoint(file: UploadFile = File(...)):
             for page_num in range(len(pdf_document)):
                 page = pdf_document[page_num]
                 pix = page.get_pixmap(dpi=150)  # adjust DPI
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-
-                text, avg_conf = run_ocr_on_image(img)
-                pages_output.append({
+                import tempfile, os
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+                    tmp_img.write(pix.tobytes())
+                    tmp_img_path = tmp_img.name
+                page_result = {
                     "page_index": page_num,
-                    "text": text,
-                    "avg_confidence": avg_conf
-                })
-
+                    "text": None,
+                    "avg_confidence": None,
+                    "error": None
+                }
+                try:
+                    img = Image.open(tmp_img_path)
+                    text, avg_conf = run_ocr_on_image(img)
+                    page_result["text"] = text
+                    page_result["avg_confidence"] = avg_conf
+                    print(f"[OCR] Processed page {page_num+1}/{len(pdf_document)} (avg_conf={avg_conf:.2f})")
+                except Exception as page_err:
+                    page_result["error"] = str(page_err)
+                    print(f"[OCR] Error processing page {page_num+1}: {page_err}")
+                finally:
+                    try:
+                        img.close()
+                    except:
+                        pass
+                    os.remove(tmp_img_path)
+                pages_output.append(page_result)
             return JSONResponse({"pages": pages_output})
 
         else:
-            img = Image.open(io.BytesIO(content)).convert("RGB")
-            text, avg_conf = run_ocr_on_image(img)
-            return JSONResponse({
-                "pages": [
-                    {"page_index": 0, "text": text, "avg_confidence": avg_conf}
-                ]
-            })
+            try:
+                img = Image.open(io.BytesIO(content)).convert("RGB")
+                text, avg_conf = run_ocr_on_image(img)
+                return JSONResponse({
+                    "pages": [
+                        {"page_index": 0, "text": text, "avg_confidence": avg_conf, "error": None}
+                    ]
+                })
+            except Exception as img_err:
+                return JSONResponse({
+                    "pages": [
+                        {"page_index": 0, "text": None, "avg_confidence": None, "error": str(img_err)}
+                    ]
+                })
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

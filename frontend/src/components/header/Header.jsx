@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useFilter } from '../context/FilterContext';
-import { 
-    MagnifyingGlassIcon, 
-    AdjustmentsHorizontalIcon, 
+import {
+    MagnifyingGlassIcon,
+    AdjustmentsHorizontalIcon,
     UserCircleIcon,
     Squares2X2Icon,
     QuestionMarkCircleIcon,
     BellAlertIcon,
     BellIcon,
+    FolderMinusIcon,
+    InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../context/AuthContext';
@@ -17,13 +19,14 @@ import { useAuth } from '../context/AuthContext';
 import kmrllogo from '../../assets/kmrllogo.jpg';
 import azadilogo from '../../assets/azadilogo.jpg';
 import HeaderSearch from './HeaderSearch';
+import { LightBulbIcon } from '@heroicons/react/20/solid';
 
 const Header = () => {
     const { setShowFilters } = useFilter();
     const { user } = useAuth();
     const [notificationCount, setNotificationCount] = useState(0);
     const location = useLocation();
-    
+
     // For debugging - remove in production
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -31,15 +34,15 @@ const Header = () => {
     // Function to fetch notification count
     const fetchNotificationCount = async () => {
         if (!user?.id) return;
-        
+
         try {
             setLoading(true);
-            
+
             // Calculate date 4 days ago
             const fourDaysAgo = new Date();
             fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
             const fourDaysAgoStr = fourDaysAgo.toISOString();
-            
+
             // Get count of unseen notifications from last 4 days
             const { count, error } = await supabase
                 .from("notifications")
@@ -47,17 +50,14 @@ const Header = () => {
                 .eq("uuid", user.id)
                 .eq("is_seen", false)
                 .gte("created_at", fourDaysAgoStr);
-            
+
             if (error) {
-                console.error("Error fetching notification count:", error);
                 setError(error.message);
                 return;
             }
-            
-            console.log("Notification count:", count);
+
             setNotificationCount(count || 0);
         } catch (err) {
-            console.error("Exception in fetchNotificationCount:", err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -72,19 +72,17 @@ const Header = () => {
             return;
         }
 
-        console.log("Fetching notification count - location or user changed");
         fetchNotificationCount();
-        
+
         // Listen for changes in notifications
         const channel = supabase
             .channel('header-notif-count')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
                 table: 'notifications',
                 filter: `uuid=eq.${user.id}`
             }, () => {
-                console.log("Notification change detected via subscription");
                 fetchNotificationCount();
             })
             .subscribe();
@@ -97,14 +95,13 @@ const Header = () => {
     // Additional effect to refresh notification count when focus returns to the window
     useEffect(() => {
         if (!user?.id) return;
-        
+
         const handleFocus = () => {
-            console.log("Window focus detected, refreshing notification count");
             fetchNotificationCount();
         };
-        
+
         window.addEventListener('focus', handleFocus);
-        
+
         return () => {
             window.removeEventListener('focus', handleFocus);
         };
@@ -141,7 +138,10 @@ const Header = () => {
                         </>
                     )}
                 </Link>
-                <QuestionMarkCircleIcon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
+                <Link to="/about">
+                    <InformationCircleIcon className="h-6 w-6 text-gray-600 cursor-pointer hover:text-gray-800" />
+
+                </Link>
                 <Link to="/profile">
                     <UserCircleIcon className="h-8 w-8 text-gray-600" />
                 </Link>

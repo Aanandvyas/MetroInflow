@@ -9,14 +9,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type Document struct {
-	ID          string `json:"id"`
-	FileName    string `json:"file_name"`
-	StoragePath string `json:"storage_path"`
-	Department  string `json:"department"`
-	Status      string `json:"status"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+type TestConnection struct {
+	ID      int    `json:"id"`
+	Message string `json:"message"`
 }
 
 func main() {
@@ -27,14 +22,14 @@ func main() {
 	}
 
 	url := os.Getenv("SUPABASE_URL")
-	key := os.Getenv("SUPABASE_KEY")
+	key := os.Getenv("SUPABASE_SERVICE_KEY")
 
 	if url == "" || key == "" {
-		fmt.Println("❌ Missing SUPABASE_URL or SUPABASE_KEY")
+		fmt.Println("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
 		return
 	}
 
-	endpoint := fmt.Sprintf("%s/rest/v1/documents?limit=1", url)
+	endpoint := fmt.Sprintf("%s/rest/v1/test_connection?limit=1", url)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -53,14 +48,14 @@ func main() {
 		panic(fmt.Sprintf("❌ Failed request: %s", resp.Status))
 	}
 
-	var docs []Document
-	if err := json.NewDecoder(resp.Body).Decode(&docs); err != nil {
+	var rows []TestConnection
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
 		panic(err)
 	}
 
-	if len(docs) == 0 {
-		fmt.Println("✅ Connected to Supabase, but no rows in documents table yet")
+	if len(rows) == 0 {
+		fmt.Println("✅ Connected to Supabase, but no rows in test_connection table yet")
 	} else {
-		fmt.Printf("✅ Connected! Found a document: %+v\n", docs[0])
+		fmt.Printf("✅ Connected! Found a row: %+v\n", rows[0])
 	}
 }

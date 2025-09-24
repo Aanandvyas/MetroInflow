@@ -15,12 +15,15 @@ const Register = () => {
     password: "",
     confirmPassword: "",
     departmentName: "",
+    roleUuid: "",
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [departments, setDepartments] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
+  const [loadingRoles, setLoadingRoles] = useState(false);
 
   const { signUpNewUser } = useAuth();
   const navigate = useNavigate();
@@ -28,17 +31,40 @@ const Register = () => {
   // Fetch department names for dropdown
   useEffect(() => {
     const fetchDepartments = async () => {
-      const { data, error } = await supabase.from("department").select("d_name");
+      const { data, error } = await supabase.from("department").select("d_name, d_uuid");
       if (error) {
         console.error("Error loading departments:", error);
         setDepartments([]);
       } else {
-        setDepartments(data.map((d) => d.d_name));
+        setDepartments(data.map((d) => ({ name: d.d_name, uuid: d.d_uuid })));
       }
       setLoadingDepartments(false);
     };
     fetchDepartments();
   }, []);
+
+  // Fetch roles for a given department
+  const fetchRolesForDepartment = async (departmentUuid) => {
+    if (!departmentUuid) {
+      setRoles([]);
+      return;
+    }
+    
+    setLoadingRoles(true);
+    const { data, error } = await supabase
+      .from("role")
+      .select("r_uuid, r_name")
+      .eq("d_uuid", departmentUuid)
+      .order("r_name", { ascending: true });
+    
+    if (error) {
+      console.error("Error loading roles:", error);
+      setRoles([]);
+    } else {
+      setRoles(data || []);
+    }
+    setLoadingRoles(false);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -46,6 +72,16 @@ const Register = () => {
       ...prev,
       [name]: value,
     }));
+
+    // If department changed, fetch roles for that department and reset the current role
+    if (name === "departmentName" && value) {
+      const selectedDept = departments.find(dept => dept.name === value);
+      if (selectedDept) {
+        fetchRolesForDepartment(selectedDept.uuid);
+        // Reset selected role when department changes
+        setFormData(prev => ({ ...prev, roleUuid: "" }));
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -53,6 +89,11 @@ const Register = () => {
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+
+    if (formData.departmentName && !formData.roleUuid) {
+      setError("Please select a role for your department.");
       return;
     }
 
@@ -152,9 +193,42 @@ const Register = () => {
             <SearchableDropdown
               value={formData.departmentName}
               onChange={handleChange}
-              options={departments}
+              options={departments.map(dept => dept.name)}
               loading={loadingDepartments}
             />
+
+            {/* Role Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Role
+              </label>
+              <select
+                name="roleUuid"
+                value={formData.roleUuid}
+                onChange={handleChange}
+                disabled={!formData.departmentName || loadingRoles || roles.length === 0}
+                className={`w-full px-3 py-2 mt-1 border rounded-md ${
+                  !formData.departmentName || loadingRoles || roles.length === 0
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
+                }`}
+              >
+                <option value="">
+                  {!formData.departmentName
+                    ? "Select a department first"
+                    : loadingRoles
+                    ? "Loading roles..."
+                    : roles.length === 0
+                    ? "No roles found for this department"
+                    : "Select a role"}
+                </option>
+                {roles.map((role) => (
+                  <option key={role.r_uuid} value={role.r_uuid}>
+                    {role.r_name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Password */}
             <div>
@@ -222,6 +296,7 @@ const Register = () => {
             </div>
           </div>
 
+          
           {error && (
             <div className="p-2 mt-4 text-sm text-red-600 bg-red-100 rounded-md">
               {error}

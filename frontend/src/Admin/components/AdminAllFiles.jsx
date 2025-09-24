@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useAuth } from "../context/AuthContext";
-import { supabase } from "../../supabaseClient";
-import { useFilter } from "../context/FilterContext";
-import { Link } from "react-router-dom";
-import { markNotificationAsSeen } from '../../utils/notificationUtils';
+import { supabase } from '../../supabaseClient';
 
-const AllFiles = () => {
-  const { user } = useAuth();
-  const { searchTerm: globalSearchTerm } = useFilter();
-
+const AdminAllFiles = () => {
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
@@ -16,7 +9,6 @@ const AllFiles = () => {
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [favBusy, setFavBusy] = useState({});
   const [languages, setLanguages] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -57,9 +49,9 @@ const AllFiles = () => {
     setPage(1);
     setAllDepartmentFiles([]);
     setHasMore(true);
-  }, [selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm]);
+  }, [selectedDepartment, selectedLanguage, searchTerm]);
 
-  // Fetch files and favorites, then merge
+  // Fetch files
   const fetchFiles = useCallback(async (pageNum = 1, append = false) => {
     if (pageNum === 1) {
       setLoading(true);
@@ -70,7 +62,7 @@ const AllFiles = () => {
     const from = (pageNum - 1) * FILES_PER_PAGE;
     const to = from + FILES_PER_PAGE - 1;
 
-    // 1. Fetch all files with departments and uploader
+    // Fetch all files with departments and uploader
     const selectClause = `
       f_uuid,
       f_name,
@@ -79,7 +71,6 @@ const AllFiles = () => {
       uploader:uuid(name),
       file_department${selectedDepartment ? "!inner" : ""} (
         d_uuid,
-        is_approved,
         department:d_uuid ( d_uuid, d_name )
       )
     `;
@@ -95,18 +86,14 @@ const AllFiles = () => {
       fileQuery = fileQuery.eq("file_department.d_uuid", selectedDepartment);
     }
 
-    // Only show approved files
-    fileQuery = fileQuery.eq("file_department.is_approved", "approved");
-
     // Language
     if (selectedLanguage) {
       fileQuery = fileQuery.eq("language", selectedLanguage);
     }
 
-    // Search (local or global)
-    const effectiveSearch = searchTerm?.trim() || globalSearchTerm?.trim();
-    if (effectiveSearch) {
-      fileQuery = fileQuery.ilike("f_name", `%${effectiveSearch}%`);
+    // Search
+    if (searchTerm?.trim()) {
+      fileQuery = fileQuery.ilike("f_name", `%${searchTerm.trim()}%`);
     }
 
     const { data: files, error: fileError, count } = await fileQuery;
@@ -123,36 +110,23 @@ const AllFiles = () => {
     // Check if there are more files to load
     setHasMore(!!(count && count > to + 1));
 
-    // 2. Fetch all favorites for this user
-    let favouriteIds = [];
-    if (user?.id) {
-      const { data: favs, error: favError } = await supabase
-        .from("favorites")
-        .select("f_uuid")
-        .eq("uuid", user.id);
-      if (!favError && favs) {
-        favouriteIds = favs.map(f => f.f_uuid);
-      }
-    }
-
-    // 3. Merge: mark files as favorite if in favouriteIds
-    const filesWithFav = (files || []).map(f => ({
+    // Process the files to include department info
+    const processedFiles = (files || []).map(f => ({
       ...f,
       departments: (f.file_department || [])
         .map(fd => fd.department)
-        .filter(Boolean),
-      is_favorite: favouriteIds.includes(f.f_uuid),
+        .filter(Boolean)
     }));
 
     if (append) {
-      setAllDepartmentFiles(prev => [...prev, ...filesWithFav]);
+      setAllDepartmentFiles(prev => [...prev, ...processedFiles]);
     } else {
-      setAllDepartmentFiles(filesWithFav);
+      setAllDepartmentFiles(processedFiles);
     }
     
     setLoading(false);
     setLoadingMore(false);
-  }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm, FILES_PER_PAGE]);
+  }, [selectedDepartment, selectedLanguage, searchTerm, FILES_PER_PAGE]);
 
   const loadMoreFiles = useCallback(() => {
     if (hasMore && !loading && !loadingMore) {
@@ -166,10 +140,9 @@ const AllFiles = () => {
     fetchFiles(1, false);
   }, [fetchFiles]);
 
-  // Fetch distinct languages ignoring selectedLanguage (but respecting dept + search)
+  // Fetch distinct languages
   useEffect(() => {
     const fetchLanguages = async () => {
-      const effectiveSearch = (searchTerm || globalSearchTerm || "").trim();
       try {
         let q;
         if (selectedDepartment) {
@@ -180,7 +153,7 @@ const AllFiles = () => {
         } else {
           q = supabase.from("file").select("language");
         }
-        if (effectiveSearch) q = q.ilike("f_name", `%${effectiveSearch}%`);
+        if (searchTerm?.trim()) q = q.ilike("f_name", `%${searchTerm.trim()}%`);
         const { data, error } = await q.not("language", "is", null);
         if (error) throw error;
         const langs = Array.from(
@@ -193,8 +166,7 @@ const AllFiles = () => {
       }
     };
     fetchLanguages();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDepartment, searchTerm, globalSearchTerm]);
+  }, [selectedDepartment, searchTerm]);
 
   const groupedFiles = useMemo(() => {
     const groups = {};
@@ -218,109 +190,32 @@ const AllFiles = () => {
     return groups;
   }, [allDepartmentFiles]);
 
-  const toggleFavorite = async (f_uuid, isFavorite) => {
-    if (!user?.id) return;
-    // optimistic UI
-    setAllDepartmentFiles(prev =>
-      prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: !isFavorite } : f))
-    );
-    setFavBusy(prev => ({ ...prev, [f_uuid]: true }));
-    try {
-      if (isFavorite) {
-        const { error } = await supabase.from("favorites").delete()
-          .eq("uuid", user.id).eq("f_uuid", f_uuid);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("favorites")
-          .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
-        if (error) throw error;
-      }
-    } catch (e) {
-      // revert on failure
-      setAllDepartmentFiles(prev =>
-        prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: isFavorite } : f))
-      );
-      console.error("Favorite toggle failed:", e);
-    } finally {
-      setFavBusy(prev => ({ ...prev, [f_uuid]: false }));
-    }
-  };
-
-  // Add this function inside the component
-  const toggleImportant = async (f_uuid, currentlyImportant) => {
-    if (!user?.id || favBusy[f_uuid]) return;
-
-    // Optimistic UI
-    setFavBusy((s) => ({ ...s, [f_uuid]: true }));
-    setAllDepartmentFiles((prev) =>
-      prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: !currentlyImportant } : f))
-    );
-
-    try {
-      if (currentlyImportant) {
-        const { error } = await supabase
-          .from("favorites")
-          .delete()
-          .eq("uuid", user.id)
-          .eq("f_uuid", f_uuid);
-        if (error) throw error;
-      } else {
-        // If you don't have a unique constraint on (uuid,f_uuid), keep this insert.
-        const { data: exists } = await supabase
-          .from("favorites")
-          .select("fav_uuid")
-          .eq("uuid", user.id)
-          .eq("f_uuid", f_uuid)
-          .maybeSingle();
-
-        if (!exists) {
-          const { error } = await supabase.from("favorites").insert({ uuid: user.id, f_uuid });
-          if (error) throw error;
-        }
-      }
-    } catch (e) {
-      console.error("Important toggle failed:", e);
-      // Revert on failure
-      setAllDepartmentFiles((prev) =>
-        prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: currentlyImportant } : f))
-      );
-    } finally {
-      setFavBusy((s) => ({ ...s, [f_uuid]: false }));
-    }
-  };
-
-  // This prevents event propagation issues with Link
-  const handleViewClick = async (e, fileUuid) => {
-    e.preventDefault(); // Stop the link navigation temporarily
-    e.stopPropagation(); // Prevent any parent handlers
-    
-    if (user) {
-      try {
-        const success = await markNotificationAsSeen(fileUuid, user.id);
-        
-        // Now navigate programmatically
-        window.location.href = `/file/${fileUuid}`;
-      } catch (err) {
-        console.error("Error in view click handler:", err);
-        // If error, still navigate
-        window.location.href = `/file/${fileUuid}`;
-      }
-    } else {
-      // Just navigate if no user
-      window.location.href = `/file/${fileUuid}`;
-    }
-  };
-  
   return (
-    <div className="p-8 bg-white min-h-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">All Department Files</h1>
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-semibold text-gray-800">All Files</h3>
+        
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            placeholder="Search files..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <button 
+            onClick={() => fetchFiles(1, false)}
+            className="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+          >
+            Search
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6">
         <select
-          className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           value={selectedDepartment}
           onChange={(e) => setSelectedDepartment(e.target.value)}
         >
@@ -333,7 +228,7 @@ const AllFiles = () => {
         </select>
 
         <select
-          className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           value={selectedLanguage}
           onChange={(e) => setSelectedLanguage(e.target.value)}
         >
@@ -349,21 +244,22 @@ const AllFiles = () => {
       {/* Files grid */}
       <div>
         {loading && page === 1 ? (
-          <p className="text-gray-600">Loading files...</p>
+          <div className="flex justify-center items-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+          </div>
         ) : Object.keys(groupedFiles).length > 0 ? (
           <div className="space-y-8">
             {Object.entries(groupedFiles).map(([date, files]) => (
               <div key={date}>
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{date}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 items-stretch auto-rows-[minmax(260px,_1fr)]">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {files.map((file, index) => (
                     <div
                       key={file.f_uuid}
                       ref={file.isLast ? lastFileElementRef : null}
-                      className="bg-gray-50 rounded-lg shadow-md p-6 flex flex-col h-full transition-transform hover:scale-105"
+                      className="bg-gray-50 rounded-lg shadow-md p-6 flex flex-col h-full"
                     >
-                      {/* Content grows, pushing footer (date + actions) to bottom */}
-                      <div className="flex-1 w-full">
+                      <div className="flex-1">
                         <div className="text-xl font-semibold text-gray-800 mb-2">
                           {file.f_name}
                         </div>
@@ -371,7 +267,7 @@ const AllFiles = () => {
                           Uploaded by: {file.uploader?.name || "Unknown"}
                         </div>
 
-                        {/* Labeled meta rows */}
+                        {/* Meta data */}
                         <div className="mt-3 space-y-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[12px] font-medium text-gray-600">Departments:</span>
@@ -400,32 +296,21 @@ const AllFiles = () => {
                         </div>
                       </div>
 
-                      {/* Footer: date (static) + actions */}
+                      {/* Footer */}
                       <div className="pt-3 mt-4 border-t border-gray-200">
                         <div className="text-xs text-gray-500">
                           {file.created_at ? new Date(file.created_at).toLocaleString() : "Unknown"}
                         </div>
 
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => window.open(`/file/${file.f_uuid}`, "_blank", "noopener,noreferrer")}
-                            className="inline-flex items-center justify-center h-9 px-4 bg-blue-500 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                        <div className="mt-3">
+                          <a
+                            href={`/file/${file.f_uuid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center h-9 px-4 bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
                           >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleImportant(file.f_uuid, file.is_favorite)}
-                            disabled={!!favBusy[file.f_uuid]}
-                            className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
-                              file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
-                            } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
-                            title={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
-                            aria-label={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
-                          >
-                            {file.is_favorite ? "Unmark Important" : "Mark Important"}
-                          </button>
+                            View File
+                          </a>
                         </div>
                       </div>
                     </div>
@@ -435,16 +320,16 @@ const AllFiles = () => {
             ))}
             {loadingMore && (
               <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
               </div>
             )}
           </div>
         ) : (
-          <p className="text-center text-gray-500 mt-10">No files found.</p>
+          <p className="text-center text-gray-500 mt-10">No files found matching the selected criteria.</p>
         )}
       </div>
     </div>
   );
 };
 
-export default AllFiles;
+export default AdminAllFiles;

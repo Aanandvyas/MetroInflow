@@ -31,7 +31,6 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (error) {
-      console.error("Error signing up:", error.message);
       return { success: false, error };
     }
 
@@ -46,7 +45,6 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (deptError) {
-        console.error("Department not found:", deptError.message);
         return { success: false, error: deptError };
       }
 
@@ -73,10 +71,8 @@ export const AuthProvider = ({ children }) => {
 
 
       if (userError) {
-        console.error("❌ Error inserting user details:", userError);
         return { success: false, error: userError };
       } else {
-        console.log("✅ User profile inserted into DB!");
       }
     }
 
@@ -107,19 +103,26 @@ export const AuthProvider = ({ children }) => {
 
   // ✅ Get profile from user table
   const getUserProfile = async (uuid) => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*, department(d_name)")
-      .eq("uuid", uuid)   // <-- use "uuid" instead of "u_id"
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select(`
+          *, 
+          department(d_name, d_uuid),
+          role(r_name, r_uuid)
+        `)
+        .eq("uuid", uuid)
+        .maybeSingle();
 
-    console.log("Fetching profile for:", uuid, "result:", data, "error:", error);
-
-    if (error) {
-      console.error("Error fetching user profile:", error.message);
+      if (error) {
+        console.error("Error fetching user profile:", error.message);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.error("Error in getUserProfile:", err);
       return null;
     }
-    return data;
   };
 
   // ✅ Update user role

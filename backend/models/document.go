@@ -7,6 +7,26 @@ import (
 	"log"
 )
 
+type Notification struct {
+	NotifID   string `json:"notif_id"`
+	UUID      string `json:"uuid"`
+	FUUID     string `json:"f_uuid"`
+	IsSeen    bool   `json:"is_seen"`
+	CreatedAt string `json:"created_at,omitempty"`
+}
+
+func InsertNotification(db *sql.DB, notif Notification) error {
+	query := `
+			INSERT INTO notifications (uuid, f_uuid, is_seen, created_at)
+			VALUES ($1, $2, $3, NOW())
+		`
+	_, err := db.Exec(query, notif.UUID, notif.FUUID, notif.IsSeen)
+	if err != nil {
+		log.Println("InsertNotification DB error:", err)
+	}
+	return err
+}
+
 type Summary struct {
 	SUUID     string `json:"s_uuid"`
 	FUUID     string `json:"f_uuid"`

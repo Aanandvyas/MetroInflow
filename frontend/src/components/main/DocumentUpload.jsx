@@ -10,11 +10,6 @@ import { useNavigate } from "react-router-dom";
 const DocumentUpload = () => {
   // Replace single file with an array
   const [files, setFiles] = useState([]); // was: const [file, setFile] = useState(null);
-  // Replace single departmentId with array
-  const [selectedDepartments, setSelectedDepartments] = useState([]);
-  
-  // Add new state for department search/filter
-  const [departmentSearch, setDepartmentSearch] = useState('');
 
   // Rest of the state declarations remain same
   const { user } = useAuth();
@@ -25,29 +20,38 @@ const DocumentUpload = () => {
   // Form state
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
 
   // UI state
   const [isDragging, setIsDragging] = useState(false);
 
-  // Data from DB
-  const [departments, setDepartments] = useState([]);
-  const [loadingDepartments, setLoadingDepartments] = useState(true);
+  // User profile state
+  const [userProfile, setUserProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
-    const fetchDepartments = async () => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) return;
+      
       const { data, error } = await supabase
-        .from("department")
-        .select("d_uuid, d_name");
+        .from("users")
+        .select(`
+          uuid,
+          d_uuid,
+          department(d_name, d_uuid)
+        `)
+        .eq("uuid", user.id)
+        .single();
+        
       if (error) {
-        setStatus({ message: "Could not load departments.", type: "error" });
+        setStatus({ message: "Could not load user profile.", type: "error" });
       } else {
-        setDepartments(data);
+        setUserProfile(data);
       }
-      setLoadingDepartments(false);
+      setLoadingProfile(false);
     };
-    fetchDepartments();
-  }, []);
+    
+    fetchUserProfile();
+  }, [user]);
 
   // Helper to merge new files and avoid duplicates (by name+size+lastModified)
   const mergeFiles = (current, incoming) => {
@@ -89,34 +93,15 @@ const DocumentUpload = () => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Filter departments based on search
-  const filteredDepartments = departments.filter(dept => 
-    dept.d_name.toLowerCase().includes(departmentSearch.toLowerCase()) &&
-    !selectedDepartments.find(selected => selected.d_uuid === dept.d_uuid)
-  );
-
-  // Handle department selection
-  const addDepartment = (dept) => {
-    setSelectedDepartments(prev => [...prev, dept]);
-    setDepartmentSearch('');
-  };
-
-  // Handle department removal
-  const removeDepartment = (deptId) => {
-    setSelectedDepartments(prev => 
-      prev.filter(dept => dept.d_uuid !== deptId)
-    );
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
       setStatus({ message: "You must be logged in to upload.", type: "error" });
       return;
     }
-    if (files.length === 0 || selectedDepartments.length === 0 || !language) {
+    if (files.length === 0 || !language || !userProfile?.d_uuid) {
       setStatus({
-        message: "Please choose file(s), language and at least one department.",
+        message: "Please choose file(s), language and ensure you're assigned to a department.",
         type: "error",
       });
       return;
@@ -135,21 +120,22 @@ const DocumentUpload = () => {
         throw new Error(userError?.message || "Could not find user profile.");
       }
 
-      // Upload and insert for each selected file
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const fileName = `${Date.now()}_${i}_${f.name}`;
         const filePath = `shared/${fileName}`;
 
+        // 1. Upload to Supabase Storage
         const { error: uploadError } = await supabase
           .storage
           .from("file_storage")
           .upload(filePath, f, {
-            upsert: false, // set true to overwrite if same path exists
+            upsert: false,
             contentType: f.type || undefined,
           });
         if (uploadError) throw uploadError;
 
+        // 2. Insert into file table
         const displayName =
           files.length === 1 && title.trim().length > 0 ? title.trim() : f.name;
 
@@ -166,44 +152,57 @@ const DocumentUpload = () => {
           .single();
         if (insertFileError) throw insertFileError;
 
-        // Link this file to all selected departments
-        const joinRows = selectedDepartments.map((dept) => ({
-          f_uuid: insertedFile.f_uuid,
-          d_uuid: dept.d_uuid,
-          created_at: new Date().toISOString(),
-        }));
+        // 3. Link to user's department with auto-approval for internal files
         const { error: joinError } = await supabase
           .from("file_department")
-          .insert(joinRows);
+          .insert({
+            f_uuid: insertedFile.f_uuid,
+            d_uuid: userProfile.d_uuid,
+            is_approved: "approved", // Auto-approve files within same department
+            created_at: new Date().toISOString(),
+          });
         if (joinError) throw joinError;
 
-        // Get all users from the selected departments
-        const { data: usersInDepartments, error: usersError } = await supabase
+        // 4. Notify users in the same department
+        const { data: usersInDepartment, error: usersError } = await supabase
           .from("users")
           .select("uuid")
-          .in("d_uuid", selectedDepartments.map(d => d.d_uuid));
-        if (usersError) {
-          console.error("Error fetching users for departments:", usersError);
-          // Continue without sending notifications if fetching users fails
-        }
+          .eq("d_uuid", userProfile.d_uuid);
 
-        // Prepare the notification rows for insertion
-        if (usersInDepartments && usersInDepartments.length > 0) {
-          const notificationRows = usersInDepartments.map(u => ({
+        if (usersError) {
+          console.error("Error fetching users for department:", usersError);
+        }
+        if (usersInDepartment && usersInDepartment.length > 0) {
+          const notificationRows = usersInDepartment.map(u => ({
             uuid: u.uuid,
             f_uuid: insertedFile.f_uuid,
-            is_seen: false, // Initial status is unseen
+            is_seen: false,
             created_at: new Date().toISOString(),
           }));
+          await supabase.from("notifications").insert(notificationRows);
+        }
 
-          // Insert the notifications into the notifications table
-          const { error: notificationError } = await supabase
-            .from("notifications")
-            .insert(notificationRows);
-          if (notificationError) {
-            console.error("Error inserting notifications:", notificationError);
-            // Continue even if this fails, as the core upload succeeded
+        // 5. Send file + f_uuid to backend
+        try {
+          const formData = new FormData();
+          formData.append("f_uuid", insertedFile.f_uuid);
+          formData.append("files", f, f.name);
+
+          const response = await fetch(
+            process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            console.error("Backend summary request failed.");
+          } else {
+            const summaryData = await response.json();
           }
+        } catch (backendErr) {
+          console.error("Error sending file to summary backend:", backendErr);
         }
       }
 
@@ -219,58 +218,28 @@ const DocumentUpload = () => {
     }
   };
 
-  // Replace the department select with this new UI
-  const renderDepartmentSelect = () => (
+  // Display user's department
+  const renderDepartmentInfo = () => (
     <div className="md:col-span-2">
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        Assign to Departments
+        Target Department
       </label>
       
-      {/* Selected departments */}
-      <div className="flex flex-wrap gap-2 mb-2">
-        {selectedDepartments.map(dept => (
-          <span 
-            key={dept.d_uuid}
-            className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-700"
-          >
-            {dept.d_name}
-            <button
-              type="button"
-              onClick={() => removeDepartment(dept.d_uuid)}
-              className="ml-2 text-blue-500 hover:text-blue-700"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-
-      {/* Department search input */}
-      <div className="relative">
-        <input
-          type="text"
-          value={departmentSearch}
-          onChange={(e) => setDepartmentSearch(e.target.value)}
-          placeholder="Search departments..."
-          className="w-full p-3 border border-gray-300 rounded-lg"
-        />
-        
-        {/* Dropdown for filtered departments */}
-        {departmentSearch && filteredDepartments.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-auto">
-            {filteredDepartments.map(dept => (
-              <button
-                key={dept.d_uuid}
-                type="button"
-                onClick={() => addDepartment(dept)}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100"
-              >
-                {dept.d_name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {loadingProfile ? (
+        <div className="p-3 border border-gray-300 rounded-lg bg-gray-50">
+          <p className="text-gray-500">Loading department...</p>
+        </div>
+      ) : userProfile?.department ? (
+        <div className="p-3 border border-gray-300 rounded-lg bg-blue-50">
+          <p className="text-blue-700 font-medium">{userProfile.department.d_name}</p>
+          <p className="text-xs text-blue-600 mt-1">Files will be uploaded to your department</p>
+        </div>
+      ) : (
+        <div className="p-3 border border-red-300 rounded-lg bg-red-50">
+          <p className="text-red-700">No department assigned to your account</p>
+          <p className="text-xs text-red-600 mt-1">Contact administrator to assign a department</p>
+        </div>
+      )}
     </div>
   );
 
@@ -419,7 +388,7 @@ const DocumentUpload = () => {
             </select>
           </div>
           {/* Replace department select with new component */}
-          {renderDepartmentSelect()}
+          {renderDepartmentInfo()}
         </div>
 
         {/* Status and Submit */}
@@ -441,7 +410,7 @@ const DocumentUpload = () => {
           </div>
           <button
             type="submit"
-            disabled={uploading || loadingDepartments}
+            disabled={uploading || loadingProfile}
             className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 transition disabled:bg-gray-400"
           >
             {uploading ? "Uploading..." : "Upload & Save"}

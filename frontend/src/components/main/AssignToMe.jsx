@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import CalendarCard from "../assign-to-me/CalendarCard";
 import AssignmentsCard from "../assign-to-me/AssignmentsCard";
 import { DocumentTextIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import { Link } from "react-router-dom";
+// Import the KebabMenu component
+import KebabMenu from "../assign-to-me/common/KebabMenu";
 
 const AssignToMe = () => {
   const { user } = useAuth();
@@ -13,8 +15,10 @@ const AssignToMe = () => {
   const [userDepartment, setUserDepartment] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
-  const [impBusy, setImpBusy] = useState({}); // <-- add
+  const [impBusy, setImpBusy] = useState({});
+  
+  // Add ref for the active menu button
+  const activeButtonRef = useRef(null);
 
   // Close any open menu on outside click
   useEffect(() => {
@@ -50,10 +54,12 @@ const AssignToMe = () => {
           uploader:uuid(name),
           file_department!inner (
             d_uuid,
+            is_approved,
             department:d_uuid ( d_uuid, d_name )
           )
         `)
         .eq("file_department.d_uuid", userDepartment.d_uuid)
+        .eq("file_department.is_approved", "approved")
         .order("created_at", { ascending: false })
         .limit(20); // Limit to only last 20 files
 
@@ -117,7 +123,6 @@ const AssignToMe = () => {
         prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: true } : f))
       );
     } catch (e) {
-      console.error("Failed to mark Important:", e);
       alert("Could not mark Important. Please try again.");
     } finally {
       setImpBusy((s) => ({ ...s, [f_uuid]: false }));
@@ -214,13 +219,14 @@ const AssignToMe = () => {
                         </button>
 
                         <button
+                          ref={openMenuId === file.f_uuid ? activeButtonRef : null}
                           type="button"
                           aria-haspopup="menu"
                           aria-expanded={openMenuId === file.f_uuid}
                           onClick={(e) => {
                             e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setMenuPos({ x: rect.right, y: rect.bottom });
+                            // Save reference to the clicked button
+                            activeButtonRef.current = e.currentTarget;
                             setOpenMenuId(openMenuId === file.f_uuid ? null : file.f_uuid);
                           }}
                           className="p-2 rounded-md hover:bg-gray-100 text-gray-600"
@@ -238,36 +244,33 @@ const AssignToMe = () => {
         )}
       </div>
 
-      {/* Fixed-position dropdown so it’s never clipped */}
-      {openMenuId && (
-        <div
-          role="menu"
-          className="fixed z-[1000] w-40 rounded-md border border-gray-200 bg-white shadow-lg py-1"
-          style={{ top: menuPos.y + 6, left: Math.max(8, menuPos.x - 160) }}
-          onClick={(e) => e.stopPropagation()}
+      {/* Replace fixed-position dropdown with KebabMenu component */}
+      <KebabMenu
+        open={!!openMenuId}
+        anchorEl={activeButtonRef.current}
+        onClose={() => setOpenMenuId(null)}
+      >
+        <Link
+          to="/summary"
+          role="menuitem"
+          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          onClick={() => setOpenMenuId(null)}
         >
-          <Link
-            to="/summary"
-            role="menuitem"
-            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            onClick={() => setOpenMenuId(null)}
-          >
-            Summary
-          </Link>
+          Summary
+        </Link>
 
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => markImportant(openMenuId)}
-            disabled={!!impBusy[openMenuId]}
-            className={`block w-full text-left px-4 py-2 text-sm ${
-              impBusy[openMenuId] ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            Mark Important
-          </button>
-        </div>
-      )}
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => markImportant(openMenuId)}
+          disabled={!!impBusy[openMenuId]}
+          className={`block w-full text-left px-4 py-2 text-sm ${
+            impBusy[openMenuId] ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          Mark Important
+        </button>
+      </KebabMenu>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
@@ -9,11 +9,16 @@ import {
   EnvelopeIcon,
   CogIcon,
   DocumentDuplicateIcon,
-  ArchiveBoxIcon
+  ArchiveBoxIcon,
+  ShieldCheckIcon,
+  ShareIcon
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../context/AuthContext';
+import Calendar from '../../departmenthead/Calendar';
+import { CalendarIcon } from '@heroicons/react/20/solid';
 
-// ✅ Added a 'path' property to each navigation item
-const navItems = [
+// ✅ Navigation items for regular users
+const regularNavItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon },
   { name: 'Assigned to me', path: '/assigned-to-me', icon: UsersIcon },
   { name: 'All Files', path: '/all-files', icon: PaperAirplaneIcon },
@@ -21,8 +26,59 @@ const navItems = [
   { name: 'Important', path: '/important', icon: ArchiveBoxIcon },
 ];
 
+// ✅ Navigation items for department heads
+const headNavItems = [
+  { name: 'Head Dashboard', path: '/head-dashboard', icon: HomeIcon },
+  { name: 'All Files', path: '/all-files', icon: PaperAirplaneIcon },
+  { name: 'Shared Files', path: '/shared-files', icon: ShareIcon },
+  { name: 'Calendar', path: '/calendar', icon: CalendarIcon },
+  { name: 'Notifications', path: '/notifications', icon: EnvelopeIcon },
+  { name: 'Important', path: '/important', icon: ArchiveBoxIcon },
+  { name: 'Confidential', path: '/confidential', icon: ShieldCheckIcon },
+  
+];
+
 const Sidebar = () => {
   const location = useLocation(); // ✅ Hook to get the current URL path
+  const { user, getUserProfile } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch user profile to determine position
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user?.id) {
+        try {
+          const profile = await getUserProfile(user.id);
+          setUserProfile(profile);
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [user, getUserProfile]);
+
+  // Determine which navigation items to show based on user position
+  const navItems = userProfile?.position === 'head' ? headNavItems : regularNavItems;
+
+  if (loading) {
+    return (
+      <aside className="w-64 bg-white p-5 border-r border-gray-200 overflow-y-auto">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-8 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-64 bg-white p-5 border-r border-gray-200 overflow-y-auto">

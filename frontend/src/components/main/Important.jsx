@@ -26,11 +26,13 @@ export default function Important() {
           created_at,
           file_department(
             d_uuid,
+            is_approved,
             department:d_uuid ( d_uuid, d_name )
           )
         )
       `)
       .eq("uuid", user.id)
+      .eq("file.file_department.is_approved", "approved")
       .order("created_at", { ascending: false });
 
     if (error) {
