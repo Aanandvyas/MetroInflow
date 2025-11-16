@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MagnifyingGlassIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
-import { supabase } from "../../supabaseClient";
+import { getSupabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 
 const HeaderSearch = () => {
+  const supabase = getSupabase();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [showPopup, setShowPopup] = useState(false);

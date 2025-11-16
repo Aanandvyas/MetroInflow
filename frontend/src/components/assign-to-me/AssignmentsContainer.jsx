@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../../supabaseClient";
+import { getSupabase } from '../supabaseClient';
 import AssignmentCard from "./AssignmentsCard";
 import { useAuth } from "../context/AuthContext";
 

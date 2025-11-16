@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../components/context/AuthContext";
-import { supabase } from "../../supabaseClient";
+import { getSupabase } from '../supabaseClient';
 import UploadedDocsCard from "./UploadedDocsCard";
 
 const UploadedDocsContainer = () => {

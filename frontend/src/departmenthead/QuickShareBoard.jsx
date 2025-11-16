@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { ChatBubbleLeftIcon, ClockIcon, UserIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from '../supabaseClient';
+const supabase = getSupabase();
 
 const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
     const [messages, setMessages] = useState([]);

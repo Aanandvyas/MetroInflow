@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { 
   DocumentTextIcon, 
@@ -37,6 +37,7 @@ const formatDate = (dateStr) => {
 };
 
 const Notifications = () => {
+  const supabase = getSupabase();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);

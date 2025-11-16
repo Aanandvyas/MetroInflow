@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 
 const BUCKET_NAME = 'file_storage';
 
 const FileViewer = () => {
+  const supabase = getSupabase();
   const { uuid } = useParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);

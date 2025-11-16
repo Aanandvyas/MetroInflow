@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChatBubbleLeftIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from '../supabaseClient';
+const supabase = getSupabase();
 
 const QuickShareMessages = ({ userProfile }) => {
     const [messages, setMessages] = useState([]);

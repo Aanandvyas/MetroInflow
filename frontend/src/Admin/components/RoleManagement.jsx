@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
 
 const RoleManagement = () => {
+  const supabase = getSupabase();
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [roles, setRoles] = useState([]);

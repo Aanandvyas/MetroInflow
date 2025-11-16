@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircleIcon, XCircleIcon, ClockIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
 // Helper for status label/color
@@ -12,6 +12,7 @@ const statusMeta = (isApproved) => {
 };
 
 const SharedFiles = () => {
+    const supabase = getSupabase();
     const navigate = useNavigate();
     const { user, getUserProfile } = useAuth();
     const [profile, setProfile] = useState(null);

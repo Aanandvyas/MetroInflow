@@ -4,9 +4,9 @@ import { DocumentTextIcon, BellIcon, EllipsisVerticalIcon } from "@heroicons/rea
 import { Link } from "react-router-dom";
 import KebabMenu from "./common/KebabMenu";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../../supabaseClient";
-
+import { getSupabase } from '../../supabaseClient';
 const AssignmentsCard = ({ selectedDate, assignments = [], loading }) => {
+  const supabase = getSupabase();
   const [openMenuId, setOpenMenuId] = useState(null);
   const itemBtnRefs = useRef(new Map());
   const { user } = useAuth();

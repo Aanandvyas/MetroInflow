@@ -14,9 +14,10 @@ import {
     InboxArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from '../supabaseClient';
 
 const Calendar = () => {
+    const supabase = getSupabase();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
     const [filesData, setFilesData] = useState({});

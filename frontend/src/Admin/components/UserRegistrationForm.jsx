@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
+const supabase = getSupabase();
 
 const UserRegistrationForm = ({ onUserAdded }) => {
   const [formData, setFormData] = useState({

@@ -1,6 +1,7 @@
 import React from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
+const supabase = getSupabase();
 
 const FileCard = ({ file, onToggleFavorite }) => {
     const publicUrl = file.file_path

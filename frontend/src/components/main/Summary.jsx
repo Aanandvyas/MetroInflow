@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../supabaseClient";
+import { getSupabase } from "../../supabaseClient";
+const supabase = getSupabase();
 
 const Summary = () => {
   const location = useLocation();

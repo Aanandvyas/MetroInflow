@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
+const supabase = getSupabase();
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -32,12 +33,16 @@ const Login = () => {
         if (error) {
           setError('Admin username not found');
         } else if (data && data.a_pass === password) {
-          // Store admin session in localStorage
-          localStorage.setItem('adminSession', JSON.stringify({
-            isAdmin: true,
-            username: data.a_username,
-            adminId: data.a_uuid
-          }));
+          // Store admin session in localStorage (browser only)
+          if (typeof window !== 'undefined') {
+            try {
+              window.localStorage.setItem('adminSession', JSON.stringify({
+                isAdmin: true,
+                username: data.a_username,
+                adminId: data.a_uuid
+              }));
+            } catch {}
+          }
           navigate('/admin-dashboard');
         } else {
           setError('Invalid admin credentials');
@@ -183,9 +188,9 @@ const Login = () => {
               </label>
             </div>
             <div>
-              <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <button type="button"  className="font-medium text-indigo-600 hover:text-indigo-500">
                 Forgot password?
-              </a>
+              </button>
             </div>
           </div>
 

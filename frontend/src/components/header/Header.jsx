@@ -12,7 +12,7 @@ import {
     FolderMinusIcon,
     InformationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { supabase } from '../../supabaseClient';
+import { getSupabase } from '../../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 
 // Import your logos
@@ -22,6 +22,7 @@ import HeaderSearch from './HeaderSearch';
 import { LightBulbIcon } from '@heroicons/react/20/solid';
 
 const Header = () => {
+    const supabase = getSupabase();
     const { setShowFilters } = useFilter();
     const { user } = useAuth();
     const [notificationCount, setNotificationCount] = useState(0);
