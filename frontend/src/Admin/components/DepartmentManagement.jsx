@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getSupabase } from '../../supabaseClient';
+import { supabase } from '../../supabaseClient';
 
 const DepartmentManagement = () => {
-  const supabase = getSupabase();
   const [departments, setDepartments] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [showAddDeptModal, setShowAddDeptModal] = useState(false);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getSupabase } from "../../supabaseClient";
+import { supabase } from "../../supabaseClient";
 import CalendarCard from "../assign-to-me/CalendarCard";
 import AssignmentsCard from "../assign-to-me/AssignmentsCard";
 import { DocumentTextIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
@@ -9,7 +9,6 @@ import { Link } from "react-router-dom";
 import KebabMenu from "../assign-to-me/common/KebabMenu";
 
 const AssignToMe = () => {
-  const supabase = getSupabase();
   const { user } = useAuth();
   const [recentFiles, setRecentFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);

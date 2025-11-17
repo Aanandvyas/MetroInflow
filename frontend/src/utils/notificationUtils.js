@@ -1,5 +1,4 @@
-import { getSupabase } from '../supabaseClient';
-const supabase = getSupabase();
+import { supabase } from '../supabaseClient';
 
 export const markNotificationAsSeen = async (fileUuid, userId) => {
   if (!fileUuid || !userId) {

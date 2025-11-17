@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { getSupabase } from "../../supabaseClient";
+import { supabase } from "../../supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 
 export default function Important() {
-  const supabase = getSupabase();
   const { user } = useAuth();
 
   // Renamed state

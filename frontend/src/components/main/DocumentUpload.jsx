@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getSupabase } from "../../supabaseClient";
+import { supabase } from "../../supabaseClient";
 import {
   ArrowUpTrayIcon,
   DocumentCheckIcon,
@@ -8,7 +8,6 @@ import {
 import { useNavigate } from "react-router-dom";
 
 const DocumentUpload = () => {
-  const supabase = getSupabase();
   // Replace single file with an array
   const [files, setFiles] = useState([]); // was: const [file, setFile] = useState(null);
 

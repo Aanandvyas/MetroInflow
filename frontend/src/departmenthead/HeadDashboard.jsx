@@ -28,7 +28,7 @@ import {
     ChevronDownIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
-import { getSupabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import QuickShare from './QuickShare';
 import QuickShareBoard from './QuickShareBoard';
@@ -36,7 +36,6 @@ import QuickShareIntegration from './QuickShareIntegration';
 
 // Department Grid Component for Collab Folders
 const DepartmentGrid = () => {
-    const supabase = getSupabase();
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);

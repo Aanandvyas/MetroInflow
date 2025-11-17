@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSupabase } from '../../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { DocumentTextIcon, ArrowLeftIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import KebabMenu from '../assign-to-me/common/KebabMenu';
 import { useAuth } from '../context/AuthContext';
 import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const DepartmentFiles = () => {
-    const supabase = getSupabase();
     const { d_uuid } = useParams();
     const { user } = useAuth();
     const [files, setFiles] = useState([]);

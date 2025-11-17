@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../components/context/AuthContext';
-import { getSupabase } from '../supabaseClient';
-const supabase = getSupabase();
+import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircleIcon, XCircleIcon, DocumentTextIcon, StarIcon as StarOutline, BuildingOfficeIcon, EyeIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
@@ -203,6 +202,7 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
 const CollabFolders = () => {
   const navigate = useNavigate();
 
+  
   const { user, getUserProfile } = useAuth();
   const [profile, setProfile] = useState(null);
   const [received, setReceived] = useState([]);
@@ -212,7 +212,13 @@ const CollabFolders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [deptMap, setDeptMap] = useState({});
-  const [importantMap, setImportantMap] = useState(() => readFdImportantMap());
+  const [importantMap, setImportantMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('fd_important_map') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [summaryVisible, setSummaryVisible] = useState(false);
@@ -712,7 +718,7 @@ const CollabFolders = () => {
   }, [profile?.d_uuid]);
 
   const persistImportant = (next) => {
-    writeFdImportantMap(next);
+    try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
   
   const toggleImportant = (fd_uuid) => {
@@ -929,7 +935,7 @@ const CollabFolders = () => {
     try {
       const { error } = await supabase.from('file_department').update({ is_approved: false }).eq('fd_uuid', fd_uuid);
       if (error) throw error;
-      setReceived(prev => prev.map( r => r.fd_uuid === fd_uuid ? { ...r, is_approved: false } : r));
+      setReceived(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: false } : r));
     } catch (e) {
       setError(e.message || 'Reject failed');
     }
@@ -1297,13 +1303,3 @@ export default function SafeCollabFolders() {
     </ErrorBoundary>
   );
 };
-
-// Safe helpers (top-level)
-function readFdImportantMap() {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(window.localStorage.getItem('fd_important_map') || '{}'); } catch { return {}; }
-}
-function writeFdImportantMap(val) {
-  if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem('fd_important_map', JSON.stringify(val)); } catch {}
-}

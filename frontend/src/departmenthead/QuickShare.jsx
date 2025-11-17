@@ -5,8 +5,7 @@ import {
     MagnifyingGlassIcon,
     ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import { getSupabase } from '../supabaseClient';
-const supabase = getSupabase();
+import { supabase } from '../supabaseClient';
 
 const QuickShare = ({ userProfile, onMessageSent }) => {
     const [message, setMessage] = useState('');

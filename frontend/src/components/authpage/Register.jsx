@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import SearchableDropdown from "./SearchableDropdown";
-import { getSupabase } from "../../supabaseClient";
-const supabase = getSupabase();
+import { supabase } from "../../supabaseClient";
 
 const Register = () => {
   const [formData, setFormData] = useState({

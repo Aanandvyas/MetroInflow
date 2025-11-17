@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getSupabase } from "../../supabaseClient";
+import { supabase } from "../../supabaseClient";
 import { useFilter } from "../context/FilterContext";
 import { Link } from "react-router-dom";
 import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const AllFiles = () => {
-  const supabase = getSupabase();
   const { user } = useAuth();
   const { searchTerm: globalSearchTerm } = useFilter();
 

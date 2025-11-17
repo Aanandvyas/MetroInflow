@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { getSupabase } from '../../supabaseClient';
+import { supabase } from '../../supabaseClient';
 
 const AdminAllFiles = () => {
-  const supabase = getSupabase();
-
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getSupabase } from '../supabaseClient';
+import { supabase } from "../../supabaseClient";
 import CalendarCard from "./CalendarCard";
 import AssignmentsCard from "./AssignmentsCard";
 import { DocumentTextIcon } from '@heroicons/react/24/outline';

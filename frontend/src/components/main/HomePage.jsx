@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getSupabase } from "../../supabaseClient";
+import { supabase } from "../../supabaseClient";
 import { FolderIcon, PlusIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 
 const HomePage = () => {
-  const supabase = getSupabase();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recentFiles, setRecentFiles] = useState([]);

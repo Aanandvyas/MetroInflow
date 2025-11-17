@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSupabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../components/context/AuthContext';
 import { 
   CheckCircleIcon, 
@@ -60,7 +60,7 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
       if (deptIds.size === 0) return;
       
       try {
-        const { data, error } = await getSupabase
+        const { data, error } = await supabase
           .from('department')
           .select('d_uuid, d_name')
           .in('d_uuid', Array.from(deptIds));
@@ -208,7 +208,6 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
 };
 
 const CollabDepartment = () => {
-  const supabase = getSupabase();
   const { departmentId } = useParams();
   const navigate = useNavigate();
   const { user, getUserProfile } = useAuth();
@@ -222,8 +221,7 @@ const CollabDepartment = () => {
   const [departmentList, setDepartmentList] = useState([]); // List of all departments for filtering
   const [importantMap, setImportantMap] = useState(() => {
     try {
-      if (typeof window === 'undefined') return {};
-      return JSON.parse(window.localStorage.getItem('fd_important_map') || '{}');
+      return JSON.parse(localStorage.getItem('fd_important_map') || '{}');
     } catch {
       return {};
     }
@@ -443,11 +441,7 @@ const CollabDepartment = () => {
 
   // Handle important marking
   const persistImportant = (next) => {
-    try { 
-      if (typeof window !== 'undefined') {
-        try { window.localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
-      }
-    } catch {}
+    try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
   
   const toggleImportant = (fd_uuid) => {

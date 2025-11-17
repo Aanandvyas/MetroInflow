@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { UserIcon } from '@heroicons/react/24/outline';
-import { getSupabase } from '../../supabaseClient';
-import { getSupabaseAdmin } from '../../supabaseAdmin';
+import { supabase } from '../../supabaseClient';
+import { supabaseAdmin } from '../../supabaseAdmin';
 
 const UserManagement = () => {
-  const supabase = getSupabase();
-  const supabaseAdmin = getSupabaseAdmin();
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

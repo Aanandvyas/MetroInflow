@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSupabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 
 // Icons
 import { 
@@ -22,7 +22,6 @@ const AdminDashboard = () => {
   const [adminInfo, setAdminInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const supabase = getSupabase();
   
   // Data for the dashboard stats
   const [users, setUsers] = useState([]);
@@ -30,9 +29,7 @@ const AdminDashboard = () => {
   
   // Admin authentication check
   useEffect(() => {
-    const adminSession = (typeof window !== 'undefined' && window.localStorage)
-      ? window.localStorage.getItem('adminSession')
-      : null;
+    const adminSession = localStorage.getItem('adminSession');
     
     if (!adminSession) {
       navigate('/login');
@@ -78,9 +75,7 @@ const AdminDashboard = () => {
   
   // Handle admin logout
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      try { window.localStorage.removeItem('adminSession'); } catch {}
-    }
+    localStorage.removeItem('adminSession');
     navigate('/login');
   };
   
