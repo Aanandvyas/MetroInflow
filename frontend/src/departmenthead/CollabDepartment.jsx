@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../components/context/AuthContext';
+import { safeLocalStorage } from '../utils/localStorage';
 import { 
   CheckCircleIcon, 
   XCircleIcon, 
@@ -221,7 +222,7 @@ const CollabDepartment = () => {
   const [departmentList, setDepartmentList] = useState([]); // List of all departments for filtering
   const [importantMap, setImportantMap] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('fd_important_map') || '{}');
+      return JSON.parse(safeLocalStorage.getItem('fd_important_map') || '{}');
     } catch {
       return {};
     }
@@ -441,7 +442,7 @@ const CollabDepartment = () => {
 
   // Handle important marking
   const persistImportant = (next) => {
-    try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
+    try { safeLocalStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
   
   const toggleImportant = (fd_uuid) => {

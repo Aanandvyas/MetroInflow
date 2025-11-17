@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { safeLocalStorage } from '../utils/localStorage';
 import { CheckCircleIcon, XCircleIcon, DocumentTextIcon, StarIcon as StarOutline, BuildingOfficeIcon, EyeIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 
@@ -214,7 +215,7 @@ const CollabFolders = () => {
   const [deptMap, setDeptMap] = useState({});
   const [importantMap, setImportantMap] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('fd_important_map') || '{}');
+      return JSON.parse(safeLocalStorage.getItem('fd_important_map') || '{}');
     } catch {
       return {};
     }
@@ -718,7 +719,7 @@ const CollabFolders = () => {
   }, [profile?.d_uuid]);
 
   const persistImportant = (next) => {
-    try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
+    try { safeLocalStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
   
   const toggleImportant = (fd_uuid) => {

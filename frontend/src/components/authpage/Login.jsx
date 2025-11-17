@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
 import { supabase } from '../../supabaseClient';
+import { safeLocalStorage } from '../../utils/localStorage';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -33,7 +34,7 @@ const Login = () => {
           setError('Admin username not found');
         } else if (data && data.a_pass === password) {
           // Store admin session in localStorage
-          localStorage.setItem('adminSession', JSON.stringify({
+          safeLocalStorage.setItem('adminSession', JSON.stringify({
             isAdmin: true,
             username: data.a_username,
             adminId: data.a_uuid

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { safeLocalStorage } from '../utils/localStorage';
 
 // Icons
 import { 
@@ -29,7 +30,7 @@ const AdminDashboard = () => {
   
   // Admin authentication check
   useEffect(() => {
-    const adminSession = localStorage.getItem('adminSession');
+    const adminSession = safeLocalStorage.getItem('adminSession');
     
     if (!adminSession) {
       navigate('/login');
@@ -75,7 +76,7 @@ const AdminDashboard = () => {
   
   // Handle admin logout
   const handleLogout = () => {
-    localStorage.removeItem('adminSession');
+    safeLocalStorage.removeItem('adminSession');
     navigate('/login');
   };
   
