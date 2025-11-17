@@ -213,13 +213,19 @@ const CollabFolders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [deptMap, setDeptMap] = useState({});
-  const [importantMap, setImportantMap] = useState(() => {
+  const [importantMap, setImportantMap] = useState({});
+
+  // Load important map from localStorage on component mount
+  useEffect(() => {
     try {
-      return JSON.parse(safeLocalStorage.getItem('fd_important_map') || '{}');
-    } catch {
-      return {};
+      const stored = safeLocalStorage.getItem('fd_important_map');
+      if (stored) {
+        setImportantMap(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.warn('Failed to load important map:', error);
     }
-  });
+  }, []);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [summaryVisible, setSummaryVisible] = useState(false);

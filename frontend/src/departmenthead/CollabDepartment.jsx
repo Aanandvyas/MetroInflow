@@ -220,13 +220,19 @@ const CollabDepartment = () => {
   const [filter, setFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [deptFilter, setDeptFilter] = useState('all'); // 'all' or a specific department UUID
   const [departmentList, setDepartmentList] = useState([]); // List of all departments for filtering
-  const [importantMap, setImportantMap] = useState(() => {
+  const [importantMap, setImportantMap] = useState({});
+
+  // Load important map from localStorage on component mount
+  useEffect(() => {
     try {
-      return JSON.parse(safeLocalStorage.getItem('fd_important_map') || '{}');
-    } catch {
-      return {};
+      const stored = safeLocalStorage.getItem('fd_important_map');
+      if (stored) {
+        setImportantMap(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.warn('Failed to load important map:', error);
     }
-  });
+  }, []);
 
   const isHead = useMemo(() => profile?.position === 'head', [profile]);
 

@@ -1,12 +1,19 @@
 // Safe localStorage utility that works in both browser and Node.js environments
 
-const isClient = typeof window !== 'undefined' && window.localStorage;
+// Use a function to avoid referencing localStorage during module loading
+const getLocalStorage = () => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return null;
+  }
+  return window.localStorage;
+};
 
 export const safeLocalStorage = {
   getItem: (key) => {
-    if (!isClient) return null;
+    const storage = getLocalStorage();
+    if (!storage) return null;
     try {
-      return localStorage.getItem(key);
+      return storage.getItem(key);
     } catch (error) {
       console.warn('localStorage.getItem failed:', error);
       return null;
@@ -14,9 +21,10 @@ export const safeLocalStorage = {
   },
   
   setItem: (key, value) => {
-    if (!isClient) return false;
+    const storage = getLocalStorage();
+    if (!storage) return false;
     try {
-      localStorage.setItem(key, value);
+      storage.setItem(key, value);
       return true;
     } catch (error) {
       console.warn('localStorage.setItem failed:', error);
@@ -25,9 +33,10 @@ export const safeLocalStorage = {
   },
   
   removeItem: (key) => {
-    if (!isClient) return false;
+    const storage = getLocalStorage();
+    if (!storage) return false;
     try {
-      localStorage.removeItem(key);
+      storage.removeItem(key);
       return true;
     } catch (error) {
       console.warn('localStorage.removeItem failed:', error);
