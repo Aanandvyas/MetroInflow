@@ -2,14 +2,6 @@
 
 import React from 'react';
 
-const teamMembers = [
-  'Anand Vyas',
-  'Saksham Kriplani',
-  'Yash Rathore',
-  'Aditya Teja',
-  'Vaishnavi Parashar',
-  'Ayush Mann'
-];
 
 function About() {
   return (
@@ -74,36 +66,6 @@ function About() {
         <p style={{ color: '#333', fontSize: '1.08rem' }}>
           To deliver innovative and user-friendly solutions that solve real-world problems.
         </p>
-      </section>
-
-      <section className="about-team" style={{
-        background: '#f1f5f9',
-        borderRadius: '12px',
-        padding: '20px 24px',
-        boxShadow: '0 2px 12px rgba(60,60,120,0.05)'
-      }}>
-        <h2 style={{ color: '#4f46e5', fontWeight: 600, marginBottom: '12px' }}>The Team</h2>
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '16px'
-        }}>
-          {teamMembers.map((member, idx) => (
-            <div key={idx} style={{
-              background: '#fff',
-              borderRadius: '8px',
-              padding: '12px 20px',
-              boxShadow: '0 1px 6px rgba(60,60,120,0.06)',
-              fontWeight: 500,
-              color: '#3b3b5c',
-              fontSize: '1rem',
-              minWidth: '140px',
-              textAlign: 'center'
-            }}>
-              {member}
-            </div>
-          ))}
-        </div>
       </section>
     </div>
   );
