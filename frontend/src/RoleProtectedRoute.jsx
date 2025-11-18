@@ -14,7 +14,6 @@ const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosit
           const profile = await getUserProfile(user.id);
           setUserProfile(profile);
         } catch (error) {
-          console.error('Error fetching user profile:', error);
         } finally {
           setLoading(false);
         }

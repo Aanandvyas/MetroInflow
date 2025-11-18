@@ -76,7 +76,6 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
         
         setDepartmentNames(nameMap);
       } catch (e) {
-        console.error("Error fetching department names:", e);
       }
     };
     
@@ -265,7 +264,6 @@ const CollabDepartment = () => {
         if (error) throw error;
         setDepartment(data);
       } catch (e) {
-        console.error("Error fetching department:", e);
         setError("Failed to load department information");
       }
     };
@@ -415,7 +413,6 @@ const CollabDepartment = () => {
         
         setReceived(recMapped);
       } catch (e) {
-        console.error(e);
         setError(e.message || 'Failed to load files from this department');
       } finally {
         setLoading(false);

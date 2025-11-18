@@ -50,13 +50,12 @@ const Login = () => {
         if (signInError) {
           setError(signInError.message);
         } else {
-          console.log('Login successful:', data);
+        
           navigate('/'); // Correctly navigate to the root protected route
         }
       }
     } catch (e) {
       setError('An unexpected error occurred. Please try again.');
-      console.error("Login failed:", e);
     } finally {
       setLoading(false);
     }

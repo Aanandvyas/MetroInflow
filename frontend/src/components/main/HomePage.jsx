@@ -36,7 +36,6 @@ const HomePage = () => {
         .limit(10);
 
       if (filesError) {
-        console.error("Error fetching recent files:", filesError);
         setRecentFiles([]);
         setFilesLoading(false);
         return;
@@ -48,7 +47,6 @@ const HomePage = () => {
         .select("f_uuid, department:department ( d_uuid, d_name )")
         .in("f_uuid", fUuids);
 
-      if (linksError) console.error("Error fetching file departments:", linksError);
 
       const deptByFile = new Map();
       (links || []).forEach((row) => {
@@ -78,7 +76,6 @@ const HomePage = () => {
         .from("department")
         .select("d_uuid, d_name");
       if (error) {
-        console.error("Error fetching departments:", error);
         setDepartments([]);
         setLoading(false);
         return;
@@ -105,7 +102,6 @@ const HomePage = () => {
         `)
         .eq("is_approved", "approved");
       if (linksErr) {
-        console.error("Error fetching department file counts:", linksErr);
         setLoading(false);
         return;
       }
@@ -321,7 +317,6 @@ const HomePage = () => {
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) {
-        console.error("loadToday error:", error);
         setRecentNotifications([]);
         return;
       }

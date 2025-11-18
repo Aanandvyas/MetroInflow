@@ -95,26 +95,21 @@ const Notifications = () => {
         .eq('notif_id', notificationId);
 
       if (notificationError) {
-        console.error('Error updating notification:', notificationError);
       }
 
       // If approved, create notifications for all department members
-      if (action === 'accept') {
-        console.log('Creating notifications for approved file:', fileId, 'in department:', userDepartmentId);
-        
+      if (action === 'accept') {        
         // Get all users in the department (excluding the head who approved)
         const { data: allDeptUsers, error: usersError } = await supabase
           .from('users')
           .select('uuid, name, position')
           .eq('d_uuid', userDepartmentId);
 
-        console.log('All department users found:', allDeptUsers);
         
         if (!usersError && allDeptUsers && allDeptUsers.length > 0) {
           const staffMembers = allDeptUsers.filter(u => u.uuid !== user.id);
           
           for (const staff of staffMembers) {
-            console.log('Processing staff member:', staff.name);
             
             // Delete any existing notifications for this file/user combination
             await supabase
@@ -134,11 +129,7 @@ const Notifications = () => {
                 created_at: new Date().toISOString()
               });
             
-            if (createError) {
-              console.error('Error creating notification for', staff.name, ':', createError);
-            } else {
-              console.log('Successfully created notification for', staff.name);
-            }
+            
           }
         }
         
@@ -155,17 +146,14 @@ const Notifications = () => {
           });
         
         if (broadcastError) {
-          console.error('Broadcast error:', broadcastError);
         }
         
         // Also trigger ensure function multiple times for broader coverage
         setTimeout(() => {
-          console.log('Running first ensure notifications after approval');
           ensureTodaysNotifications();
         }, 500);
         
         setTimeout(() => {
-          console.log('Running second ensure notifications after approval');
           ensureTodaysNotifications();
           fetchNotifications();
         }, 2000);
@@ -271,7 +259,6 @@ const Notifications = () => {
           .eq('is_approved', 'approved')
           .gte('created_at', fourDaysAgoStr);
 
-        console.log('Approved external files found:', approvedExternalFiles);
 
         // Combine with internal files
         const allVisibleFiles = [
@@ -279,7 +266,6 @@ const Notifications = () => {
           ...(approvedExternalFiles || []).map(f => ({ f_uuid: f.f_uuid }))
         ];
 
-        console.log('All visible files for staff:', allVisibleFiles);
 
         // Create notifications for visible files
         for (const file of allVisibleFiles) {
@@ -291,7 +277,6 @@ const Notifications = () => {
             .eq('is_sent', true);
 
           if (count === 0) {
-            console.log('Creating notification for file:', file.f_uuid);
             const { error: insertError } = await supabase
               .from('notifications')
               .insert({
@@ -303,7 +288,6 @@ const Notifications = () => {
               });
             
             if (insertError) {
-              console.error('Error creating notification in ensure:', insertError);
             }
           } else {
             const { error: updateError } = await supabase
@@ -315,7 +299,6 @@ const Notifications = () => {
               .eq('is_sent', true);
             
             if (updateError) {
-              console.error('Error updating notification in ensure:', updateError);
             }
           }
         }
@@ -345,7 +328,6 @@ const Notifications = () => {
         }
       }
     } catch (err) {
-      console.error("Error ensuring today's notifications:", err);
     }
   };
 
@@ -411,12 +393,6 @@ const Notifications = () => {
       
       const { data, error } = await notificationsQuery;
       
-      console.log('Notifications query result:', { 
-        data: data?.length, 
-        isHead, 
-        userDepartmentId,
-        query: isHead ? 'head-query' : 'staff-query' 
-      });
       
       if (error) {
         setError(`Database error: ${error.message}`);
@@ -463,8 +439,7 @@ const Notifications = () => {
         fileMap[file.f_uuid] = file;
       });
       
-      console.log('File data retrieved:', fileData?.length, 'files');
-      console.log('Sample file data:', fileData?.[0]);
+     
       
       // Deduplicate notifications so only the latest per file is shown
       const sortedByNewest = (data || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -481,14 +456,7 @@ const Notifications = () => {
       const notificationItems = latestPerFile
         .filter(notification => {
           const file = fileMap[notification.f_uuid];
-          console.log('Filtering notification:', {
-            file_id: notification.f_uuid,
-            file_name: file?.f_name,
-            is_sent: notification.is_sent,
-            file_dept: file?.d_uuid,
-            user_dept: userDepartmentId,
-            file_department_relations: file?.file_department
-          });
+          
           
           if (!file) return false;
           
@@ -594,7 +562,6 @@ const Notifications = () => {
         { event: 'file_approved' },
         (payload) => {
           // When any file is approved, refresh notifications for all users
-          console.log('File approved broadcast received:', payload);
           setTimeout(() => {
             ensureTodaysNotifications();
             fetchNotifications();

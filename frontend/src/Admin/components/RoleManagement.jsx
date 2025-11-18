@@ -41,7 +41,6 @@ const RoleManagement = () => {
         }
         
       } catch (error) {
-        console.error('Error fetching departments:', error);
         showNotification('error', `Error fetching departments: ${error.message}`);
       } finally {
         setLoadingDepartments(false);
@@ -68,7 +67,6 @@ const RoleManagement = () => {
       
       setRoles(data || []);
     } catch (error) {
-      console.error('Error fetching roles:', error);
       showNotification('error', `Error fetching roles: ${error.message}`);
     } finally {
       setLoadingRoles(false);
@@ -166,7 +164,6 @@ const RoleManagement = () => {
       // Close modal
       setShowAddRoleModal(false);
     } catch (error) {
-      console.error('Error adding role:', error);
       showNotification('error', `Error adding role: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -210,7 +207,6 @@ const RoleManagement = () => {
       // Close modal
       setShowEditRoleModal(false);
     } catch (error) {
-      console.error('Error updating role:', error);
       showNotification('error', `Error updating role: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -239,7 +235,6 @@ const RoleManagement = () => {
       // Close confirmation dialog
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error('Error deleting role:', error);
       showNotification('error', `Error deleting role: ${error.message}`);
     } finally {
       setIsSubmitting(false);

@@ -64,7 +64,6 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
                 .limit(7);
 
             if (sentError) {
-                console.error("Error in Supabase query:", sentError);
                 throw sentError;
             }
             
@@ -72,10 +71,8 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
             if (sentError) {
                 // Provide more specific error messages based on common issues
                 if (sentError.code === "42P01") {
-                    console.error("Table 'quick_share' does not exist. Database schema issue.");
                     setError("Database table 'quick_share' not found. Please contact an administrator.");
                 } else if (sentError.code === "42703") {
-                    console.error("Column not found in database. Schema mismatch:", sentError.message);
                     setError(`Database schema mismatch: ${sentError.message}`);
                 } else {
                     throw sentError;

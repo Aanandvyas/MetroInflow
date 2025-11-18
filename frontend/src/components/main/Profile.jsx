@@ -29,7 +29,6 @@ const Profile = () => {
                     setError("Could not load profile data.");
                 }
             } catch (err) {
-                console.error("Error fetching profile:", err);
                 setError("Failed to load profile data.");
             } finally {
                 setLoading(false);

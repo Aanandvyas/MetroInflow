@@ -18,8 +18,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("COMPONENT ERROR:", error);
-    console.error("COMPONENT STACK:", errorInfo.componentStack);
+   
     this.setState({ error, errorInfo });
   }
 
@@ -472,7 +471,6 @@ const CollabFolders = () => {
             .select('d_uuid, d_name');
             
           if (deptError) {
-            console.error("FETCH TEST: Department fetch error:", deptError);
             throw deptError;
           }
           
@@ -513,7 +511,6 @@ const CollabFolders = () => {
           .in('f_uuid', fileIds);
         
         if (filesError) {
-          console.error("DEBUG: Error fetching file details:", filesError);
           throw filesError;
         }
         
@@ -525,7 +522,6 @@ const CollabFolders = () => {
           .in('f_uuid', fileIds);
         
         if (sourceFileDeptsError) {
-          console.error("DEBUG: Error fetching source departments:", sourceFileDeptsError);
           throw sourceFileDeptsError;
         }
         
@@ -645,7 +641,7 @@ const CollabFolders = () => {
           .eq('d_uuid', profile.d_uuid);
           
         if (myFilesError) {
-          console.error("DEBUG: Error fetching department files:", myFilesError);
+
           throw myFilesError;
         }
         
@@ -664,7 +660,6 @@ const CollabFolders = () => {
             .neq('d_uuid', profile.d_uuid);
             
           if (sentError) {
-            console.error("DEBUG: Error fetching sent file entries:", sentError);
             throw sentError;
           }
           
@@ -744,7 +739,6 @@ const CollabFolders = () => {
       
       // Check if supabase client exists
       if (!supabase) {
-        console.error("CONNECTION TEST: Supabase client not initialized");
         setTestResults("ERROR: Supabase client not initialized");
         return;
       }
@@ -753,7 +747,6 @@ const CollabFolders = () => {
       try {
         const { data: authData, error: authError } = await supabase.auth.getSession();
         if (authError) {
-          console.error("CONNECTION TEST: Auth check failed", authError);
           setTestResults(`Auth check failed: ${authError.message}`);
           return;
         }
@@ -764,7 +757,6 @@ const CollabFolders = () => {
           return;
         }
       } catch (authErr) {
-        console.error("CONNECTION TEST: Auth check exception", authErr);
         setTestResults(`Auth check exception: ${authErr.message}`);
         return;
       }

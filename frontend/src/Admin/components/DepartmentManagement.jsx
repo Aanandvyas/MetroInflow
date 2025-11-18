@@ -37,7 +37,6 @@ const DepartmentManagement = () => {
       
       setDepartments(data || []);
     } catch (error) {
-      console.error("Error loading departments:", error);
       showNotification('error', `Error loading departments: ${error.message}`);
     } finally {
       setLoadingDepartments(false);
@@ -122,7 +121,6 @@ const DepartmentManagement = () => {
       // Close modal
       setShowAddDeptModal(false);
     } catch (error) {
-      console.error('Error adding department:', error);
       showNotification('error', `Error adding department: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -166,7 +164,6 @@ const DepartmentManagement = () => {
       // Close modal
       setShowEditDeptModal(false);
     } catch (error) {
-      console.error('Error updating department:', error);
       showNotification('error', `Error updating department: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -195,7 +192,6 @@ const DepartmentManagement = () => {
       // Close confirmation dialog
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error('Error deleting department:', error);
       showNotification('error', `Error deleting department: ${error.message}`);
     } finally {
       setIsSubmitting(false);

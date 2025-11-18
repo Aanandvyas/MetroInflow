@@ -43,7 +43,6 @@ const AllFiles = () => {
         .select("d_uuid, d_name")
         .order("d_name", { ascending: true });
       if (error) {
-        console.error("Error fetching departments:", error.message);
         setDepartments([]);
       } else {
         setDepartments(data || []);
@@ -111,7 +110,6 @@ const AllFiles = () => {
 
     const { data: files, error: fileError, count } = await fileQuery;
     if (fileError) {
-      console.error("Error loading files:", fileError.message);
       if (pageNum === 1) {
         setAllDepartmentFiles([]);
       }
@@ -188,7 +186,6 @@ const AllFiles = () => {
         ).sort((a, b) => a.localeCompare(b));
         setLanguages(langs);
       } catch (e) {
-        console.error("Error fetching languages:", e.message);
         setLanguages([]);
       }
     };
@@ -240,7 +237,6 @@ const AllFiles = () => {
       setAllDepartmentFiles(prev =>
         prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: isFavorite } : f))
       );
-      console.error("Favorite toggle failed:", e);
     } finally {
       setFavBusy(prev => ({ ...prev, [f_uuid]: false }));
     }
@@ -279,7 +275,6 @@ const AllFiles = () => {
         }
       }
     } catch (e) {
-      console.error("Important toggle failed:", e);
       // Revert on failure
       setAllDepartmentFiles((prev) =>
         prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: currentlyImportant } : f))
@@ -301,7 +296,6 @@ const AllFiles = () => {
         // Now navigate programmatically
         window.location.href = `/file/${fileUuid}`;
       } catch (err) {
-        console.error("Error in view click handler:", err);
         // If error, still navigate
         window.location.href = `/file/${fileUuid}`;
       }

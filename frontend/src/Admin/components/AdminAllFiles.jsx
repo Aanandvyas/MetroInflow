@@ -35,7 +35,6 @@ const AdminAllFiles = () => {
         .select("d_uuid, d_name")
         .order("d_name", { ascending: true });
       if (error) {
-        console.error("Error fetching departments:", error.message);
         setDepartments([]);
       } else {
         setDepartments(data || []);
@@ -98,7 +97,6 @@ const AdminAllFiles = () => {
 
     const { data: files, error: fileError, count } = await fileQuery;
     if (fileError) {
-      console.error("Error loading files:", fileError.message);
       if (pageNum === 1) {
         setAllDepartmentFiles([]);
       }
@@ -161,7 +159,6 @@ const AdminAllFiles = () => {
         ).sort((a, b) => a.localeCompare(b));
         setLanguages(langs);
       } catch (e) {
-        console.error("Error fetching languages:", e.message);
         setLanguages([]);
       }
     };

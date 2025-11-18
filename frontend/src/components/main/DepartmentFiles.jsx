@@ -41,7 +41,6 @@ const DepartmentFiles = () => {
             if (error) throw error;
             setFiles((prev) => prev.map(f => f.f_uuid === f_uuid ? { ...f, is_favorite: true } : f));
         } catch (e) {
-            console.error('Mark Important failed:', e);
         } finally {
             setImpBusy((s) => ({ ...s, [f_uuid]: false }));
             setOpenMenuId(null);
@@ -54,7 +53,6 @@ const DepartmentFiles = () => {
             try {
                 await markNotificationAsSeen(fileUuid, user.id);
             } catch (err) {
-                console.error("Error marking notification as seen:", err);
             }
         }
         window.open(`/file/${fileUuid}`, "_blank", "noopener,noreferrer");
@@ -74,7 +72,6 @@ const DepartmentFiles = () => {
                     .single();
                     
                 if (deptError) {
-                    console.error("Department fetch error:", deptError);
                     setError("Could not fetch department details.");
                     return;
                 }
@@ -92,7 +89,6 @@ const DepartmentFiles = () => {
                 
                 setDepartment(deptData);
             } catch (err) {
-                console.error("Error fetching department:", err);
                 setError("Could not fetch department details.");
             }
         };
@@ -222,7 +218,6 @@ const DepartmentFiles = () => {
             }
 
             if (filesError) {
-                console.error("Files fetch error:", filesError);
                 if (pageNum === 1) {
                     setError("Could not fetch files for this department.");
                 }
@@ -239,7 +234,6 @@ const DepartmentFiles = () => {
                 setFiles(filesData || []);
             }
         } catch (err) {
-            console.error("Error fetching files:", err);
             if (pageNum === 1) {
                 setError("Could not fetch files for this department.");
             }

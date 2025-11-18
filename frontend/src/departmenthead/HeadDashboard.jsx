@@ -57,7 +57,6 @@ const DepartmentGrid = () => {
                     setUserProfile(profile);
                 }
             } catch (err) {
-                console.error("Error fetching user profile:", err);
             }
         };
 
@@ -91,7 +90,6 @@ const DepartmentGrid = () => {
                     .eq('d_uuid', userProfile.d_uuid);
                 
                 if (fileDeptError) {
-                    console.error("Error fetching file_department entries:", fileDeptError);
                     throw fileDeptError;
                 }
                 
@@ -123,7 +121,6 @@ const DepartmentGrid = () => {
                     .in('f_uuid', fileIds);
                 
                 if (filesError) {
-                    console.error("Error fetching file details:", filesError);
                     throw filesError;
                 }
                 
@@ -135,7 +132,6 @@ const DepartmentGrid = () => {
                     .select('*');
                     
                 if (allDeptsError) {
-                    console.error("Error fetching all departments:", allDeptsError);
                     throw allDeptsError;
                 }
                 
@@ -161,7 +157,6 @@ const DepartmentGrid = () => {
                     .in('f_uuid', fileIds);
                     
                 if (sourceFileDeptsError) {
-                    console.error("Error fetching source departments:", sourceFileDeptsError);
                     throw sourceFileDeptsError;
                 }
                 
@@ -396,7 +391,6 @@ const DepartmentGrid = () => {
 
                 setDepartments(departmentsWithFiles);
             } catch (e) {
-                console.error("Error fetching departments:", e);
                 setError("Failed to load departments");
             } finally {
                 setLoading(false);
@@ -820,7 +814,6 @@ const HeadDashboard = () => {
                     }
 
                 } catch (dbError) {
-                    console.error('Database query error:', dbError);
                     // Set empty arrays if database queries fail
                     setDashboardStats({
                         totalFiles: 0,
@@ -863,12 +856,10 @@ const HeadDashboard = () => {
                         setDepartmentFolders([]);
                     }
                 } catch (deptError) {
-                    console.error('Error fetching departments:', deptError);
                     setDepartmentFolders([]);
                 }
 
             } catch (error) {
-                console.error('Error fetching dashboard data:', error);
                 // Set empty data on error instead of mock data
                 setDashboardStats({
                     totalFiles: 0,
@@ -895,7 +886,6 @@ const HeadDashboard = () => {
                 .from("department")
                 .select("d_uuid, d_name");
             if (error) {
-                console.error("Could not load departments:", error);
             } else {
                 setDepartments(data || []);
             }
@@ -941,7 +931,6 @@ const HeadDashboard = () => {
 
                 setImportantDocuments(ordered);
             } catch (e) {
-                console.error('Error fetching favorite documents:', e);
                 setImportantDocuments([]);
             }
         };
@@ -1185,10 +1174,8 @@ const HeadDashboard = () => {
                 );
 
                 if (!response.ok) {
-                    console.error("Backend summary request failed.");
                 }
             } catch (backendErr) {
-                console.error("Error sending files to summary backend:", backendErr);
             }
 
             setUploadStatus({
@@ -1506,7 +1493,6 @@ const HeadDashboard = () => {
             // Show success message
             alert('File approved successfully!');
         } catch (error) {
-            console.error('Error approving file:', error);
             alert('Error approving file. Please try again.');
         }
     };
@@ -1527,7 +1513,6 @@ const HeadDashboard = () => {
             // Show success message
             alert('File rejected successfully!');
         } catch (error) {
-            console.error('Error rejecting file:', error);
             alert('Error rejecting file. Please try again.');
         }
     };
