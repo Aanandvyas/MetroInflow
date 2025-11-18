@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
 import { supabase } from '../../supabaseClient';
 import { safeLocalStorage } from '../../utils/localStorage';
@@ -45,7 +45,7 @@ const Login = () => {
         }
       } else {
         // Regular user login
-        const { data, error: signInError } = await signInUser(email, password);
+        const { error: signInError } = await signInUser(email, password);
 
         if (signInError) {
           setError(signInError.message);
@@ -183,9 +183,9 @@ const Login = () => {
               </label>
             </div>
             <div>
-              <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <button type="button" className="font-medium text-indigo-600 hover:text-indigo-500">
                 Forgot password?
-              </a>
+              </button>
             </div>
           </div>
 

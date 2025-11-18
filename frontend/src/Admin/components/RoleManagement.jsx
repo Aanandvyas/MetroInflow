@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 
 const RoleManagement = () => {
@@ -17,6 +17,43 @@ const RoleManagement = () => {
     name: ''
   });
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
+
+  // Helper to show notifications
+  const showNotification = useCallback((type, message) => {
+    setNotification({
+      show: true,
+      type,
+      message
+    });
+    
+    // Auto-hide notification after a few seconds
+    setTimeout(() => {
+      setNotification({ show: false, type: '', message: '' });
+    }, type === 'error' ? 5000 : 3000);
+  }, []);
+
+  // Fetch roles for the selected department
+  const fetchRoles = useCallback(async (departmentId) => {
+    if (!departmentId) return;
+    
+    setLoadingRoles(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('role')
+        .select('r_uuid, r_name, d_uuid')
+        .eq('d_uuid', departmentId)
+        .order('r_name', { ascending: true });
+      
+      if (error) throw error;
+      
+      setRoles(data || []);
+    } catch (error) {
+      showNotification('error', `Error fetching roles: ${error.message}`);
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, [showNotification]);
 
   // Fetch departments
   useEffect(() => {
@@ -48,44 +85,7 @@ const RoleManagement = () => {
     };
     
     fetchDepartments();
-  }, []);
-
-  // Fetch roles for the selected department
-  const fetchRoles = async (departmentId) => {
-    if (!departmentId) return;
-    
-    setLoadingRoles(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('role')
-        .select('r_uuid, r_name, d_uuid')
-        .eq('d_uuid', departmentId)
-        .order('r_name', { ascending: true });
-      
-      if (error) throw error;
-      
-      setRoles(data || []);
-    } catch (error) {
-      showNotification('error', `Error fetching roles: ${error.message}`);
-    } finally {
-      setLoadingRoles(false);
-    }
-  };
-
-  // Helper to show notifications
-  const showNotification = (type, message) => {
-    setNotification({
-      show: true,
-      type,
-      message
-    });
-    
-    // Auto-hide notification after a few seconds
-    setTimeout(() => {
-      setNotification({ show: false, type: '', message: '' });
-    }, type === 'error' ? 5000 : 3000);
-  };
+  }, [fetchRoles, showNotification]);
 
   // Handle department change
   const handleDepartmentChange = (e) => {

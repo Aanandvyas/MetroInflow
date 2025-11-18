@@ -7,7 +7,7 @@ export const markNotificationAsSeen = async (fileUuid, userId) => {
   
   try {
     
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ is_seen: true })
       .match({ 

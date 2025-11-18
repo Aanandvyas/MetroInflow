@@ -222,7 +222,7 @@ const CollabFolders = () => {
         setImportantMap(JSON.parse(stored));
       }
     } catch (error) {
-      console.warn('Failed to load important map:', error);
+
     }
   }, []);
 

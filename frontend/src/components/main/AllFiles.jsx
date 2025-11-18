@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import { useFilter } from "../context/FilterContext";
-import { Link } from "react-router-dom";
-import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const AllFiles = () => {
   const { user } = useAuth();
@@ -12,7 +10,7 @@ const AllFiles = () => {
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm] = useState("");
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -27,7 +25,8 @@ const AllFiles = () => {
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
-        loadMoreFiles();
+        // Simplified to avoid circular dependency
+        setPage(prev => prev + 1);
       }
     });
     if (node) observer.current.observe(node);
@@ -152,14 +151,6 @@ const AllFiles = () => {
     setLoadingMore(false);
   }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm, FILES_PER_PAGE]);
 
-  const loadMoreFiles = useCallback(() => {
-    if (hasMore && !loading && !loadingMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchFiles(nextPage, true);
-    }
-  }, [page, hasMore, loading, loadingMore, fetchFiles]);
-
   useEffect(() => {
     fetchFiles(1, false);
   }, [fetchFiles]);
@@ -215,33 +206,6 @@ const AllFiles = () => {
     return groups;
   }, [allDepartmentFiles]);
 
-  const toggleFavorite = async (f_uuid, isFavorite) => {
-    if (!user?.id) return;
-    // optimistic UI
-    setAllDepartmentFiles(prev =>
-      prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: !isFavorite } : f))
-    );
-    setFavBusy(prev => ({ ...prev, [f_uuid]: true }));
-    try {
-      if (isFavorite) {
-        const { error } = await supabase.from("favorites").delete()
-          .eq("uuid", user.id).eq("f_uuid", f_uuid);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("favorites")
-          .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
-        if (error) throw error;
-      }
-    } catch (e) {
-      // revert on failure
-      setAllDepartmentFiles(prev =>
-        prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: isFavorite } : f))
-      );
-    } finally {
-      setFavBusy(prev => ({ ...prev, [f_uuid]: false }));
-    }
-  };
-
   // Add this function inside the component
   const toggleImportant = async (f_uuid, currentlyImportant) => {
     if (!user?.id || favBusy[f_uuid]) return;
@@ -284,26 +248,7 @@ const AllFiles = () => {
     }
   };
 
-  // This prevents event propagation issues with Link
-  const handleViewClick = async (e, fileUuid) => {
-    e.preventDefault(); // Stop the link navigation temporarily
-    e.stopPropagation(); // Prevent any parent handlers
-    
-    if (user) {
-      try {
-        const success = await markNotificationAsSeen(fileUuid, user.id);
-        
-        // Now navigate programmatically
-        window.location.href = `/file/${fileUuid}`;
-      } catch (err) {
-        // If error, still navigate
-        window.location.href = `/file/${fileUuid}`;
-      }
-    } else {
-      // Just navigate if no user
-      window.location.href = `/file/${fileUuid}`;
-    }
-  };
+
   
   return (
     <div className="p-8 bg-white min-h-full">

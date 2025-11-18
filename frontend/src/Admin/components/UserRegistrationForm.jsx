@@ -138,7 +138,6 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         dob,
         gender,
         address,
-        departmentName,
         departmentUuid,
         roleUuid,
         position,

@@ -3,7 +3,6 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import {
   ArrowUpTrayIcon,
-  DocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
 

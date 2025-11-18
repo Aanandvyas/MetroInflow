@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MagnifyingGlassIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import { supabase } from "../../supabaseClient";
-import { useNavigate } from "react-router-dom";
+
 
 const HeaderSearch = () => {
   const [query, setQuery] = useState("");
@@ -15,7 +15,7 @@ const HeaderSearch = () => {
   const [selectedLanguages, setSelectedLanguages] = useState([]); // Array of language strings
   const popupRef = useRef();
   const sidebarRef = useRef();
-  const navigate = useNavigate();
+
 
   // Fetch departments and languages for filters
   useEffect(() => {

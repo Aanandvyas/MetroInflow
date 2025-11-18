@@ -19,7 +19,8 @@ const AdminAllFiles = () => {
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
-        loadMoreFiles();
+        // Call fetchFiles directly instead of loadMoreFiles
+        setPage(prev => prev + 1);
       }
     });
     if (node) observer.current.observe(node);
@@ -125,14 +126,6 @@ const AdminAllFiles = () => {
     setLoading(false);
     setLoadingMore(false);
   }, [selectedDepartment, selectedLanguage, searchTerm, FILES_PER_PAGE]);
-
-  const loadMoreFiles = useCallback(() => {
-    if (hasMore && !loading && !loadingMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchFiles(nextPage, true);
-    }
-  }, [page, hasMore, loading, loadingMore, fetchFiles]);
 
   useEffect(() => {
     fetchFiles(1, false);

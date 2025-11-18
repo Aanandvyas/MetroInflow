@@ -195,7 +195,7 @@ const UserManagement = () => {
        
         
         // First, try to get the user to see if it exists
-        const { data: authUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(
+        const { error: getUserError } = await supabaseAdmin.auth.admin.getUserById(
           userToDelete.uuid
         );
         
@@ -229,7 +229,7 @@ const UserManagement = () => {
       }
       
       // Delete the user from the database
-      const { error: dbError } = await supabase
+      const { error } = await supabase
         .from('users')
         .delete()
         .eq('uuid', userToDelete.uuid);

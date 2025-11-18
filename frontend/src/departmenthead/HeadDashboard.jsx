@@ -1,37 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
     DocumentTextIcon,
-    UserGroupIcon,
-    ClockIcon,
-    ChartBarIcon,
-    ShareIcon,
-    FolderIcon,
     BuildingOfficeIcon,
-    PlusIcon,
-    EllipsisHorizontalIcon,
-    MagnifyingGlassIcon,
-    BellIcon,
     ArrowUpTrayIcon,
     EyeIcon,
-    DocumentArrowDownIcon,
-    UsersIcon,
-    ClipboardDocumentListIcon,
-    CurrencyDollarIcon,
-    TrendingUpIcon,
-    TrendingDownIcon,
     XMarkIcon,
-    DocumentCheckIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
     ArrowRightIcon,
-    StarIcon,
-    ChevronDownIcon
+    StarIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import QuickShare from './QuickShare';
-import QuickShareBoard from './QuickShareBoard';
 import QuickShareIntegration from './QuickShareIntegration';
 
 // Department Grid Component for Collab Folders
@@ -47,7 +28,7 @@ const DepartmentGrid = () => {
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (!user?.id) {
-                console.warn("HeadDashboard: user.id is missing");
+
                 return;
             }
             try {

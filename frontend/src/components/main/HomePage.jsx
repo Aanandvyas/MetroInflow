@@ -8,14 +8,12 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [recentFiles, setRecentFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [userDeptIds, setUserDeptIds] = useState([]);
   const [deptCounts, setDeptCounts] = useState({}); // file count per department
   const navigate = useNavigate();
-  const summaryBackendUrl = process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents";
+
 
   // Fetch recent files (top 10 by time)
   useEffect(() => {
@@ -42,7 +40,7 @@ const HomePage = () => {
       }
 
       const fUuids = (files || []).map((f) => f.f_uuid);
-      const { data: links, error: linksError } = await supabase
+        const { data: links } = await supabase
         .from("file_department")
         .select("f_uuid, department:department ( d_uuid, d_name )")
         .in("f_uuid", fUuids);

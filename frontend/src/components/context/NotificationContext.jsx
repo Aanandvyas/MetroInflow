@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../../supabaseClient';
 
@@ -17,7 +17,7 @@ export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
 
   // Function to fetch notification count using exact same logic as notifications page
-  const fetchNotificationCount = async () => {
+  const fetchNotificationCount = useCallback(async () => {
     if (!user?.id) {
       setNotificationCount(0);
       return;
@@ -144,7 +144,7 @@ export const NotificationProvider = ({ children }) => {
     } catch (err) {
       setNotificationCount(0);
     }
-  };
+  }, [user?.id]);
 
   // Fetch count when user changes or component mounts
   useEffect(() => {
@@ -153,7 +153,7 @@ export const NotificationProvider = ({ children }) => {
     } else {
       setNotificationCount(0);
     }
-  }, [user?.id]);
+  }, [user?.id, fetchNotificationCount]);
 
   const updateNotificationCount = (count) => {
     setNotificationCount(count);

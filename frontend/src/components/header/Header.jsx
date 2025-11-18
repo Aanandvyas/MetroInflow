@@ -1,30 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useFilter } from '../context/FilterContext';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useNotificationCount } from '../context/NotificationContext';
 import {
-    MagnifyingGlassIcon,
-    AdjustmentsHorizontalIcon,
-    UserCircleIcon,
-    Squares2X2Icon,
-    QuestionMarkCircleIcon,
-    BellAlertIcon,
     BellIcon,
-    FolderMinusIcon,
+    UserCircleIcon,
     InformationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { useAuth } from '../context/AuthContext';
 
 // Import your logos
 import kmrllogo from '../../assets/kmrllogo.jpg';
 import azadilogo from '../../assets/azadilogo.jpg';
 import HeaderSearch from './HeaderSearch';
-import { LightBulbIcon } from '@heroicons/react/20/solid';
 
 const Header = () => {
-    const { setShowFilters } = useFilter();
     const { notificationCount } = useNotificationCount();
-    const location = useLocation();
 
     return (
         <header className="w-full bg-white p-4 flex items-center justify-between border-b">
