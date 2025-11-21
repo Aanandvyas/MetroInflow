@@ -1,3 +1,4 @@
+// lies here for review
 package main
 
 import (
@@ -18,14 +19,14 @@ func main() {
 	// Load .env file
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("⚠️ Could not load .env file, falling back to system environment")
+		fmt.Println("Could not load .env file, falling back to system environment")
 	}
 
 	url := os.Getenv("SUPABASE_URL")
 	key := os.Getenv("SUPABASE_SERVICE_KEY")
 
 	if url == "" || key == "" {
-		fmt.Println("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+		fmt.Println("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
 		return
 	}
 
@@ -45,7 +46,7 @@ func main() {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		panic(fmt.Sprintf("❌ Failed request: %s", resp.Status))
+		panic(fmt.Sprintf("Failed request: %s", resp.Status))
 	}
 
 	var rows []TestConnection
@@ -54,8 +55,8 @@ func main() {
 	}
 
 	if len(rows) == 0 {
-		fmt.Println("✅ Connected to Supabase, but no rows in test_connection table yet")
+		fmt.Println("Connected to Supabase, but no rows in test_connection table yet")
 	} else {
-		fmt.Printf("✅ Connected! Found a row: %+v\n", rows[0])
+		fmt.Printf("Connected! Found a row: %+v\n", rows[0])
 	}
 }

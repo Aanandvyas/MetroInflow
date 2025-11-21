@@ -1,3 +1,4 @@
+#lies here for review(dk y i had a need for it)
 import numpy as np
 import fitz  # PyMuPDF
 import io
@@ -10,7 +11,7 @@ def run_ocr(ocr, img, label=""):
     result = ocr.ocr(img)
     print(f"\n--- OCR Results ({label}) ---")
     if not result or not result[0]:
-        print("❌ No text found")
+        print("No text found")
         return
     for line in result[0]:
         try:
@@ -32,7 +33,7 @@ def main(filepath):
     try:
         ocr_ml = PaddleOCR(use_angle_cls=True, lang="ml")
     except Exception as e:
-        print(f"⚠️ Warning: Could not initialize Malayalam OCR. Error: {e}")
+        print(f"Warning: Could not initialize Malayalam OCR. Error: {e}")
         ocr_ml = None
     ocr_multi = PaddleOCR(use_angle_cls=True, lang="multi")
 
