@@ -17,11 +17,11 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "cross-env NODE_OPTIONS=--localstorage-file=./.node-localstorage react-scripts start",
+    "build": "cross-env NODE_OPTIONS=--localstorage-file=./.node-localstorage react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "react-scripts start"
+    "dev": "cross-env NODE_OPTIONS=--localstorage-file=./.node-localstorage react-scripts start"
   },
   "eslintConfig": {
     "extends": [
@@ -42,6 +42,8 @@
     ]
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
+    "source-map-explorer": "^2.5.3",
     "tailwindcss": "^3.4.17",
     "webpack": "^5.101.3",
     "webpack-cli": "^6.0.1",

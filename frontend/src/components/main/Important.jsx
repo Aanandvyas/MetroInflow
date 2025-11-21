@@ -36,7 +36,6 @@ export default function Important() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching important files:", error);
       setImportants([]);
     } else {
       const normalized = (data || [])
@@ -77,7 +76,6 @@ export default function Important() {
         .eq("f_uuid", id);
       if (error) throw error;
     } catch (e) {
-      console.error("Unmark Important failed:", e);
       // revert on failure
       setImportants((prev) => [{ file, fav_uuid: `tmp-${id}` }, ...prev]);
     } finally {

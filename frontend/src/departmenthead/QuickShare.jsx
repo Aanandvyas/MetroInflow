@@ -43,7 +43,6 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
                 setDepartments(filteredData);
                 setFilteredDepartments(filteredData);
             } catch (error) {
-                console.error("Error fetching departments:", error);
             }
         };
         

@@ -37,7 +37,6 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         .select("d_name, d_uuid");
         
       if (error) {
-        console.error("Error loading departments:", error);
         setDepartments([]);
       } else {
         setDepartments(data.map((d) => ({ name: d.d_name, uuid: d.d_uuid })));
@@ -63,7 +62,6 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       .order("r_name", { ascending: true });
     
     if (error) {
-      console.error("Error loading roles:", error);
       setRoles([]);
     } else {
       setRoles(data || []);
@@ -140,7 +138,6 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         dob,
         gender,
         address,
-        departmentName,
         departmentUuid,
         roleUuid,
         position,
@@ -216,7 +213,6 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       }
       
     } catch (err) {
-      console.error("Registration error:", err);
       setRegistrationStatus({
         loading: false,
         success: false,

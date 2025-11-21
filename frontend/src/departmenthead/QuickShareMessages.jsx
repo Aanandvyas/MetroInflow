@@ -54,7 +54,6 @@ const QuickShareMessages = ({ userProfile }) => {
 
             setMessages(allMessages);
         } catch (error) {
-            console.error('Error fetching quick share messages:', error);
             setError('Failed to load messages');
         } finally {
             setLoading(false);

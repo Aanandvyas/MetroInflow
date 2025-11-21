@@ -1,3 +1,4 @@
+// configure the below API end points to POSTMAN for accessibility
 package handlers
 
 import (

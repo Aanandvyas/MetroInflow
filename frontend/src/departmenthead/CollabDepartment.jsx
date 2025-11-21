@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../components/context/AuthContext';
+import { safeLocalStorage } from '../utils/localStorage';
 import { 
   CheckCircleIcon, 
   XCircleIcon, 
@@ -75,7 +76,6 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
         
         setDepartmentNames(nameMap);
       } catch (e) {
-        console.error("Error fetching department names:", e);
       }
     };
     
@@ -219,13 +219,19 @@ const CollabDepartment = () => {
   const [filter, setFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [deptFilter, setDeptFilter] = useState('all'); // 'all' or a specific department UUID
   const [departmentList, setDepartmentList] = useState([]); // List of all departments for filtering
-  const [importantMap, setImportantMap] = useState(() => {
+  const [importantMap, setImportantMap] = useState({});
+
+  // Load important map from localStorage on component mount
+  useEffect(() => {
     try {
-      return JSON.parse(localStorage.getItem('fd_important_map') || '{}');
-    } catch {
-      return {};
+      const stored = safeLocalStorage.getItem('fd_important_map');
+      if (stored) {
+        setImportantMap(JSON.parse(stored));
+      }
+    } catch (error) {
+
     }
-  });
+  }, []);
 
   const isHead = useMemo(() => profile?.position === 'head', [profile]);
 
@@ -258,7 +264,6 @@ const CollabDepartment = () => {
         if (error) throw error;
         setDepartment(data);
       } catch (e) {
-        console.error("Error fetching department:", e);
         setError("Failed to load department information");
       }
     };
@@ -408,7 +413,6 @@ const CollabDepartment = () => {
         
         setReceived(recMapped);
       } catch (e) {
-        console.error(e);
         setError(e.message || 'Failed to load files from this department');
       } finally {
         setLoading(false);
@@ -441,7 +445,7 @@ const CollabDepartment = () => {
 
   // Handle important marking
   const persistImportant = (next) => {
-    try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
+    try { safeLocalStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
   
   const toggleImportant = (fd_uuid) => {

@@ -43,10 +43,8 @@ const FileViewer = () => {
               .match({ f_uuid: uuid, uuid: user.id });
               
             if (markError) {
-              console.error('Error marking notification as seen:', markError);
             }
           } catch (err) {
-            console.error('Error updating notification status:', err);
           }
         }
 
@@ -69,7 +67,6 @@ const FileViewer = () => {
         link.click();
         document.body.removeChild(link);
       } catch (err) {
-        console.error('Error in file viewer:', err);
         setError('An error occurred while processing your request.');
       } finally {
         setLoading(false);

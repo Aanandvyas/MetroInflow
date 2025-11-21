@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { safeLocalStorage } from '../utils/localStorage';
 import { CheckCircleIcon, XCircleIcon, DocumentTextIcon, StarIcon as StarOutline, BuildingOfficeIcon, EyeIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 
@@ -17,8 +18,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("COMPONENT ERROR:", error);
-    console.error("COMPONENT STACK:", errorInfo.componentStack);
+   
     this.setState({ error, errorInfo });
   }
 
@@ -212,13 +212,19 @@ const CollabFolders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
   const [deptMap, setDeptMap] = useState({});
-  const [importantMap, setImportantMap] = useState(() => {
+  const [importantMap, setImportantMap] = useState({});
+
+  // Load important map from localStorage on component mount
+  useEffect(() => {
     try {
-      return JSON.parse(localStorage.getItem('fd_important_map') || '{}');
-    } catch {
-      return {};
+      const stored = safeLocalStorage.getItem('fd_important_map');
+      if (stored) {
+        setImportantMap(JSON.parse(stored));
+      }
+    } catch (error) {
+
     }
-  });
+  }, []);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [summaryVisible, setSummaryVisible] = useState(false);
@@ -465,7 +471,6 @@ const CollabFolders = () => {
             .select('d_uuid, d_name');
             
           if (deptError) {
-            console.error("FETCH TEST: Department fetch error:", deptError);
             throw deptError;
           }
           
@@ -506,7 +511,6 @@ const CollabFolders = () => {
           .in('f_uuid', fileIds);
         
         if (filesError) {
-          console.error("DEBUG: Error fetching file details:", filesError);
           throw filesError;
         }
         
@@ -518,7 +522,6 @@ const CollabFolders = () => {
           .in('f_uuid', fileIds);
         
         if (sourceFileDeptsError) {
-          console.error("DEBUG: Error fetching source departments:", sourceFileDeptsError);
           throw sourceFileDeptsError;
         }
         
@@ -638,7 +641,7 @@ const CollabFolders = () => {
           .eq('d_uuid', profile.d_uuid);
           
         if (myFilesError) {
-          console.error("DEBUG: Error fetching department files:", myFilesError);
+
           throw myFilesError;
         }
         
@@ -657,7 +660,6 @@ const CollabFolders = () => {
             .neq('d_uuid', profile.d_uuid);
             
           if (sentError) {
-            console.error("DEBUG: Error fetching sent file entries:", sentError);
             throw sentError;
           }
           
@@ -718,7 +720,7 @@ const CollabFolders = () => {
   }, [profile?.d_uuid]);
 
   const persistImportant = (next) => {
-    try { localStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
+    try { safeLocalStorage.setItem('fd_important_map', JSON.stringify(next)); } catch {}
   };
   
   const toggleImportant = (fd_uuid) => {
@@ -737,7 +739,6 @@ const CollabFolders = () => {
       
       // Check if supabase client exists
       if (!supabase) {
-        console.error("CONNECTION TEST: Supabase client not initialized");
         setTestResults("ERROR: Supabase client not initialized");
         return;
       }
@@ -746,7 +747,6 @@ const CollabFolders = () => {
       try {
         const { data: authData, error: authError } = await supabase.auth.getSession();
         if (authError) {
-          console.error("CONNECTION TEST: Auth check failed", authError);
           setTestResults(`Auth check failed: ${authError.message}`);
           return;
         }
@@ -757,7 +757,6 @@ const CollabFolders = () => {
           return;
         }
       } catch (authErr) {
-        console.error("CONNECTION TEST: Auth check exception", authErr);
         setTestResults(`Auth check exception: ${authErr.message}`);
         return;
       }

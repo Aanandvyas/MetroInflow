@@ -8,14 +8,12 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [recentFiles, setRecentFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [userDeptIds, setUserDeptIds] = useState([]);
   const [deptCounts, setDeptCounts] = useState({}); // file count per department
   const navigate = useNavigate();
-  const summaryBackendUrl = process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents";
+
 
   // Fetch recent files (top 10 by time)
   useEffect(() => {
@@ -36,19 +34,17 @@ const HomePage = () => {
         .limit(10);
 
       if (filesError) {
-        console.error("Error fetching recent files:", filesError);
         setRecentFiles([]);
         setFilesLoading(false);
         return;
       }
 
       const fUuids = (files || []).map((f) => f.f_uuid);
-      const { data: links, error: linksError } = await supabase
+        const { data: links } = await supabase
         .from("file_department")
         .select("f_uuid, department:department ( d_uuid, d_name )")
         .in("f_uuid", fUuids);
 
-      if (linksError) console.error("Error fetching file departments:", linksError);
 
       const deptByFile = new Map();
       (links || []).forEach((row) => {
@@ -78,7 +74,6 @@ const HomePage = () => {
         .from("department")
         .select("d_uuid, d_name");
       if (error) {
-        console.error("Error fetching departments:", error);
         setDepartments([]);
         setLoading(false);
         return;
@@ -105,7 +100,6 @@ const HomePage = () => {
         `)
         .eq("is_approved", "approved");
       if (linksErr) {
-        console.error("Error fetching department file counts:", linksErr);
         setLoading(false);
         return;
       }
@@ -321,7 +315,6 @@ const HomePage = () => {
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) {
-        console.error("loadToday error:", error);
         setRecentNotifications([]);
         return;
       }

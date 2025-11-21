@@ -41,7 +41,6 @@ const DepartmentFiles = () => {
             if (error) throw error;
             setFiles((prev) => prev.map(f => f.f_uuid === f_uuid ? { ...f, is_favorite: true } : f));
         } catch (e) {
-            console.error('Mark Important failed:', e);
         } finally {
             setImpBusy((s) => ({ ...s, [f_uuid]: false }));
             setOpenMenuId(null);
@@ -54,7 +53,6 @@ const DepartmentFiles = () => {
             try {
                 await markNotificationAsSeen(fileUuid, user.id);
             } catch (err) {
-                console.error("Error marking notification as seen:", err);
             }
         }
         window.open(`/file/${fileUuid}`, "_blank", "noopener,noreferrer");
@@ -74,7 +72,6 @@ const DepartmentFiles = () => {
                     .single();
                     
                 if (deptError) {
-                    console.error("Department fetch error:", deptError);
                     setError("Could not fetch department details.");
                     return;
                 }
@@ -92,7 +89,6 @@ const DepartmentFiles = () => {
                 
                 setDepartment(deptData);
             } catch (err) {
-                console.error("Error fetching department:", err);
                 setError("Could not fetch department details.");
             }
         };
@@ -100,9 +96,9 @@ const DepartmentFiles = () => {
         fetchDepartmentData();
     }, [d_uuid, user?.id]);
 
-    // Fetch files with pagination
+    // Fetch files with pagination - now supports collaboration files
     const fetchFiles = useCallback(async (pageNum = 1, append = false) => {
-        if (!d_uuid) return;
+        if (!d_uuid || !user?.id) return;
         
         if (pageNum === 1) {
             setLoading(true);
@@ -111,11 +107,11 @@ const DepartmentFiles = () => {
             setLoadingMore(true);
         }
 
-        // Get current user's department
+        // Get current user's department and profile
         const { data: userProfile, error: userError } = await supabase
             .from("users")
-            .select("d_uuid")
-            .eq("uuid", user?.id)
+            .select("d_uuid, position")
+            .eq("uuid", user.id)
             .single();
             
         if (userError || !userProfile?.d_uuid) {
@@ -153,30 +149,75 @@ const DepartmentFiles = () => {
                 filesError = result.error;
                 count = result.count;
             } else {
-                // Other department - show files sent from that department to user's department
-                const result = await supabase
-                    .from("file")
+                // Other department folder - show approved collaboration files from that specific department
+                const { data: collabData, error: collabError, count: collabCount } = await supabase
+                    .from('file_department')
                     .select(`
-                        f_uuid, f_name, language, file_path, created_at, uuid,
-                        uploader:uuid(name, d_uuid),
-                        file_department!inner (
-                          d_uuid,
-                          is_approved
+                        fd_uuid,
+                        f_uuid,
+                        d_uuid,
+                        is_approved,
+                        created_at,
+                        file:f_uuid (
+                            f_uuid,
+                            f_name,
+                            language,
+                            file_path,
+                            created_at,
+                            uuid,
+                            users:uuid (
+                                uuid,
+                                name,
+                                position,
+                                d_uuid
+                            )
                         )
                     `, { count: 'exact' })
-                    .eq("file_department.d_uuid", userProfile.d_uuid)
-                    .eq("file_department.is_approved", "approved")
-                    .eq("uploader.d_uuid", d_uuid)
-                    .order("created_at", { ascending: false })
+                    .eq('d_uuid', userProfile.d_uuid) // Files received by user's department
+                    .eq('is_approved', 'approved') // Only approved files
+                    .order('created_at', { ascending: false })
                     .range(from, to);
-                    
-                filesData = result.data;
-                filesError = result.error;
-                count = result.count;
+
+                if (collabError) {
+                    filesError = collabError;
+                } else {
+                    // Filter to only show files from the selected department
+                    const filteredFiles = (collabData || [])
+                        .filter(item => {
+                            // Check if file was sent from the selected department
+                            return item.file && item.file.users?.d_uuid === d_uuid;
+                        })
+                        .map(item => ({
+                            // Map collaboration file structure to match regular file structure
+                            f_uuid: item.file.f_uuid,
+                            f_name: item.file.f_name,
+                            language: item.file.language,
+                            file_path: item.file.file_path,
+                            created_at: item.created_at, // Use collaboration date
+                            uuid: item.file.uuid,
+                            uploader: {
+                                name: item.file.users?.name,
+                                d_uuid: item.file.users?.d_uuid
+                            },
+                            file_department: {
+                                d_uuid: item.d_uuid,
+                                is_approved: item.is_approved
+                            },
+                            // Additional collaboration info
+                            fd_uuid: item.fd_uuid,
+                            shared_at: item.created_at,
+                            original_created_at: item.file.created_at,
+                            sender_name: item.file.users?.name,
+                            sender_position: item.file.users?.position,
+                            is_collaboration: true
+                        }));
+
+                    filesData = filteredFiles;
+                    count = filteredFiles.length; // Approximate count for filtered results
+                }
             }
 
             if (filesError) {
-                console.error("Files fetch error:", filesError);
                 if (pageNum === 1) {
                     setError("Could not fetch files for this department.");
                 }
@@ -193,7 +234,6 @@ const DepartmentFiles = () => {
                 setFiles(filesData || []);
             }
         } catch (err) {
-            console.error("Error fetching files:", err);
             if (pageNum === 1) {
                 setError("Could not fetch files for this department.");
             }
@@ -278,7 +318,23 @@ const DepartmentFiles = () => {
                                 <h3 className="font-semibold text-gray-800 truncate mb-1" title={file.f_name}>
                                     {file.f_name}
                                 </h3>
-                                <p className="text-sm text-gray-500 mb-4">{file.language}</p>
+                                <p className="text-sm text-gray-500 mb-2">{file.language}</p>
+                                
+                                {/* Show collaboration info if it's a shared file */}
+                                {file.is_collaboration && (
+                                    <div className="text-xs text-blue-600 mb-2 bg-blue-50 px-2 py-1 rounded">
+                                        Shared by {file.sender_name}
+                                        {file.sender_position === 'head' && ' (Department Head)'}
+                                    </div>
+                                )}
+                                
+                                {/* Show sharing date for collaboration files */}
+                                {file.is_collaboration && file.shared_at && (
+                                    <p className="text-xs text-gray-400 mb-2">
+                                        Shared: {new Date(file.shared_at).toLocaleDateString()}
+                                    </p>
+                                )}
+                                
                                 <div className="mt-auto flex items-center gap-2 w-full">
                                     <button
                                         type="button"
@@ -341,18 +397,18 @@ const DepartmentFiles = () => {
             ) : (
                 <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-700">
-                        {isOwnDepartment ? "No Documents Found" : "No Files Received"}
+                        {isOwnDepartment ? "No Documents Found" : "No Collaboration Files"}
                     </h2>
                     <p className="text-gray-500 mt-2">
                         {isOwnDepartment 
                             ? "There are no files uploaded by your department yet."
-                            : `There are no approved files sent from ${department?.d_name || 'this department'} to your department yet.`
+                            : `No approved files have been shared from ${department?.d_name || 'this department'} to your department yet.`
                         }
                     </p>
                     <p className="text-gray-400 text-sm mt-1">
                         {isOwnDepartment 
                             ? "Files uploaded by your department appear here automatically."
-                            : `Files sent from ${department?.d_name || 'this department'} need to be approved by your department head before they appear here.`
+                            : `When the head of ${department?.d_name || 'this department'} shares files with your department and your department head approves them, they will appear here.`
                         }
                     </p>
                 </div>

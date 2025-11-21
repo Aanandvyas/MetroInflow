@@ -3,7 +3,6 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import {
   ArrowUpTrayIcon,
-  DocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
 
@@ -170,7 +169,6 @@ const DocumentUpload = () => {
           .eq("d_uuid", userProfile.d_uuid);
 
         if (usersError) {
-          console.error("Error fetching users for department:", usersError);
         }
         if (usersInDepartment && usersInDepartment.length > 0) {
           const notificationRows = usersInDepartment.map(u => ({
@@ -197,12 +195,10 @@ const DocumentUpload = () => {
           );
 
           if (!response.ok) {
-            console.error("Backend summary request failed.");
           } else {
             const summaryData = await response.json();
           }
         } catch (backendErr) {
-          console.error("Error sending file to summary backend:", backendErr);
         }
       }
 

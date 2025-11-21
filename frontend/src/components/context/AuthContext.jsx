@@ -87,7 +87,6 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (error) {
-      console.error("Error signing in:", error.message);
       return { success: false, error };
     }
     return { success: true, data };
@@ -96,9 +95,6 @@ export const AuthProvider = ({ children }) => {
   // ✅ Sign out
   const signOutUser = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error("Error signing out:", error.message);
-    }
   };
 
   // ✅ Get profile from user table
@@ -115,12 +111,10 @@ export const AuthProvider = ({ children }) => {
         .maybeSingle();
 
       if (error) {
-        console.error("Error fetching user profile:", error.message);
         return null;
       }
       return data;
     } catch (err) {
-      console.error("Error in getUserProfile:", err);
       return null;
     }
   };
@@ -133,7 +127,6 @@ export const AuthProvider = ({ children }) => {
       .eq("uuid", uuid);   // <-- also here
 
     if (error) {
-      console.error("Error updating role:", error.message);
       return { success: false, error };
     }
 
@@ -148,7 +141,6 @@ export const AuthProvider = ({ children }) => {
       .select("r_uuid, r_name");
 
     if (error) {
-      console.error("Error fetching roles:", error.message);
       return [];
     }
     return data;

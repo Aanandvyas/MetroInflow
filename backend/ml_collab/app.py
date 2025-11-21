@@ -1,4 +1,4 @@
-
+#this file lies here for review
 import os
 import threading
 import time
@@ -31,9 +31,9 @@ try:
     MODEL_NAME = "facebook/bart-large-cnn"
     summarizer: Pipeline = pipeline("summarization", model=MODEL_NAME, device=device)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    print(f"✅ Model loaded successfully on device: {'GPU' if device == 0 else 'CPU'}")
+    print(f"Model loaded successfully on device: {'GPU' if device == 0 else 'CPU'}")
 except Exception as e:
-    print(f"💥 Failed to load model: {e}")
+    print(f"Failed to load model: {e}")
     summarizer = None
     tokenizer = None
 
@@ -161,4 +161,17 @@ for row in ocr_rows:
     print(f"[DEBUG] Marking summary_generated TRUE for ocr_uuid: {row['ocr_uuid']}")
     supabase.table("ocr").update({"summary_generated": True}).eq("ocr_uuid", row["ocr_uuid"]).execute()
 
-print("✅ JSON array summaries generated and tables updated.")
+print("JSON array summaries generated and tables updated.")
+
+
+
+
+
+
+
+
+
+
+
+
+

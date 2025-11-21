@@ -1,3 +1,4 @@
+#lies here for review
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -172,3 +173,13 @@ async def ocr_summarize_endpoint(file: UploadFile = File(...), document_text: st
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
+
+
+
+
+
+    

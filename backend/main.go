@@ -1,3 +1,13 @@
+/*
+TODO: for self
+
+==>i'm sure that main has to be optimized
+==>if(check if i'm using pgadmin cli tools(probably not) ==true){where and y}else remove the functions
+==>balance the handlers and utils folders
+==>check which model i'm runn'n on the collab for summary(remove emoji's)
+==>go through the comments in each file for task verification(at the top)
+==>check what all i am using from config/config.go and utlis/helper.go
+*/
 package main
 
 import (
@@ -20,7 +30,7 @@ func checkDBConnection() {
 	key := os.Getenv("SUPABASE_SERVICE_KEY")
 
 	if url == "" || key == "" {
-		log.Println("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+		log.Println("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
 		return
 	}
 
@@ -28,7 +38,7 @@ func checkDBConnection() {
 
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Printf("❌ Failed to build DB request: %v\n", err)
+		log.Printf("Failed to build DB request: %v\n", err)
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
@@ -36,36 +46,36 @@ func checkDBConnection() {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Printf("❌ Failed DB connection: %v\n", err)
+		log.Printf("Failed DB connection: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		log.Printf("❌ DB responded with error: %s\n", resp.Status)
+		log.Printf("DB responded with error: %s\n", resp.Status)
 		return
 	}
 
 	var rows []map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
-		log.Printf("❌ Could not decode DB response: %v\n", err)
+		log.Printf("Could not decode DB response: %v\n", err)
 		return
 	}
 
 	if len(rows) == 0 {
-		log.Println("✅ Connected to Supabase, but no rows in test_connection table yet")
+		log.Println("Connected to Supabase, but no rows in test_connection table yet")
 	} else {
-		log.Printf("✅ Connected! Found a row: %+v\n", rows[0])
+		log.Printf("Connected! Found a row: %+v\n", rows[0])
 	}
 }
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("⚠️ No .env file found, falling back to system environment")
+		log.Println("No .env file found, falling back to system environment")
 	}
 
 	config.InitConfig()
-	log.Println("✅ Config initialized.")
+	log.Println("Config initialized.")
 
 	checkDBConnection()
 
@@ -74,7 +84,7 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
-	// 1. Define HTTP routes
+	//Define HTTP routes
 	http.HandleFunc("/v1/documents", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -93,7 +103,7 @@ func main() {
 	// http.HandleFunc("/v1/files/", handlers.GetFileHandler)
 	// http.HandleFunc("/v1/departments", handlers.ListDepartmentsHandler)
 
-	// 2. CORS Health check
+	//CORS Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -105,7 +115,7 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	// 3. Start notification polling goroutine
+	//Start notification polling goroutine
 	go func() {
 		for {
 			rows, err := config.DB.Query(`SELECT notif_id, uuid, f_uuid FROM notifications WHERE is_sent = false`)
@@ -148,7 +158,7 @@ func main() {
 		}
 	}()
 
-	// 7️⃣ Start quick share notification polling goroutine
+	//Start quick share notification polling goroutine
 	go func() {
 		for {
 			log.Println("[QUICK_SHARE] Polling for new quick_share entries...")
@@ -220,7 +230,7 @@ func main() {
 		}
 	}()
 
-	// 8️⃣ Start HTTP server
+	//Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -234,6 +244,6 @@ func main() {
 
 	log.Printf("🚀 Server started at http://localhost:%s\n", port)
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("❌ Server failed: %v", err)
+		log.Fatalf("Server failed: %v", err)
 	}
 }

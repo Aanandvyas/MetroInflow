@@ -360,7 +360,6 @@ const Calendar = () => {
             setFilesData(processedData);
             
         } catch (error) {
-            console.error('Error fetching files data:', error);
             setFilesData({});
             // You could add a toast notification here or show an error message to the user
         } finally {
@@ -401,7 +400,6 @@ const Calendar = () => {
                         await fetchFilesData(profile.d_uuid);
                     }
                 } catch (error) {
-                    console.error('Error fetching user profile:', error);
                 }
             }
         };
