@@ -16,13 +16,13 @@ const UserRegistrationForm = ({ onUserAdded }) => {
     roleUuid: "",
     position: "regular", // Default position
   });
-  
+
   const [registrationStatus, setRegistrationStatus] = useState({
     loading: false,
     success: false,
     error: null
   });
-  
+
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
@@ -35,16 +35,15 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       const { data, error } = await supabase
         .from("department")
         .select("d_name, d_uuid");
-        
+
       if (error) {
-        console.error("Error loading departments:", error);
         setDepartments([]);
       } else {
         setDepartments(data.map((d) => ({ name: d.d_name, uuid: d.d_uuid })));
       }
       setLoadingDepartments(false);
     };
-    
+
     fetchDepartments();
   }, []);
 
@@ -54,16 +53,15 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRoles([]);
       return;
     }
-    
+
     setLoadingRoles(true);
     const { data, error } = await supabase
       .from("role")
       .select("r_uuid, r_name")
       .eq("d_uuid", departmentUuid)
       .order("r_name", { ascending: true });
-    
+
     if (error) {
-      console.error("Error loading roles:", error);
       setRoles([]);
     } else {
       setRoles(data || []);
@@ -85,22 +83,22 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       if (selectedDept) {
         fetchRolesForDepartment(selectedDept.uuid);
         // Reset selected role when department changes and store department UUID
-        setFormData(prev => ({ 
-          ...prev, 
-          roleUuid: "", 
-          departmentUuid: selectedDept.uuid 
+        setFormData(prev => ({
+          ...prev,
+          roleUuid: "",
+          departmentUuid: selectedDept.uuid
         }));
       } else {
         // Clear department UUID if no department selected
-        setFormData(prev => ({ 
-          ...prev, 
-          roleUuid: "", 
-          departmentUuid: "" 
+        setFormData(prev => ({
+          ...prev,
+          roleUuid: "",
+          departmentUuid: ""
         }));
       }
     }
   };
-  
+
   // Handle registration submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -140,7 +138,6 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         dob,
         gender,
         address,
-        departmentName,
         departmentUuid,
         roleUuid,
         position,
@@ -151,7 +148,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         email,
         password,
         options: {
-          emailRedirectTo: "http://localhost:3000/login", // change for production
+          emailRedirectTo: process.env.REACT_APP_REDIRECT_URL || "http://localhost:3000/login",
         },
       });
 
@@ -177,7 +174,16 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             r_uuid: position === "head" ? null : (roleUuid || null),
             position,
             age: dob
-              ? new Date().getFullYear() - new Date(dob).getFullYear()
+              ? (() => {
+                const today = new Date();
+                const birth = new Date(dob);
+                let age = today.getFullYear() - birth.getFullYear();
+                const monthDiff = today.getMonth() - birth.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                  age--;
+                }
+                return age;
+              })()
               : null,
           },
         ]);
@@ -193,7 +199,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         success: true,
         error: null
       });
-      
+
       // Reset form
       setFormData({
         fullName: "",
@@ -209,14 +215,13 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         roleUuid: "",
         position: "regular",
       });
-      
+
       // Notify parent component
       if (onUserAdded && typeof onUserAdded === 'function') {
         onUserAdded();
       }
-      
+
     } catch (err) {
-      console.error("Registration error:", err);
       setRegistrationStatus({
         loading: false,
         success: false,
@@ -228,19 +233,19 @@ const UserRegistrationForm = ({ onUserAdded }) => {
   return (
     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
       <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4 sm:mb-6">Register New User</h3>
-      
+
       {registrationStatus.success && (
         <div className="mb-6 p-4 bg-green-100 text-green-800 border border-green-300 rounded-md">
           User registered successfully!
         </div>
       )}
-      
+
       {registrationStatus.error && (
         <div className="mb-6 p-4 bg-red-100 text-red-800 border border-red-300 rounded-md">
           {registrationStatus.error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Full Name */}
         <div>
@@ -254,7 +259,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
           />
         </div>
-        
+
         {/* Email */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -267,7 +272,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
           />
         </div>
-        
+
         {/* Phone Number */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Phone Number</label>
@@ -280,7 +285,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 mt-1 border rounded-md"
           />
         </div>
-        
+
         {/* Date of Birth */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
@@ -293,7 +298,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 mt-1 border rounded-md"
           />
         </div>
-        
+
         {/* Department */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Department</label>
@@ -312,7 +317,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             ))}
           </select>
         </div>
-        
+
         {/* Position */}
         {formData.departmentName && (
           <div>
@@ -328,7 +333,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             </select>
           </div>
         )}
-        
+
         {/* Role - Only show if not department head */}
         {formData.departmentName && formData.position !== "head" && (
           <div>
@@ -338,16 +343,15 @@ const UserRegistrationForm = ({ onUserAdded }) => {
               value={formData.roleUuid}
               onChange={handleChange}
               disabled={loadingRoles}
-              className={`w-full px-3 py-2 mt-1 border rounded-md ${
-                loadingRoles ? "bg-gray-100" : ""
-              }`}
+              className={`w-full px-3 py-2 mt-1 border rounded-md ${loadingRoles ? "bg-gray-100" : ""
+                }`}
             >
               <option value="">
-                {loadingRoles 
-                  ? "Loading roles..." 
-                  : roles.length === 0 
-                  ? "No roles available for this department" 
-                  : "Select a role (optional)"}
+                {loadingRoles
+                  ? "Loading roles..."
+                  : roles.length === 0
+                    ? "No roles available for this department"
+                    : "Select a role (optional)"}
               </option>
               {roles.map((role) => (
                 <option key={role.r_uuid} value={role.r_uuid}>
@@ -362,7 +366,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             )}
           </div>
         )}
-        
+
         {/* Password */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Password</label>
@@ -375,7 +379,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 mt-1 border rounded-md"
           />
         </div>
-        
+
         {/* Confirm Password */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
@@ -388,7 +392,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 mt-1 border rounded-md"
           />
         </div>
-        
+
         {/* Gender */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Gender</label>
@@ -407,7 +411,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             ))}
           </div>
         </div>
-        
+
         {/* Address */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700">Address</label>
@@ -419,7 +423,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
             className="w-full px-3 py-2 mt-1 border rounded-md"
           ></textarea>
         </div>
-        
+
         {/* Submit Button */}
         <div className="sm:col-span-2">
           <button

@@ -2,20 +2,19 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { FolderIcon, PlusIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import { useAuth } from "../context/AuthContext";
 
 const HomePage = () => {
+  const { user } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recentFiles, setRecentFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [userDeptIds, setUserDeptIds] = useState([]);
-  const [deptCounts, setDeptCounts] = useState({}); // file count per department
   const navigate = useNavigate();
-  const summaryBackendUrl = process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents";
+
 
   // Fetch recent files (top 10 by time)
   useEffect(() => {
@@ -36,19 +35,17 @@ const HomePage = () => {
         .limit(10);
 
       if (filesError) {
-        console.error("Error fetching recent files:", filesError);
         setRecentFiles([]);
         setFilesLoading(false);
         return;
       }
 
       const fUuids = (files || []).map((f) => f.f_uuid);
-      const { data: links, error: linksError } = await supabase
+      const { data: links } = await supabase
         .from("file_department")
         .select("f_uuid, department:department ( d_uuid, d_name )")
         .in("f_uuid", fUuids);
 
-      if (linksError) console.error("Error fetching file departments:", linksError);
 
       const deptByFile = new Map();
       (links || []).forEach((row) => {
@@ -72,13 +69,13 @@ const HomePage = () => {
   // Fetch departments and initial counts
   useEffect(() => {
     const fetchDepartments = async () => {
+      if (!user?.id) return;
       setLoading(true);
-      
+
       const { data, error } = await supabase
         .from("department")
         .select("d_uuid, d_name");
       if (error) {
-        console.error("Error fetching departments:", error);
         setDepartments([]);
         setLoading(false);
         return;
@@ -86,12 +83,9 @@ const HomePage = () => {
       setDepartments(data || []);
 
       // Get user's department
-      const user = (await supabase.auth.getUser()).data.user;
       let userDeptId = null;
-      if (user) {
-        const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
-        userDeptId = profile?.d_uuid;
-      }
+      const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
+      userDeptId = profile?.d_uuid;
 
       // Count files differently for user's own dept vs other depts
       const { data: links, error: linksErr } = await supabase
@@ -105,16 +99,15 @@ const HomePage = () => {
         `)
         .eq("is_approved", "approved");
       if (linksErr) {
-        console.error("Error fetching department file counts:", linksErr);
         setLoading(false);
         return;
       }
-      
+
       const counts = {};
       (links || []).forEach((row) => {
         const senderDeptId = row.file?.users?.d_uuid;
         const receiverDeptId = row.d_uuid;
-        
+
         if (receiverDeptId === userDeptId) {
           if (senderDeptId === userDeptId) {
             // Own department files - count under own department
@@ -125,31 +118,29 @@ const HomePage = () => {
           }
         }
       });
-      setDeptCounts(counts);
       setLoading(false);
     };
     fetchDepartments();
-  }, []);
+  }, [user?.id]);
 
   // Load user's departments once
   useEffect(() => {
     const loadUserDepts = async () => {
+      if (!user?.id) return;
       const { data: mapRows, error: mapErr } = await supabase
         .from("user_department")
         .select("d_uuid")
-        .eq("uuid", (await supabase.auth.getUser()).data.user?.id);
+        .eq("uuid", user.id);
       if (!mapErr && mapRows?.length) {
         setUserDeptIds(mapRows.map((r) => r.d_uuid));
         return;
       }
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) return;
       const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
       if (profile?.d_uuid) setUserDeptIds([profile.d_uuid]);
       else setUserDeptIds([]);
     };
     loadUserDepts();
-  }, []);
+  }, [user?.id]);
 
   // Realtime: new/removed files and file_department links
   useEffect(() => {
@@ -202,24 +193,16 @@ const HomePage = () => {
             .select("users:uuid(d_uuid)")
             .eq("f_uuid", f_uuid)
             .single();
-            
+
           const senderDeptId = fileData?.users?.d_uuid;
-          const user = (await supabase.auth.getUser()).data.user;
           let userDeptId = null;
-          if (user) {
+          if (user?.id) {
             const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
             userDeptId = profile?.d_uuid;
           }
-          
+
           if (d_uuid === userDeptId) {
-            if (senderDeptId === userDeptId) {
-              // Same department file - count under own department
-              setDeptCounts((prev) => ({ ...prev, [userDeptId]: (prev[userDeptId] || 0) + 1 }));
-            } else {
-              // File from another department - count under sender department
-              setDeptCounts((prev) => ({ ...prev, [senderDeptId]: (prev[senderDeptId] || 0) + 1 }));
-            }
-            
+
             // Update recent files department chips
             const { data: dept } = await supabase
               .from("department")
@@ -242,8 +225,7 @@ const HomePage = () => {
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "file_department" }, (payload) => {
         const { f_uuid, d_uuid } = payload.old || {};
-        // decrement badge count
-        setDeptCounts((prev) => ({ ...prev, [d_uuid]: Math.max(0, (prev[d_uuid] || 1) - 1) }));
+        // decrement badge count (removed stale deptCounts)
         // remove chip if file in recent list
         setRecentFiles((prev) => {
           const idx = prev.findIndex((f) => f.f_uuid === f_uuid);
@@ -260,7 +242,7 @@ const HomePage = () => {
       supabase.removeChannel(filesChannel);
       supabase.removeChannel(fdChannel);
     };
-  }, []);
+  }, [user?.id]);
 
   // Helpers for grouping and formatting
   const toDateKey = (iso) => {
@@ -321,7 +303,6 @@ const HomePage = () => {
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) {
-        console.error("loadToday error:", error);
         setRecentNotifications([]);
         return;
       }
@@ -397,7 +378,6 @@ const HomePage = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {departments.map((dept) => {
-              const count = deptCounts[dept.d_uuid] || 0;
               return (
                 <Link key={dept.d_uuid} to={`/department/${dept.d_uuid}`} className="block">
                   <div className="relative bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-500 transition cursor-pointer group h-full">

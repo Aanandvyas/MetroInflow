@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { ChatBubbleLeftIcon, ClockIcon, UserIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../supabaseClient';
 
@@ -9,33 +9,7 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
     const [lastRefresh, setLastRefresh] = useState(null);
     const refreshTimerRef = useRef(null);
 
-    // Expose fetchMessages method to parent components through ref
-    useImperativeHandle(ref, () => ({
-        fetchMessages: () => fetchMessages()
-    }));
-
-    useEffect(() => {
-        // Only fetch if we have a user profile
-        if (userProfile?.id) {
-            fetchMessages();
-            
-            // Set up refresh timer to check for new messages every minute
-            refreshTimerRef.current = setInterval(() => {
-                fetchMessages();
-            }, 60000);
-        } else {
-            setError("User profile not available. Please refresh the page or log in again.");
-            setLoading(false);
-        }
-        
-        return () => {
-            if (refreshTimerRef.current) {
-                clearInterval(refreshTimerRef.current);
-            }
-        };
-    }, [userProfile]);
-
-    const fetchMessages = async () => {
+    const fetchMessages = useCallback(async () => {
         if (!userProfile || !userProfile.id) {
             setError("User profile not available. Please refresh the page.");
             setLoading(false);
@@ -64,7 +38,6 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
                 .limit(7);
 
             if (sentError) {
-                console.error("Error in Supabase query:", sentError);
                 throw sentError;
             }
             
@@ -72,10 +45,8 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
             if (sentError) {
                 // Provide more specific error messages based on common issues
                 if (sentError.code === "42P01") {
-                    console.error("Table 'quick_share' does not exist. Database schema issue.");
                     setError("Database table 'quick_share' not found. Please contact an administrator.");
                 } else if (sentError.code === "42703") {
-                    console.error("Column not found in database. Schema mismatch:", sentError.message);
                     setError(`Database schema mismatch: ${sentError.message}`);
                 } else {
                     throw sentError;
@@ -90,7 +61,33 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userProfile]);
+
+    // Expose fetchMessages method to parent components through ref
+    useImperativeHandle(ref, () => ({
+        fetchMessages
+    }));
+
+    useEffect(() => {
+        // Only fetch if we have a user profile
+        if (userProfile?.id) {
+            fetchMessages();
+            
+            // Set up refresh timer to check for new messages every minute
+            refreshTimerRef.current = setInterval(() => {
+                fetchMessages();
+            }, 60000);
+        } else {
+            setError("User profile not available. Please refresh the page or log in again.");
+            setLoading(false);
+        }
+        
+        return () => {
+            if (refreshTimerRef.current) {
+                clearInterval(refreshTimerRef.current);
+            }
+        };
+    }, [userProfile, fetchMessages]);
 
     // Format relative time (e.g., "2 hours ago")
     const formatRelativeTime = (dateString) => {

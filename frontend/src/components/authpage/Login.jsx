@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
 import { supabase } from '../../supabaseClient';
+import { safeLocalStorage } from '../../utils/localStorage';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -33,7 +34,7 @@ const Login = () => {
           setError('Admin username not found');
         } else if (data && data.a_pass === password) {
           // Store admin session in localStorage
-          localStorage.setItem('adminSession', JSON.stringify({
+          safeLocalStorage.setItem('adminSession', JSON.stringify({
             isAdmin: true,
             username: data.a_username,
             adminId: data.a_uuid
@@ -44,18 +45,17 @@ const Login = () => {
         }
       } else {
         // Regular user login
-        const { data, error: signInError } = await signInUser(email, password);
+        const { error: signInError } = await signInUser(email, password);
 
         if (signInError) {
           setError(signInError.message);
         } else {
-          console.log('Login successful:', data);
+        
           navigate('/'); // Correctly navigate to the root protected route
         }
       }
     } catch (e) {
       setError('An unexpected error occurred. Please try again.');
-      console.error("Login failed:", e);
     } finally {
       setLoading(false);
     }
@@ -183,9 +183,9 @@ const Login = () => {
               </label>
             </div>
             <div>
-              <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <button type="button" className="font-medium text-indigo-600 hover:text-indigo-500">
                 Forgot password?
-              </a>
+              </button>
             </div>
           </div>
 

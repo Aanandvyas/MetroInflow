@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 
 const DepartmentManagement = () => {
@@ -15,13 +15,22 @@ const DepartmentManagement = () => {
   });
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
 
-  // Fetch departments
-  useEffect(() => {
-    fetchDepartments();
+  // Helper to show notifications
+  const showNotification = useCallback((type, message) => {
+    setNotification({
+      show: true,
+      type,
+      message
+    });
+    
+    // Auto-hide notification after a few seconds
+    setTimeout(() => {
+      setNotification({ show: false, type: '', message: '' });
+    }, type === 'error' ? 5000 : 3000);
   }, []);
 
   // Fetch department list
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     setLoadingDepartments(true);
     
     try {
@@ -37,26 +46,16 @@ const DepartmentManagement = () => {
       
       setDepartments(data || []);
     } catch (error) {
-      console.error("Error loading departments:", error);
       showNotification('error', `Error loading departments: ${error.message}`);
     } finally {
       setLoadingDepartments(false);
     }
-  };
+  }, [showNotification]);
 
-  // Helper to show notifications
-  const showNotification = (type, message) => {
-    setNotification({
-      show: true,
-      type,
-      message
-    });
-    
-    // Auto-hide notification after a few seconds
-    setTimeout(() => {
-      setNotification({ show: false, type: '', message: '' });
-    }, type === 'error' ? 5000 : 3000);
-  };
+  // Fetch departments
+  useEffect(() => {
+    fetchDepartments();
+  }, [fetchDepartments]);
 
   // Handle form change for department
   const handleDeptFormChange = (e) => {
@@ -122,7 +121,6 @@ const DepartmentManagement = () => {
       // Close modal
       setShowAddDeptModal(false);
     } catch (error) {
-      console.error('Error adding department:', error);
       showNotification('error', `Error adding department: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -166,7 +164,6 @@ const DepartmentManagement = () => {
       // Close modal
       setShowEditDeptModal(false);
     } catch (error) {
-      console.error('Error updating department:', error);
       showNotification('error', `Error updating department: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -195,7 +192,6 @@ const DepartmentManagement = () => {
       // Close confirmation dialog
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error('Error deleting department:', error);
       showNotification('error', `Error deleting department: ${error.message}`);
     } finally {
       setIsSubmitting(false);

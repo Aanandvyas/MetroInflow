@@ -29,7 +29,6 @@ const AssignmentsCard = ({ selectedDate, assignments = [], loading }) => {
         .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
       if (error) throw error;
     } catch (e) {
-      console.error("Mark Important failed:", e);
       alert("Could not mark Important. Please try again.");
     } finally {
       setImpBusy((s) => ({ ...s, [f_uuid]: false }));

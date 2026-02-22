@@ -29,7 +29,6 @@ const SharedFiles = () => {
                 const data = await getUserProfile(user.id);
                 setProfile(data);
             } catch (e) {
-                console.error('Failed to load profile', e);
                 setError('Unable to load user profile');
             }
         };
@@ -107,7 +106,6 @@ const SharedFiles = () => {
                     }));
                 setRows(mapped);
             } catch (e) {
-                console.error('Error loading shared files', e);
                 setError(e.message || 'Failed to load shared files');
             } finally {
                 setLoading(false);
@@ -136,7 +134,6 @@ const SharedFiles = () => {
             // Optimistic update
             setRows(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: 'approved' } : r));
         } catch (e) {
-            console.error('Approve failed', e);
             setError(e.message || 'Failed to approve');
         }
     };
@@ -151,7 +148,6 @@ const SharedFiles = () => {
             // Optimistic update
             setRows(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: 'rejected' } : r));
         } catch (e) {
-            console.error('Reject failed', e);
             setError(e.message || 'Failed to reject');
         }
     };

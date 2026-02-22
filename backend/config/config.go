@@ -141,3 +141,8 @@ func (s SupabaseClient) InsertDocument(doc models.Document) (string, error) {
 	}
 	return inserted[0].FUUID, nil
 }
+
+
+
+
+

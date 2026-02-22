@@ -43,7 +43,6 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
                 setDepartments(filteredData);
                 setFilteredDepartments(filteredData);
             } catch (error) {
-                console.error("Error fetching departments:", error);
             }
         };
         
@@ -117,7 +116,7 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
             };
             
             // Insert entry into quick_share table
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('quick_share')
                 .insert([
                     {

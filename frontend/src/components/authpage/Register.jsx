@@ -33,7 +33,6 @@ const Register = () => {
     const fetchDepartments = async () => {
       const { data, error } = await supabase.from("department").select("d_name, d_uuid");
       if (error) {
-        console.error("Error loading departments:", error);
         setDepartments([]);
       } else {
         setDepartments(data.map((d) => ({ name: d.d_name, uuid: d.d_uuid })));
@@ -58,7 +57,6 @@ const Register = () => {
       .order("r_name", { ascending: true });
     
     if (error) {
-      console.error("Error loading roles:", error);
       setRoles([]);
     } else {
       setRoles(data || []);
@@ -110,7 +108,6 @@ const Register = () => {
         navigate("/login");
       }
     } catch (err) {
-      console.error("Registration error:", err);
       setError("Unexpected error. Please try again.");
     } finally {
       setLoading(false);

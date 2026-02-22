@@ -31,7 +31,6 @@ const AssignmentsContainer = () => {
           .single();
 
         if (userError || !userData) {
-          console.error("Debug Step 2: Error fetching user profile:", userError);
           setDebugMessage("Error: Could not fetch your user profile. Check RLS policies on the 'user' table.");
           throw new Error(userError?.message || "User department not found.");
         }
@@ -54,7 +53,6 @@ const AssignmentsContainer = () => {
           .eq('d_uuid', userDeptId);
 
         if (error) {
-            console.error("Debug Step 3: Error fetching department files:", error);
             setDebugMessage("Error: Could not fetch department files. Check RLS policies on the 'file' table.");
             throw error;
         }
@@ -63,7 +61,6 @@ const AssignmentsContainer = () => {
         setDebugMessage(''); // Clear message on success
 
       } catch (error) {
-        console.error("Final Error:", error.message);
       } finally {
         setLoading(false);
       }

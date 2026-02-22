@@ -2,13 +2,12 @@ import { supabase } from '../supabaseClient';
 
 export const markNotificationAsSeen = async (fileUuid, userId) => {
   if (!fileUuid || !userId) {
-    console.error("Missing required parameters:", { fileUuid, userId });
     return false;
   }
   
   try {
     
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('notifications')
       .update({ is_seen: true })
       .match({ 
@@ -18,13 +17,11 @@ export const markNotificationAsSeen = async (fileUuid, userId) => {
       });
 
     if (error) {
-      console.error("Error marking notification as seen:", error);
       return false;
     }
     
     return true; // Just return success boolean
   } catch (err) {
-    console.error("Exception in markNotificationAsSeen:", err);
     return false;
   }
 };

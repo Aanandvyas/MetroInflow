@@ -19,7 +19,8 @@ const AdminAllFiles = () => {
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
-        loadMoreFiles();
+        // Call fetchFiles directly instead of loadMoreFiles
+        setPage(prev => prev + 1);
       }
     });
     if (node) observer.current.observe(node);
@@ -35,7 +36,6 @@ const AdminAllFiles = () => {
         .select("d_uuid, d_name")
         .order("d_name", { ascending: true });
       if (error) {
-        console.error("Error fetching departments:", error.message);
         setDepartments([]);
       } else {
         setDepartments(data || []);
@@ -98,7 +98,6 @@ const AdminAllFiles = () => {
 
     const { data: files, error: fileError, count } = await fileQuery;
     if (fileError) {
-      console.error("Error loading files:", fileError.message);
       if (pageNum === 1) {
         setAllDepartmentFiles([]);
       }
@@ -128,14 +127,6 @@ const AdminAllFiles = () => {
     setLoadingMore(false);
   }, [selectedDepartment, selectedLanguage, searchTerm, FILES_PER_PAGE]);
 
-  const loadMoreFiles = useCallback(() => {
-    if (hasMore && !loading && !loadingMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchFiles(nextPage, true);
-    }
-  }, [page, hasMore, loading, loadingMore, fetchFiles]);
-
   useEffect(() => {
     fetchFiles(1, false);
   }, [fetchFiles]);
@@ -161,7 +152,6 @@ const AdminAllFiles = () => {
         ).sort((a, b) => a.localeCompare(b));
         setLanguages(langs);
       } catch (e) {
-        console.error("Error fetching languages:", e.message);
         setLanguages([]);
       }
     };

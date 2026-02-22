@@ -3,7 +3,7 @@ import { useAuth } from './components/context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosition = null }) => {
-  const { user, getUserProfile } = useAuth();
+  const { user, getUserProfile, signOutUser } = useAuth();
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -12,17 +12,26 @@ const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosit
       if (user?.id) {
         try {
           const profile = await getUserProfile(user.id);
-          setUserProfile(profile);
+          if (profile) {
+            setUserProfile(profile);
+            setLoading(false);
+          } else {
+            // Profile missing - stale session
+            console.warn('Profile missing in RoleProtectedRoute. Signing out.');
+            await signOutUser();
+            // The redirection to login will be handled by ProtectedRoute or AuthContext state change
+          }
         } catch (error) {
-          console.error('Error fetching user profile:', error);
-        } finally {
+          console.error('Failed to fetch user profile for role check:', error);
           setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     };
 
     fetchUserProfile();
-  }, [user, getUserProfile]);
+  }, [user, getUserProfile, signOutUser]);
 
   if (loading) {
     return (
@@ -32,18 +41,22 @@ const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosit
     );
   }
 
-  // If requiredPosition is specified, check if user has that position
+  // If requiredPosition is specified, only allow users WITH that position
   if (requiredPosition && userProfile?.position !== requiredPosition) {
-    // Redirect to appropriate dashboard based on user position
+    // User doesn't have the required position — redirect them to their appropriate home
     const redirectPath = userProfile?.position === 'head' ? '/head-dashboard' : '/';
     return <Navigate to={redirectPath} replace />;
   }
 
-  // If restrictToPosition is specified, check if user has that position
+  // If restrictToPosition is specified, BLOCK users who have that position
+  // e.g. restrictToPosition="head" means heads are NOT allowed on this page
   if (restrictToPosition && userProfile?.position === restrictToPosition) {
-    // Redirect non-head users away from head-only pages
-    const redirectPath = userProfile?.position === 'head' ? '/head-dashboard' : '/';
-    return <Navigate to={redirectPath} replace />;
+    // User has the restricted position — redirect them away
+    if (restrictToPosition === 'head') {
+      return <Navigate to="/head-dashboard" replace />;
+    }
+    // For any other restricted position, send to home
+    return <Navigate to="/" replace />;
   }
 
   return children;

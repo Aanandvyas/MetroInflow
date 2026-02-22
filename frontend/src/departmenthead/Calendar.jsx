@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { 
-    ChevronLeftIcon, 
-    ChevronRightIcon, 
-    CalendarIcon, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    CalendarIcon,
     DocumentTextIcon,
     ShareIcon,
     ChartBarIcon,
@@ -26,20 +26,20 @@ const Calendar = () => {
     const [loading, setLoading] = useState(true);
     const { user, getUserProfile } = useAuth();
     const [userProfile, setUserProfile] = useState(null);
-    
+
     // Fetch files data from database
-    const fetchFilesData = async (departmentId) => {
+    const fetchFilesData = useCallback(async (departmentId) => {
         try {
             setLoading(true);
             const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
             const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-            
+
             // Format dates for SQL
             const startDate = startOfMonth.toISOString().split('T')[0];
             const endDate = endOfMonth.toISOString().split('T')[0];
-            
-           
-            
+
+
+
             // Fetch uploaded files from the department
             const { data: uploadedFiles, error: uploadError } = await supabase
                 .from('file')
@@ -52,8 +52,8 @@ const Calendar = () => {
                 .lte('created_at', endDate + 'T23:59:59');
 
             if (uploadError) throw uploadError;
-            
-           
+
+
 
             // Fetch shared files (files shared TO this department)
             const { data: sharedFiles, error: sharedError } = await supabase
@@ -68,9 +68,9 @@ const Calendar = () => {
                 .lte('created_at', endDate + 'T23:59:59');
 
             if (sharedError) throw sharedError;
-            
-            
-            
+
+
+
             // Now get user information for these files in a separate query
             if (sharedFiles && sharedFiles.length > 0) {
                 const fileIds = sharedFiles.filter(fileRef => fileRef.file).map(fileRef => fileRef.file.uuid);
@@ -79,9 +79,9 @@ const Calendar = () => {
                         .from('users')
                         .select('uuid, name, email, position')
                         .in('uuid', fileIds);
-                    
-                   
-                    
+
+
+
                     // Attach user info to the shared files
                     if (fileUsers && fileUsers.length > 0) {
                         sharedFiles.forEach(fileRef => {
@@ -109,29 +109,29 @@ const Calendar = () => {
                 .lte('created_at', endDate + 'T23:59:59');
 
             if (receivedError) throw receivedError;
-            
-           
-            
+
+
+
             // Filter files that are not from this department
             const filteredReceivedFiles = receivedFiles?.filter(fileRef => {
                 if (!fileRef.file || !fileRef.file.d_uuid) return true; // Keep if we can't determine origin
                 return fileRef.file.d_uuid !== departmentId; // Keep if from different department
             }) || [];
-            
+
             // Get user information for these files
             if (filteredReceivedFiles.length > 0) {
                 const fileUserIds = filteredReceivedFiles
                     .filter(fileRef => fileRef.file && fileRef.file.uuid)
                     .map(fileRef => fileRef.file.uuid);
-                    
+
                 if (fileUserIds.length > 0) {
                     const { data: fileUsers } = await supabase
                         .from('users')
                         .select('uuid, name, email, position, d_uuid')
                         .in('uuid', fileUserIds);
-                        
-                    
-                    
+
+
+
                     // Attach user info to the received files
                     if (fileUsers && fileUsers.length > 0) {
                         filteredReceivedFiles.forEach(fileRef => {
@@ -148,7 +148,7 @@ const Calendar = () => {
 
             // Process and organize data by date
             const processedData = {};
-            
+
             // Process uploaded files
             uploadedFiles?.forEach(file => {
                 const date = file.created_at.split('T')[0];
@@ -169,7 +169,7 @@ const Calendar = () => {
                         }
                     };
                 }
-                
+
                 processedData[date].uploads++;
                 // Add null check for users
                 if (file.users && file.users.name) {
@@ -177,10 +177,10 @@ const Calendar = () => {
                 } else {
                     processedData[date].users.add('Unknown User');
                 }
-                
+
                 // Get user name safely
                 const userName = file.users?.name || 'Unknown User';
-                
+
                 // Determine if this is an internal notification (within the department)
                 const isInternal = true; // Uploads are always considered internal
                 if (isInternal) {
@@ -189,23 +189,23 @@ const Calendar = () => {
                         id: file.f_uuid,
                         name: file.f_name,
                         size: file.f_size || 'Unknown',
-                        time: new Date(file.created_at).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
+                        time: new Date(file.created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
                         }),
                         user: userName,
                         type: 'internal',
                         action: 'uploaded'
                     });
                 }
-                
+
                 processedData[date].files.uploaded.push({
                     id: file.f_uuid,
                     name: file.f_name,
                     size: file.f_size || 'Unknown',
-                    time: new Date(file.created_at).toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
+                    time: new Date(file.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
                     }),
                     user: userName,
                     type: 'uploaded',
@@ -234,19 +234,19 @@ const Calendar = () => {
                         }
                     };
                 }
-                
+
                 processedData[date].shared++;
-                
+
                 // Add null check for file and users
                 if (file && file.users && file.users.name) {
                     processedData[date].users.add(file.users.name);
                 } else {
                     processedData[date].users.add('Unknown User');
                 }
-                
+
                 // Get user name safely
                 const userName = file?.users?.name || 'Unknown User';
-                
+
                 // Determine if this is an internal notification (within the department)
                 // A file shared by this department to another department is internal from our perspective
                 const isInternal = true; // Shared files are outgoing from this department
@@ -256,9 +256,9 @@ const Calendar = () => {
                         id: file?.f_uuid || fileRef.f_uuid,
                         name: file?.f_name || 'Unnamed File',
                         size: file?.f_size || 'Unknown',
-                        time: new Date(fileRef.created_at).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
+                        time: new Date(fileRef.created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
                         }),
                         user: userName,
                         sharedTo: 'Department',
@@ -266,14 +266,14 @@ const Calendar = () => {
                         action: 'shared'
                     });
                 }
-                
+
                 processedData[date].files.shared.push({
                     id: file?.f_uuid || fileRef.f_uuid,
                     name: file?.f_name || 'Unnamed File',
                     size: file?.f_size || 'Unknown',
-                    time: new Date(fileRef.created_at).toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
+                    time: new Date(fileRef.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
                     }),
                     sharedTo: 'Department',
                     user: userName,
@@ -303,20 +303,20 @@ const Calendar = () => {
                         }
                     };
                 }
-                
+
                 processedData[date].received++;
-                
+
                 // Add null check for file and users
                 if (file && file.users && file.users.name) {
                     processedData[date].users.add(file.users.name);
                 } else {
                     processedData[date].users.add('Unknown User');
                 }
-                
+
                 // Get user name safely
                 const userName = file?.users?.name || 'Unknown User';
                 const deptName = fileRef.department?.d_name || 'Unknown Department';
-                
+
                 // Determine if this is an external notification (from another department)
                 // Files received from other departments are always external
                 const isExternal = true; // Received files are incoming from other departments
@@ -326,9 +326,9 @@ const Calendar = () => {
                         id: file?.f_uuid || fileRef.f_uuid,
                         name: file?.f_name || 'Unnamed File',
                         size: file?.f_size || 'Unknown',
-                        time: new Date(fileRef.created_at).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
+                        time: new Date(fileRef.created_at).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
                         }),
                         user: userName,
                         from: deptName,
@@ -336,14 +336,14 @@ const Calendar = () => {
                         action: 'received'
                     });
                 }
-                
+
                 processedData[date].files.received.push({
                     id: file?.f_uuid || fileRef.f_uuid,
                     name: file?.f_name || 'Unnamed File',
                     size: file?.f_size || 'Unknown',
-                    time: new Date(fileRef.created_at).toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
+                    time: new Date(fileRef.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
                     }),
                     user: userName,
                     from: deptName,
@@ -358,21 +358,20 @@ const Calendar = () => {
             });
 
             setFilesData(processedData);
-            
+
         } catch (error) {
-            console.error('Error fetching files data:', error);
             setFilesData({});
             // You could add a toast notification here or show an error message to the user
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentDate]);
 
     // Generate monthly statistics for line graph
-    const generateMonthlyStats = () => {
+    const generateMonthlyStats = useCallback(() => {
         const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
         const stats = [];
-        
+
         for (let day = 1; day <= daysInMonth; day++) {
             const date = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const dayData = filesData[date] || { uploads: 0, shared: 0, received: 0, internal: 0, external: 0 };
@@ -387,7 +386,7 @@ const Calendar = () => {
             });
         }
         return stats;
-    };
+    }, [filesData, currentDate]);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -395,36 +394,35 @@ const Calendar = () => {
                 try {
                     const profile = await getUserProfile(user.id);
                     setUserProfile(profile);
-                    
+
                     // Only fetch files data if user is a department head and has a department
                     if (profile?.position === 'head' && profile?.d_uuid) {
                         await fetchFilesData(profile.d_uuid);
                     }
                 } catch (error) {
-                    console.error('Error fetching user profile:', error);
                 }
             }
         };
         fetchUserProfile();
-    }, [user, getUserProfile, currentDate]);
+    }, [user, getUserProfile, currentDate, fetchFilesData]);
 
     useEffect(() => {
         // Generate monthly stats whenever filesData changes
         setMonthlyStats(generateMonthlyStats());
-    }, [filesData, currentDate]);
+    }, [filesData, currentDate, generateMonthlyStats]);
 
     const daysInMonth = new Date(
         currentDate.getFullYear(),
         currentDate.getMonth() + 1,
         0
     ).getDate();
-    
+
     const firstDayOfMonth = new Date(
         currentDate.getFullYear(),
         currentDate.getMonth(),
         1
     ).getDay();
-    
+
     const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
@@ -453,12 +451,12 @@ const Calendar = () => {
 
     const renderDays = () => {
         const days = [];
-        
+
         // Add empty cells for days before the first day of the month
         for (let i = 0; i < firstDayOfMonth; i++) {
             days.push(<div key={`empty-${i}`} className="h-24"></div>);
         }
-        
+
         // Add cells for each day of the month
         for (let day = 1; day <= daysInMonth; day++) {
             const date = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -466,23 +464,22 @@ const Calendar = () => {
             const isSelected = selectedDate === date;
             const isToday = new Date().toDateString() === new Date(date).toDateString();
             const hasActivity = dayData.uploads > 0 || dayData.shared > 0 || dayData.received > 0;
-            
+
             days.push(
-                <div 
-                    key={day} 
+                <div
+                    key={day}
                     onClick={() => handleDateClick(day)}
-                    className={`h-24 p-2 border rounded-lg transition-all duration-200 cursor-pointer relative ${
-                        isSelected 
-                            ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-400' 
+                    className={`h-24 p-2 border rounded-lg transition-all duration-200 cursor-pointer relative ${isSelected
+                            ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-400'
                             : hasActivity
-                                ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                                ? 'bg-green-50 border-green-200 hover:bg-green-100'
                                 : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${isToday ? 'ring-2 ring-orange-400' : ''}`}
+                        } ${isToday ? 'ring-2 ring-orange-400' : ''}`}
                 >
                     <div className={`font-bold text-sm ${isToday ? 'text-orange-600' : 'text-gray-900'}`}>
                         {day}
                     </div>
-                    
+
                     {hasActivity && (
                         <div className="mt-1 grid grid-cols-2 gap-y-1 gap-x-0.5">
                             {dayData.uploads > 0 && (
@@ -527,24 +524,24 @@ const Calendar = () => {
                             )}
                         </div>
                     )}
-                    
+
                     {isToday && (
                         <div className="absolute top-1 right-1 w-2 h-2 bg-orange-400 rounded-full"></div>
                     )}
                 </div>
             );
         }
-        
+
         return days;
     };
 
     // File Modal Component
     const FileModal = () => {
         if (!showFileModal || !selectedDate || !filesData[selectedDate]) return null;
-        
+
         const dateData = filesData[selectedDate];
         const files = dateData.files || { uploaded: [], shared: [], received: [], internal: [], external: [] };
-        
+
         const getFilteredFiles = () => {
             switch (fileFilter) {
                 case 'uploaded':
@@ -565,9 +562,9 @@ const Calendar = () => {
                     ].sort((a, b) => a.time.localeCompare(b.time));
             }
         };
-        
+
         const filteredFiles = getFilteredFiles();
-        
+
         const getFileTypeIcon = (type) => {
             switch (type) {
                 case 'uploaded':
@@ -584,7 +581,7 @@ const Calendar = () => {
                     return <DocumentTextIcon className="h-5 w-5 text-gray-500" />;
             }
         };
-        
+
         const getFileTypeColor = (type) => {
             switch (type) {
                 case 'uploaded':
@@ -601,7 +598,7 @@ const Calendar = () => {
                     return 'bg-gray-50 border-gray-200';
             }
         };
-        
+
         const getFileTypeBadgeColor = (type) => {
             switch (type) {
                 case 'uploaded':
@@ -626,25 +623,25 @@ const Calendar = () => {
                     <div className="flex items-center justify-between p-6 border-b border-gray-200">
                         <div>
                             <h2 className="text-xl font-semibold text-gray-900">
-                                Files for {new Date(selectedDate).toLocaleDateString('en-US', { 
-                                    weekday: 'long', 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
+                                Files for {new Date(selectedDate).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
                                 })}
                             </h2>
                             <p className="text-sm text-gray-600 mt-1">
                                 {filteredFiles.length} file{filteredFiles.length !== 1 ? 's' : ''} found
                             </p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setShowFileModal(false)}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                         >
                             <XMarkIcon className="h-6 w-6 text-gray-500" />
                         </button>
                     </div>
-                    
+
                     {/* Filter Controls */}
                     <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                         <div className="flex items-center space-x-4">
@@ -661,11 +658,11 @@ const Calendar = () => {
                                 ].map(filter => {
                                     const Icon = filter.icon;
                                     const isActive = fileFilter === filter.key;
-                                    
+
                                     let buttonClass = 'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ';
                                     let iconBgClass = 'w-5 h-5 rounded-full mr-2 flex items-center justify-center ';
                                     let iconClass = 'h-3 w-3 ';
-                                    
+
                                     // Set appropriate colors based on filter type
                                     if (isActive) {
                                         if (filter.key === 'all') {
@@ -715,7 +712,7 @@ const Calendar = () => {
                                             iconClass += 'text-red-500';
                                         }
                                     }
-                                    
+
                                     return (
                                         <button
                                             key={filter.key}
@@ -732,13 +729,13 @@ const Calendar = () => {
                             </div>
                         </div>
                     </div>
-                    
+
                     {/* Files List */}
                     <div className="p-6 max-h-96 overflow-y-auto">
                         {filteredFiles.length > 0 ? (
                             <div className="space-y-3">
                                 {filteredFiles.map(file => (
-                                    <div 
+                                    <div
                                         key={file.id}
                                         className={`p-4 rounded-lg border ${getFileTypeColor(file.type)} hover:shadow-sm transition-shadow`}
                                     >
@@ -786,31 +783,31 @@ const Calendar = () => {
         const maxValue = Math.max(...monthlyStats.map(stat => stat.total));
         const graphHeight = 200;
         const graphWidth = 600;
-        
+
         const points = monthlyStats.map((stat, index) => {
             const x = (index / (monthlyStats.length - 1)) * graphWidth;
             const y = graphHeight - ((stat.total / maxValue) * graphHeight);
             return `${x},${y}`;
         }).join(' ');
-        
+
         const uploadPoints = monthlyStats.map((stat, index) => {
             const x = (index / (monthlyStats.length - 1)) * graphWidth;
             const y = graphHeight - ((stat.uploads / maxValue) * graphHeight);
             return `${x},${y}`;
         }).join(' ');
-        
+
         const sharedPoints = monthlyStats.map((stat, index) => {
             const x = (index / (monthlyStats.length - 1)) * graphWidth;
             const y = graphHeight - ((stat.shared / maxValue) * graphHeight);
             return `${x},${y}`;
         }).join(' ');
-        
+
         const internalPoints = monthlyStats.map((stat, index) => {
             const x = (index / (monthlyStats.length - 1)) * graphWidth;
             const y = graphHeight - ((stat.internal / maxValue) * graphHeight);
             return `${x},${y}`;
         }).join(' ');
-        
+
         const externalPoints = monthlyStats.map((stat, index) => {
             const x = (index / (monthlyStats.length - 1)) * graphWidth;
             const y = graphHeight - ((stat.external / maxValue) * graphHeight);
@@ -823,7 +820,7 @@ const Calendar = () => {
                     <ChartBarIcon className="h-6 w-6 text-purple-500 mr-2" />
                     <h3 className="text-lg font-semibold text-gray-900">Monthly File Activity</h3>
                 </div>
-                
+
                 <div className="flex justify-center">
                     <svg width={graphWidth + 40} height={graphHeight + 40} className="border border-gray-200 rounded">
                         {/* Grid lines */}
@@ -836,7 +833,7 @@ const Calendar = () => {
                                 </g>
                             );
                         })}
-                        
+
                         {/* Total files line */}
                         <polyline
                             fill="none"
@@ -847,7 +844,7 @@ const Calendar = () => {
                                 return `${parseInt(x) + 20},${parseInt(y) + 20}`;
                             }).join(' ')}
                         />
-                        
+
                         {/* Uploads line */}
                         <polyline
                             fill="none"
@@ -858,7 +855,7 @@ const Calendar = () => {
                                 return `${parseInt(x) + 20},${parseInt(y) + 20}`;
                             }).join(' ')}
                         />
-                        
+
                         {/* Shared files line */}
                         <polyline
                             fill="none"
@@ -869,7 +866,7 @@ const Calendar = () => {
                                 return `${parseInt(x) + 20},${parseInt(y) + 20}`;
                             }).join(' ')}
                         />
-                        
+
                         {/* Internal notifications line */}
                         <polyline
                             fill="none"
@@ -881,7 +878,7 @@ const Calendar = () => {
                                 return `${parseInt(x) + 20},${parseInt(y) + 20}`;
                             }).join(' ')}
                         />
-                        
+
                         {/* External notifications line */}
                         <polyline
                             fill="none"
@@ -893,7 +890,7 @@ const Calendar = () => {
                                 return `${parseInt(x) + 20},${parseInt(y) + 20}`;
                             }).join(' ')}
                         />
-                        
+
                         {/* Data points */}
                         {monthlyStats.map((stat, index) => {
                             const x = (index / (monthlyStats.length - 1)) * graphWidth + 20;
@@ -913,7 +910,7 @@ const Calendar = () => {
                         })}
                     </svg>
                 </div>
-                
+
                 {/* Legend */}
                 <div className="flex justify-center mt-4 flex-wrap gap-4">
                     <div className="flex items-center">
@@ -945,7 +942,7 @@ const Calendar = () => {
         <div className="max-w-7xl mx-auto mt-8 mb-8 p-6 space-y-6">
             {/* File Modal */}
             <FileModal />
-            
+
             {/* Loading State */}
             {loading && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
@@ -955,7 +952,7 @@ const Calendar = () => {
                     </div>
                 </div>
             )}
-            
+
             {/* Header */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex justify-between items-center mb-6">
@@ -976,14 +973,14 @@ const Calendar = () => {
                         </div>
                     </div>
                     <div className="flex space-x-2">
-                        <button 
+                        <button
                             onClick={prevMonth}
                             className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                         >
                             <ChevronLeftIcon className="h-4 w-4 mr-1" />
                             Previous
                         </button>
-                        <button 
+                        <button
                             onClick={nextMonth}
                             className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                         >
@@ -992,11 +989,11 @@ const Calendar = () => {
                         </button>
                     </div>
                 </div>
-                
+
                 <h2 className="text-2xl font-semibold text-center mb-6 text-gray-800">
                     {months[currentDate.getMonth()]} {currentDate.getFullYear()}
                 </h2>
-                
+
                 {/* Calendar Grid */}
                 <div className="grid grid-cols-7 gap-2 mb-4">
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -1006,10 +1003,10 @@ const Calendar = () => {
                             </div>
                         </div>
                     ))}
-                    
+
                     {!loading && renderDays()}
                 </div>
-                
+
                 {/* No Data Message */}
                 {!loading && Object.keys(filesData).length === 0 && (
                     <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -1018,7 +1015,7 @@ const Calendar = () => {
                         <p className="text-sm text-gray-500 mt-2">Files will appear here once your department starts uploading or sharing documents.</p>
                     </div>
                 )}
-                
+
                 {/* Legend */}
                 <div className="flex justify-center flex-wrap gap-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
                     <div className="flex items-center">
@@ -1074,14 +1071,14 @@ const Calendar = () => {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <h3 className="text-xl font-semibold mb-4 text-gray-900 flex items-center">
                         <DocumentTextIcon className="h-6 w-6 text-blue-500 mr-2" />
-                        Activity for {new Date(selectedDate).toLocaleDateString('en-US', { 
-                            weekday: 'long', 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
+                        Activity for {new Date(selectedDate).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
                         })}
                     </h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         {/* Statistics Cards */}
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1095,7 +1092,7 @@ const Calendar = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                             <div className="flex items-center">
                                 <ShareIcon className="h-8 w-8 text-green-500 mr-3" />
@@ -1107,7 +1104,7 @@ const Calendar = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                             <div className="flex items-center">
                                 <ArrowDownTrayIcon className="h-8 w-8 text-purple-500 mr-3" />
@@ -1119,7 +1116,7 @@ const Calendar = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                             <div className="flex items-center">
                                 <UsersIcon className="h-8 w-8 text-orange-500 mr-3" />
@@ -1132,7 +1129,7 @@ const Calendar = () => {
                             </div>
                         </div>
                     </div>
-                    
+
                     {/* View Files Button */}
                     <div className="mt-6 text-center">
                         <button
@@ -1143,14 +1140,14 @@ const Calendar = () => {
                             View All Files
                         </button>
                     </div>
-                    
+
                     {/* Active Users List */}
                     {filesData[selectedDate].users.length > 0 && (
                         <div className="mt-6">
                             <h4 className="text-lg font-medium text-gray-900 mb-3">Active Users</h4>
                             <div className="flex flex-wrap gap-2">
                                 {filesData[selectedDate].users.map((user, index) => (
-                                    <span 
+                                    <span
                                         key={index}
                                         className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
                                     >

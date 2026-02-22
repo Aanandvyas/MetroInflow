@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabaseClient";
 import { useFilter } from "../context/FilterContext";
-import { Link } from "react-router-dom";
-import { markNotificationAsSeen } from '../../utils/notificationUtils';
 
 const AllFiles = () => {
   const { user } = useAuth();
@@ -12,7 +10,7 @@ const AllFiles = () => {
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm] = useState("");
   const [allDepartmentFiles, setAllDepartmentFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -20,14 +18,15 @@ const AllFiles = () => {
   const [languages, setLanguages] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const observer = useRef();
   const lastFileElementRef = useCallback(node => {
     if (loading || loadingMore) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
-        loadMoreFiles();
+        // Simplified to avoid circular dependency
+        setPage(prev => prev + 1);
       }
     });
     if (node) observer.current.observe(node);
@@ -43,7 +42,6 @@ const AllFiles = () => {
         .select("d_uuid, d_name")
         .order("d_name", { ascending: true });
       if (error) {
-        console.error("Error fetching departments:", error.message);
         setDepartments([]);
       } else {
         setDepartments(data || []);
@@ -111,7 +109,6 @@ const AllFiles = () => {
 
     const { data: files, error: fileError, count } = await fileQuery;
     if (fileError) {
-      console.error("Error loading files:", fileError.message);
       if (pageNum === 1) {
         setAllDepartmentFiles([]);
       }
@@ -123,13 +120,15 @@ const AllFiles = () => {
     // Check if there are more files to load
     setHasMore(!!(count && count > to + 1));
 
-    // 2. Fetch all favorites for this user
+    // 2. Fetch only favorites matching the current page's files
     let favouriteIds = [];
-    if (user?.id) {
+    const currentFileIds = (files || []).map(f => f.f_uuid);
+    if (user?.id && currentFileIds.length > 0) {
       const { data: favs, error: favError } = await supabase
         .from("favorites")
         .select("f_uuid")
-        .eq("uuid", user.id);
+        .eq("uuid", user.id)
+        .in("f_uuid", currentFileIds);
       if (!favError && favs) {
         favouriteIds = favs.map(f => f.f_uuid);
       }
@@ -149,18 +148,10 @@ const AllFiles = () => {
     } else {
       setAllDepartmentFiles(filesWithFav);
     }
-    
+
     setLoading(false);
     setLoadingMore(false);
   }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm, FILES_PER_PAGE]);
-
-  const loadMoreFiles = useCallback(() => {
-    if (hasMore && !loading && !loadingMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchFiles(nextPage, true);
-    }
-  }, [page, hasMore, loading, loadingMore, fetchFiles]);
 
   useEffect(() => {
     fetchFiles(1, false);
@@ -188,7 +179,6 @@ const AllFiles = () => {
         ).sort((a, b) => a.localeCompare(b));
         setLanguages(langs);
       } catch (e) {
-        console.error("Error fetching languages:", e.message);
         setLanguages([]);
       }
     };
@@ -201,13 +191,13 @@ const AllFiles = () => {
     (allDepartmentFiles || []).forEach((file, index) => {
       const date = file.created_at
         ? new Date(file.created_at).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
         : "Unknown Date";
       if (!groups[date]) groups[date] = [];
-      
+
       // Add ref to the last element for infinite scroll
       if (index === allDepartmentFiles.length - 1) {
         groups[date].push({ ...file, isLast: true });
@@ -217,34 +207,6 @@ const AllFiles = () => {
     });
     return groups;
   }, [allDepartmentFiles]);
-
-  const toggleFavorite = async (f_uuid, isFavorite) => {
-    if (!user?.id) return;
-    // optimistic UI
-    setAllDepartmentFiles(prev =>
-      prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: !isFavorite } : f))
-    );
-    setFavBusy(prev => ({ ...prev, [f_uuid]: true }));
-    try {
-      if (isFavorite) {
-        const { error } = await supabase.from("favorites").delete()
-          .eq("uuid", user.id).eq("f_uuid", f_uuid);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("favorites")
-          .upsert({ uuid: user.id, f_uuid }, { onConflict: "uuid,f_uuid" });
-        if (error) throw error;
-      }
-    } catch (e) {
-      // revert on failure
-      setAllDepartmentFiles(prev =>
-        prev.map(f => (f.f_uuid === f_uuid ? { ...f, is_favorite: isFavorite } : f))
-      );
-      console.error("Favorite toggle failed:", e);
-    } finally {
-      setFavBusy(prev => ({ ...prev, [f_uuid]: false }));
-    }
-  };
 
   // Add this function inside the component
   const toggleImportant = async (f_uuid, currentlyImportant) => {
@@ -279,7 +241,6 @@ const AllFiles = () => {
         }
       }
     } catch (e) {
-      console.error("Important toggle failed:", e);
       // Revert on failure
       setAllDepartmentFiles((prev) =>
         prev.map((f) => (f.f_uuid === f_uuid ? { ...f, is_favorite: currentlyImportant } : f))
@@ -289,28 +250,8 @@ const AllFiles = () => {
     }
   };
 
-  // This prevents event propagation issues with Link
-  const handleViewClick = async (e, fileUuid) => {
-    e.preventDefault(); // Stop the link navigation temporarily
-    e.stopPropagation(); // Prevent any parent handlers
-    
-    if (user) {
-      try {
-        const success = await markNotificationAsSeen(fileUuid, user.id);
-        
-        // Now navigate programmatically
-        window.location.href = `/file/${fileUuid}`;
-      } catch (err) {
-        console.error("Error in view click handler:", err);
-        // If error, still navigate
-        window.location.href = `/file/${fileUuid}`;
-      }
-    } else {
-      // Just navigate if no user
-      window.location.href = `/file/${fileUuid}`;
-    }
-  };
-  
+
+
   return (
     <div className="p-8 bg-white min-h-full">
       <div className="flex items-center justify-between">
@@ -418,9 +359,8 @@ const AllFiles = () => {
                             type="button"
                             onClick={() => toggleImportant(file.f_uuid, file.is_favorite)}
                             disabled={!!favBusy[file.f_uuid]}
-                            className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
-                              file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
-                            } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
+                            className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
+                              } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
                             title={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
                             aria-label={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
                           >

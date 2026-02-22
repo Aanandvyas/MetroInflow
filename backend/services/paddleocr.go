@@ -1,3 +1,4 @@
+// in the main.go file the API request is adjusted for FE convenience
 package services
 
 import (

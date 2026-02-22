@@ -3,18 +3,13 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
   UsersIcon,
-  ClockIcon,
   PaperAirplaneIcon,
-  TagIcon,
   EnvelopeIcon,
-  CogIcon,
-  DocumentDuplicateIcon,
   ArchiveBoxIcon,
   ShieldCheckIcon,
   ShareIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
-import Calendar from '../../departmenthead/Calendar';
 import { CalendarIcon } from '@heroicons/react/20/solid';
 
 // ✅ Navigation items for regular users
@@ -35,7 +30,7 @@ const headNavItems = [
   { name: 'Notifications', path: '/notifications', icon: EnvelopeIcon },
   { name: 'Important', path: '/important', icon: ArchiveBoxIcon },
   { name: 'Confidential', path: '/confidential', icon: ShieldCheckIcon },
-  
+
 ];
 
 const Sidebar = () => {
@@ -52,7 +47,7 @@ const Sidebar = () => {
           const profile = await getUserProfile(user.id);
           setUserProfile(profile);
         } catch (error) {
-          console.error('Error fetching user profile:', error);
+          console.error('Failed to fetch user profile:', error);
         } finally {
           setLoading(false);
         }
@@ -93,16 +88,14 @@ const Sidebar = () => {
                 {/* ✅ Replaced <a> with <Link> */}
                 <Link
                   to={item.path}
-                  className={`flex items-center p-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
+                  className={`flex items-center p-2 rounded-lg text-sm font-medium transition-colors ${isActive
                       ? 'bg-blue-50 text-blue-600'
                       : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <item.icon
-                    className={`h-6 w-6 mr-3 ${
-                      isActive ? 'text-blue-600' : 'text-gray-500'
-                    }`}
+                    className={`h-6 w-6 mr-3 ${isActive ? 'text-blue-600' : 'text-gray-500'
+                      }`}
                     aria-hidden="true"
                   />
                   {item.name}

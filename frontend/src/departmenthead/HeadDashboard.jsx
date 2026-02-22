@@ -1,37 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
     DocumentTextIcon,
-    UserGroupIcon,
-    ClockIcon,
-    ChartBarIcon,
-    ShareIcon,
-    FolderIcon,
     BuildingOfficeIcon,
-    PlusIcon,
-    EllipsisHorizontalIcon,
-    MagnifyingGlassIcon,
-    BellIcon,
     ArrowUpTrayIcon,
     EyeIcon,
-    DocumentArrowDownIcon,
-    UsersIcon,
-    ClipboardDocumentListIcon,
-    CurrencyDollarIcon,
-    TrendingUpIcon,
-    TrendingDownIcon,
     XMarkIcon,
-    DocumentCheckIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
     ArrowRightIcon,
-    StarIcon,
-    ChevronDownIcon
+    StarIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import QuickShare from './QuickShare';
-import QuickShareBoard from './QuickShareBoard';
 import QuickShareIntegration from './QuickShareIntegration';
 
 // Department Grid Component for Collab Folders
@@ -47,23 +28,22 @@ const DepartmentGrid = () => {
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (!user?.id) {
-                console.warn("HeadDashboard: user.id is missing");
+
                 return;
             }
             try {
                 const profile = await getUserProfile(user.id);
-                
+
                 if (profile) {
                     setUserProfile(profile);
                 }
             } catch (err) {
-                console.error("Error fetching user profile:", err);
             }
         };
 
         fetchUserProfile();
     }, [user?.id, getUserProfile]);
-    
+
 
 
     useEffect(() => {
@@ -83,22 +63,21 @@ const DepartmentGrid = () => {
                 // Filter out the department that the current user belongs to
                 const filteredDepartments = departmentsData.filter(dept => dept.d_uuid !== userProfile.d_uuid);
 
-                
+
                 // Step 1: Get all shared files for the current user's department
                 const { data: fileDeptEntries, error: fileDeptError } = await supabase
                     .from('file_department')
                     .select('*')
                     .eq('d_uuid', userProfile.d_uuid);
-                
+
                 if (fileDeptError) {
-                    console.error("Error fetching file_department entries:", fileDeptError);
                     throw fileDeptError;
                 }
-                
 
-                
+
+
                 if (!fileDeptEntries || fileDeptEntries.length === 0) {
-    
+
                     setDepartments(filteredDepartments.map((dept, index) => ({
                         id: dept.d_uuid,
                         name: dept.d_name,
@@ -113,63 +92,60 @@ const DepartmentGrid = () => {
                     setLoading(false);
                     return;
                 }
-                
+
                 // Step 2: Get the details of all these files
                 const fileIds = fileDeptEntries.map(entry => entry.f_uuid);
-                
+
                 const { data: filesData, error: filesError } = await supabase
                     .from('file')
                     .select('*, users:uuid (*)')
                     .in('f_uuid', fileIds);
-                
+
                 if (filesError) {
-                    console.error("Error fetching file details:", filesError);
                     throw filesError;
                 }
-                
 
-                
+
+
                 // Step 3: Fetch information about all departments to look up source departments
                 const { data: allDepartments, error: allDeptsError } = await supabase
                     .from('department')
                     .select('*');
-                    
+
                 if (allDeptsError) {
-                    console.error("Error fetching all departments:", allDeptsError);
                     throw allDeptsError;
                 }
-                
+
                 // Create a lookup map of departments
                 const departmentMap = allDepartments.reduce((acc, dept) => {
                     acc[dept.d_uuid] = dept;
                     return acc;
                 }, {});
-                
+
                 // Create a map of department IDs to their names for easier reference
                 const deptIdToNameMap = {};
                 allDepartments.forEach(dept => {
                     deptIdToNameMap[dept.d_uuid] = dept.d_name;
                 });
-                
 
-                
+
+
                 // Step 4: Get the source department information for each file
                 // We need to get the original department (source) for each file
                 const { data: sourceFileDepts, error: sourceFileDeptsError } = await supabase
                     .from('file_department')
                     .select('f_uuid, d_uuid')
                     .in('f_uuid', fileIds);
-                    
+
                 if (sourceFileDeptsError) {
-                    console.error("Error fetching source departments:", sourceFileDeptsError);
                     throw sourceFileDeptsError;
                 }
-                
 
-                
+
+
                 // Create a map of file to source department
                 const fileSourceMap = {};
-                
+
                 // Group all entries by file ID to find all departments associated with each file
                 const fileToDeptsMap = {};
                 sourceFileDepts.forEach(entry => {
@@ -178,16 +154,16 @@ const DepartmentGrid = () => {
                     }
                     fileToDeptsMap[entry.f_uuid].push(entry.d_uuid);
                 });
-                
+
                 // For each file, determine the source department (the one that's not the user's department)
                 for (const [fileId, deptIds] of Object.entries(fileToDeptsMap)) {
                     // If there are multiple departments, find one that's not the user's department
                     const sourceDept = deptIds.find(deptId => deptId !== userProfile.d_uuid);
-                    
+
                     // If we found a non-user department, use it as the source
                     if (sourceDept) {
                         fileSourceMap[fileId] = sourceDept;
-                    } 
+                    }
                     // Otherwise, use the file's actual department from filesData
                     else {
                         const fileData = filesData.find(f => f.f_uuid === fileId);
@@ -196,22 +172,22 @@ const DepartmentGrid = () => {
                         }
                     }
                 }
-                
 
-                
+
+
                 // Step 5: If users are not loaded properly, fetch them separately
                 let usersData = {};
-                
+
                 // If the users aren't already included in the files data
                 if (filesData.length > 0 && (!filesData[0].users || !filesData[0].users.name)) {
                     const userIds = filesData.filter(f => f.uuid).map(f => f.uuid);
-                    
+
                     if (userIds.length > 0) {
                         const { data: users, error: usersError } = await supabase
                             .from('users')
                             .select('*')
                             .in('uuid', userIds);
-                        
+
                         if (!usersError && users) {
                             // Convert to a dictionary for easy lookup
                             usersData = users.reduce((acc, user) => {
@@ -221,18 +197,18 @@ const DepartmentGrid = () => {
                         }
                     }
                 }
-                
+
                 // Step 6: Join the file department entries with file details
                 const sharedFilesData = fileDeptEntries.map(fileDept => {
                     const fileDetails = filesData.find(f => f.f_uuid === fileDept.f_uuid);
                     if (!fileDetails) return null;
-                    
+
                     // Get the user info either from the joined data or our separately fetched data
                     const user = fileDetails.users || usersData[fileDetails.uuid];
-                    
+
                     // First try to get source from our map, then from the file itself
                     let sourceDeptId = fileSourceMap[fileDept.f_uuid];
-                    
+
                     // If no source department found, use the file's original department
                     if (!sourceDeptId && fileDetails) {
                         sourceDeptId = fileDetails.d_uuid;
@@ -241,10 +217,10 @@ const DepartmentGrid = () => {
                             sourceDeptId = null;
                         }
                     }
-                    
+
                     // If we have a department name, use it; otherwise mark as Unknown
                     const sourceDeptName = sourceDeptId ? deptIdToNameMap[sourceDeptId] || "Unknown Department" : "Unknown Department";
-                    
+
                     return {
                         fd_uuid: fileDept.fd_uuid,
                         f_uuid: fileDept.f_uuid,
@@ -258,41 +234,37 @@ const DepartmentGrid = () => {
                         }
                     };
                 }).filter(Boolean);
-                
 
-                
+
+
                 // Step 5: Group files by their source department
                 const filesBySourceDept = {};
-                
+
                 // Initialize all departments with empty file arrays
                 filteredDepartments.forEach(dept => {
                     filesBySourceDept[dept.d_uuid] = [];
                 });
-                
-                // Get the first department as a default for null or missing department IDs
-                const defaultDepartment = filteredDepartments.length > 0 ? filteredDepartments[0].d_uuid : null;
-                
+
                 // Always create an "Unknown" department for files that can't be assigned
-                let hasUnknownDept = true;
                 filesBySourceDept["unknown"] = [];
-                
+
                 // Organize files by the source department
                 sharedFilesData.forEach(fileData => {
                     // Use the source department we determined earlier
                     let sourceDeptId = fileData.source_d_uuid;
                     let sourceDeptName = fileData.source_dept_name || "Unknown Department";
-                    
 
-                    
+
+
                     // Get uploader info if available
                     let uploaderName = "Unknown";
                     let uploaderPosition = "Unknown";
-                    
+
                     if (fileData.file.uploader) {
                         uploaderName = fileData.file.uploader.name || "Unknown";
                         uploaderPosition = fileData.file.uploader.position || "Unknown";
                     }
-                    
+
                     // Handle department assignment logic 
                     if (!sourceDeptId) {
                         // No source department specified
@@ -310,7 +282,7 @@ const DepartmentGrid = () => {
                         sourceDeptId = "unknown";
                         sourceDeptName = "Unknown Source";
                     }
-                    
+
                     // Add file to appropriate department bucket
                     const fileEntry = {
                         fd_uuid: fileData.fd_uuid,
@@ -325,22 +297,22 @@ const DepartmentGrid = () => {
                         originalSourceId: fileData.source_d_uuid,
                         fileDeptId: fileData.file.d_uuid
                     };
-                    
+
 
                     filesBySourceDept[sourceDeptId].push(fileEntry);
                 });
-                
 
-                
+
+
                 // Generate department objects with their files and stats
                 let departmentsWithFiles = filteredDepartments.map((dept, index) => {
                     const deptFiles = filesBySourceDept[dept.d_uuid] || [];
-                    
+
                     // Count by approval status (using the new text-based status)
                     const pendingCount = deptFiles.filter(f => f.is_approved === 'pending' || f.is_approved === null).length;
                     const approvedCount = deptFiles.filter(f => f.is_approved === 'approved').length;
                     const rejectedCount = deptFiles.filter(f => f.is_approved === 'rejected').length;
-                    
+
                     return {
                         id: dept.d_uuid,
                         name: dept.d_name,
@@ -353,14 +325,14 @@ const DepartmentGrid = () => {
                         rejectedCount
                     };
                 });
-                
+
                 // Add Unknown department for files with missing department info if it exists
                 if (filesBySourceDept["unknown"] && filesBySourceDept["unknown"].length > 0) {
                     const unknownFiles = filesBySourceDept["unknown"];
                     const pendingCount = unknownFiles.filter(f => f.is_approved === 'pending' || f.is_approved === null).length;
                     const approvedCount = unknownFiles.filter(f => f.is_approved === 'approved').length;
                     const rejectedCount = unknownFiles.filter(f => f.is_approved === 'rejected').length;
-                    
+
                     departmentsWithFiles.push({
                         id: "unknown",
                         name: "Unknown Source",
@@ -372,31 +344,30 @@ const DepartmentGrid = () => {
                         approvedCount,
                         rejectedCount
                     });
-                    
+
 
                 }
-                
+
                 // Sort files within each department by date (newest first)
                 Object.keys(filesBySourceDept).forEach(deptId => {
-                    filesBySourceDept[deptId].sort((a, b) => 
+                    filesBySourceDept[deptId].sort((a, b) =>
                         new Date(b.createdAt) - new Date(a.createdAt)
                     );
                 });
-                
+
                 // Sort departments by number of files (most files first)
                 // But ensure "Unknown Source" is always at the end
                 departmentsWithFiles = departmentsWithFiles.sort((a, b) => {
                     // If one of them is the "Unknown Source" department
                     if (a.id === "unknown") return 1; // Move 'a' to the end
                     if (b.id === "unknown") return -1; // Move 'b' to the end
-                    
+
                     // For normal departments, sort by number of files
                     return b.totalFiles - a.totalFiles;
                 });
 
                 setDepartments(departmentsWithFiles);
             } catch (e) {
-                console.error("Error fetching departments:", e);
                 setError("Failed to load departments");
             } finally {
                 setLoading(false);
@@ -406,7 +377,7 @@ const DepartmentGrid = () => {
         if (userProfile?.d_uuid) {
             fetchDepartments();
         }
-    }, [userProfile?.d_uuid]);    
+    }, [userProfile?.d_uuid]);
 
     // Color palette for department cards
     const getColorForIndex = (index) => {
@@ -462,18 +433,18 @@ const DepartmentGrid = () => {
 
     // Check if there are any files in any department
     const totalFilesAcrossDepts = departments.reduce((total, dept) => total + dept.totalFiles, 0);
-    
+
     if (totalFilesAcrossDepts === 0) {
         return (
             <div className="text-gray-500 py-4 text-center bg-gray-50 rounded-lg border border-gray-200 p-6">
                 <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-700 mb-2">No Shared Files Found</h3>
                 <p className="text-sm text-gray-500 max-w-md mx-auto">
-                    There are no files shared with your department from other departments. 
+                    There are no files shared with your department from other departments.
                     Files will appear here when other departments share documents with you.
                 </p>
                 <p className="mt-4">
-                    <button 
+                    <button
                         className="text-blue-600 hover:text-blue-800 transition-colors font-medium flex items-center mx-auto"
                         onClick={() => window.location.reload()}
                     >
@@ -494,11 +465,10 @@ const DepartmentGrid = () => {
                     <button
                         onClick={scrollDeptLeft}
                         disabled={deptScrollIndex === 0}
-                        className={`p-1.5 rounded-full border shadow-sm ${
-                            deptScrollIndex === 0
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
-                        }`}
+                        className={`p-1.5 rounded-full border shadow-sm ${deptScrollIndex === 0
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                            }`}
                         aria-label="Scroll left"
                     >
                         <ChevronLeftIcon className="h-5 w-5" />
@@ -506,11 +476,10 @@ const DepartmentGrid = () => {
                     <button
                         onClick={scrollDeptRight}
                         disabled={deptScrollIndex >= departments.length - DEPT_ITEMS_PER_VIEW}
-                        className={`p-1.5 rounded-full border shadow-sm ${
-                            deptScrollIndex >= departments.length - DEPT_ITEMS_PER_VIEW
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
-                        }`}
+                        className={`p-1.5 rounded-full border shadow-sm ${deptScrollIndex >= departments.length - DEPT_ITEMS_PER_VIEW
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                            }`}
                         aria-label="Scroll right"
                     >
                         <ChevronRightIcon className="h-5 w-5" />
@@ -584,20 +553,7 @@ const HeadDashboard = () => {
     const navigate = useNavigate();
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [dashboardStats, setDashboardStats] = useState({
-        totalFiles: 0,
-        activeUsers: 0,
-        sharedFiles: 0,
-        pendingTasks: 0
-    });
-    const [recentDocuments, setRecentDocuments] = useState([]);
     const [importantDocuments, setImportantDocuments] = useState([]);
-    const [departmentFolders, setDepartmentFolders] = useState([]);
-    const [sharedFiles, setSharedFiles] = useState([]);
-    const [pendingFiles, setPendingFiles] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-
-
 
     // Upload modal states
     const [showUploadModal, setShowUploadModal] = useState(false);
@@ -614,7 +570,6 @@ const HeadDashboard = () => {
 
     // Horizontal scrolling states
     const [documentsScrollIndex, setDocumentsScrollIndex] = useState(0);
-    const [foldersScrollIndex, setFoldersScrollIndex] = useState(0);
     const ITEMS_PER_VIEW = 4;
 
     // Fetch user profile and department data
@@ -672,7 +627,7 @@ const HeadDashboard = () => {
                     }
 
                     setUserProfile(userData);
-                } catch (error) {
+                } catch (err) {
                     // Set fallback profile
                     setUserProfile({
                         id: user.id,
@@ -699,194 +654,19 @@ const HeadDashboard = () => {
 
             try {
                 setLoading(true);
-                const departmentId = userProfile.department_id;
 
-                // Simplified queries with error handling
-                try {
-                    // Get user's department ID
-                    const departmentId = userProfile.department_id;
-
-                    // Fetch total files in department using proper relationships
-                    const { data: departmentFiles, error: filesError } = await supabase
-                        .from('file')
-                        .select('f_uuid')
-                        .eq('d_uuid', departmentId);
-
-                    // Fetch active users in department
-                    const { data: usersData, error: usersError } = await supabase
-                        .from('users')
-                        .select('uuid')
-                        .eq('d_uuid', departmentId);
-
-                    // Fetch shared files (files that have been shared with this department)
-                    const { data: notificationFilesData, error: sharedError } = await supabase
-                        .from('notifications')
-                        .select('f_uuid, file:f_uuid(f_name, created_at, users:uuid(name))')
-                        .eq('uuid', user.id)
-                        .eq('is_seen', false);
-
-                    // Fetch pending notifications as tasks
-                    const { data: pendingNotifications, error: notifError } = await supabase
-                        .from('notifications')
-                        .select('notif_id')
-                        .eq('uuid', user.id)
-                        .eq('is_seen', false);
-
-                    // Set real stats
-                    setDashboardStats({
-                        totalFiles: departmentFiles?.length || 0,
-                        activeUsers: usersData?.length || 0,
-                        sharedFiles: notificationFilesData?.length || 0,
-                        pendingTasks: pendingNotifications?.length || 0
-                    });
-
-                    // Fetch recent documents from file table
-                    const { data: recentFiles, error: recentError } = await supabase
-                        .from('file')
-                        .select('f_uuid, f_name, created_at, language, users:uuid(name)')
-                        .eq('d_uuid', departmentId)
-                        .order('created_at', { ascending: false })
-                        .limit(4);
-
-                    if (recentFiles && recentFiles.length > 0) {
-                        setRecentDocuments(recentFiles);
-                    } else {
-                        setRecentDocuments([]);
-                    }
-
-                    // Fetch real shared files - files shared WITH this department FROM other departments
-                    const { data: sharedFilesData, error: sharedFilesError } = await supabase
-                        .from('file_department')
-                        .select(`
-                            f_uuid,
-                            created_at,
-                            status,
-                            file:f_uuid (
-                                f_name,
-                                created_at,
-                                d_uuid,
-                                users:uuid (
-                                    name,
-                                    d_uuid,
-                                    department:d_uuid (
-                                        d_name
-                                    )
-                                )
-                            )
-                        `)
-                        .eq('d_uuid', departmentId)
-                        .order('created_at', { ascending: false });
-
-                    if (sharedFilesData && sharedFilesData.length > 0) {
-                        // Filter out self-shares (files uploaded by the same department)
-                        const externalShares = sharedFilesData.filter(item => {
-                            const uploaderDepartment = item.file?.users?.d_uuid;
-                            const targetDepartment = departmentId;
-
-                            // Only include if uploader is from a different department
-                            return uploaderDepartment && uploaderDepartment !== targetDepartment;
-                        });
-
-                        // Separate pending and approved files
-                        const pendingFilesList = externalShares
-                            .filter(item => !item.status || item.status === 'pending')
-                            .map((item) => ({
-                                id: item.f_uuid,
-                                name: item.file?.f_name || 'Unknown File',
-                                sharedBy: item.file?.users?.name || 'Unknown User',
-                                dateShared: new Date(item.created_at).toLocaleDateString(),
-                                status: 'Pending',
-                                uploaderDepartment: item.file?.users?.d_uuid,
-                                fromDepartment: item.file?.users?.department?.d_name || 'Unknown Department'
-                            }));
-
-                        const approvedFilesList = externalShares
-                            .filter(item => item.status === 'approved')
-                            .map((item) => ({
-                                id: item.f_uuid,
-                                name: item.file?.f_name || 'Unknown File',
-                                sharedBy: item.file?.users?.name || 'Unknown User',
-                                dateShared: new Date(item.created_at).toLocaleDateString(),
-                                status: 'Approved',
-                                uploaderDepartment: item.file?.users?.d_uuid,
-                                fromDepartment: item.file?.users?.department?.d_name || 'Unknown Department'
-                            }));
-
-                        setPendingFiles(pendingFilesList);
-                        setSharedFiles(approvedFilesList);
-                    } else {
-                        setPendingFiles([]);
-                        setSharedFiles([]);
-                    }
-
-                } catch (dbError) {
-                    console.error('Database query error:', dbError);
-                    // Set empty arrays if database queries fail
-                    setDashboardStats({
-                        totalFiles: 0,
-                        activeUsers: 0,
-                        sharedFiles: 0,
-                        pendingTasks: 0
-                    });
-
-                    setRecentDocuments([]);
-                    setSharedFiles([]);
-                }
-
-                // Fetch real departments and their file counts
-                try {
-                    const { data: allDepartments, error: deptError } = await supabase
-                        .from('department')
-                        .select('d_uuid, d_name');
-
-                    if (allDepartments && allDepartments.length > 0) {
-                        // Get file counts for each department
-                        const departmentWithCounts = await Promise.all(
-                            allDepartments.map(async (dept) => {
-                                const { count, error } = await supabase
-                                    .from('file')
-                                    .select('f_uuid', { count: 'exact' })
-                                    .eq('d_uuid', dept.d_uuid);
-
-                                return {
-                                    id: dept.d_uuid,
-                                    name: dept.d_name,
-                                    description: `Files and documents for ${dept.d_name}`,
-                                    icon: <BuildingOfficeIcon className="h-8 w-8 text-blue-500" />,
-                                    count: count || 0
-                                };
-                            })
-                        );
-
-                        setDepartmentFolders(departmentWithCounts);
-                    } else {
-                        setDepartmentFolders([]);
-                    }
-                } catch (deptError) {
-                    console.error('Error fetching departments:', deptError);
-                    setDepartmentFolders([]);
-                }
+                // Dead queries removed — stats/recentDocuments/sharedFiles/departmentFolders
+                // were fetched here but never rendered. Re-add when the JSX needs them.
 
             } catch (error) {
-                console.error('Error fetching dashboard data:', error);
-                // Set empty data on error instead of mock data
-                setDashboardStats({
-                    totalFiles: 0,
-                    activeUsers: 0,
-                    sharedFiles: 0,
-                    pendingTasks: 0
-                });
-
-                setRecentDocuments([]);
-                setSharedFiles([]);
-                setDepartmentFolders([]);
+                // ignore stats on outer error - not rendered
             } finally {
                 setLoading(false);
             }
         };
 
         fetchDashboardData();
-    }, [userProfile]);
+    }, [userProfile, user?.id]);
 
     // Fetch departments for upload modal
     useEffect(() => {
@@ -895,7 +675,6 @@ const HeadDashboard = () => {
                 .from("department")
                 .select("d_uuid, d_name");
             if (error) {
-                console.error("Could not load departments:", error);
             } else {
                 setDepartments(data || []);
             }
@@ -941,7 +720,6 @@ const HeadDashboard = () => {
 
                 setImportantDocuments(ordered);
             } catch (e) {
-                console.error('Error fetching favorite documents:', e);
                 setImportantDocuments([]);
             }
         };
@@ -1006,28 +784,9 @@ const HeadDashboard = () => {
     };
 
     // Additional function aliases for modal compatibility
-    const handleFileSelect = (e) => {
-        const list = Array.from(e.target.files || []);
-        if (list.length === 0) return;
-        const newFiles = mergeFiles(files, list);
-        setFiles(newFiles);
 
-        // Clear title if multiple files are selected
-        if (newFiles.length > 1) {
-            setTitle("");
-        }
 
-        setUploadStatus({ message: "", type: "" });
-        e.target.value = "";
-    };
 
-    const removeFile = (index) => {
-        const newFiles = files.filter((_, i) => i !== index);
-        setFiles(newFiles);
-
-        // If removing files results in only one file, user can edit title again
-        // Title remains cleared for them to optionally set
-    };
 
     const filteredDepartments = departments.filter(dept =>
         dept && dept.d_name &&
@@ -1055,15 +814,6 @@ const HeadDashboard = () => {
         const totalItems = importantDocuments.length;
         const maxIndex = Math.max(0, totalItems - ITEMS_PER_VIEW);
         setDocumentsScrollIndex(prev => Math.min(maxIndex, prev + 1));
-    };
-
-    const scrollFoldersLeft = () => {
-        setFoldersScrollIndex(prev => Math.max(0, prev - 1));
-    };
-
-    const scrollFoldersRight = () => {
-        const maxIndex = Math.max(0, departmentFolders.length - ITEMS_PER_VIEW);
-        setFoldersScrollIndex(prev => Math.min(maxIndex, prev + 1));
     };
 
     const handleUploadSubmit = async (e) => {
@@ -1141,7 +891,7 @@ const HeadDashboard = () => {
                 if (joinError) throw joinError;
 
                 // Notify users in departments
-                const { data: usersInDepartments, error: usersError } = await supabase
+                const { data: usersInDepartments } = await supabase
                     .from("users")
                     .select("uuid")
                     .in("d_uuid", selectedDepartments.map(d => d.d_uuid));
@@ -1185,10 +935,8 @@ const HeadDashboard = () => {
                 );
 
                 if (!response.ok) {
-                    console.error("Backend summary request failed.");
                 }
             } catch (backendErr) {
-                console.error("Error sending files to summary backend:", backendErr);
             }
 
             setUploadStatus({
@@ -1218,29 +966,7 @@ const HeadDashboard = () => {
         }
     };
 
-    const formatFileSize = (bytes) => {
-        if (!bytes) return 'Unknown';
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        if (bytes === 0) return '0 Bytes';
-        const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-    };
 
-    const getFileTypeIcon = (filename) => {
-        const extension = filename?.split('.').pop()?.toLowerCase();
-        switch (extension) {
-            case 'pdf':
-                return <DocumentTextIcon className="h-6 w-6 text-red-500" />;
-            case 'doc':
-            case 'docx':
-                return <DocumentTextIcon className="h-6 w-6 text-blue-500" />;
-            case 'xls':
-            case 'xlsx':
-                return <DocumentTextIcon className="h-6 w-6 text-green-500" />;
-            default:
-                return <DocumentTextIcon className="h-6 w-6 text-gray-500" />;
-        }
-    };
 
     // Upload Modal Component
     const UploadModal = () => {
@@ -1450,10 +1176,10 @@ const HeadDashboard = () => {
                             {/* Status Message */}
                             {uploadStatus.message && (
                                 <div className={`p-3 rounded-lg ${uploadStatus.type === "success"
-                                        ? "bg-green-100 text-green-700"
-                                        : uploadStatus.type === "error"
-                                            ? "bg-red-100 text-red-700"
-                                            : "bg-blue-100 text-blue-700"
+                                    ? "bg-green-100 text-green-700"
+                                    : uploadStatus.type === "error"
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-blue-100 text-blue-700"
                                     }`}>
                                     {uploadStatus.message}
                                 </div>
@@ -1483,55 +1209,6 @@ const HeadDashboard = () => {
         );
     };
 
-    // Approval functions for pending files
-    const handleApproveFile = async (fileId) => {
-        try {
-            const { error } = await supabase
-                .from('file_department')
-                .update({ is_approved: 'approved' })
-                .eq('f_uuid', fileId)
-                .eq('d_uuid', userProfile?.department_id);
-
-            if (error) throw error;
-
-            // Move file from pending to shared files
-            setPendingFiles(prev => prev.filter(file => file.id !== fileId));
-
-            // Refresh shared files to include the newly approved file
-            const approvedFile = pendingFiles.find(file => file.id === fileId);
-            if (approvedFile) {
-                setSharedFiles(prev => [...prev, { ...approvedFile, status: 'Approved' }]);
-            }
-
-            // Show success message
-            alert('File approved successfully!');
-        } catch (error) {
-            console.error('Error approving file:', error);
-            alert('Error approving file. Please try again.');
-        }
-    };
-
-    const handleRejectFile = async (fileId) => {
-        try {
-            const { error } = await supabase
-                .from('file_department')
-                .update({ is_approved: 'rejected' })
-                .eq('f_uuid', fileId)
-                .eq('d_uuid', userProfile?.department_id);
-
-            if (error) throw error;
-
-            // Remove file from pending files
-            setPendingFiles(prev => prev.filter(file => file.id !== fileId));
-
-            // Show success message
-            alert('File rejected successfully!');
-        } catch (error) {
-            console.error('Error rejecting file:', error);
-            alert('Error rejecting file. Please try again.');
-        }
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -1543,7 +1220,7 @@ const HeadDashboard = () => {
         );
     }
 
-    
+
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -1570,8 +1247,8 @@ const HeadDashboard = () => {
                                     onClick={scrollDocumentsLeft}
                                     disabled={documentsScrollIndex === 0}
                                     className={`p-1.5 rounded-full border shadow-sm ${documentsScrollIndex === 0
-                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                                         }`}
                                     aria-label="Scroll left"
                                 >
@@ -1581,8 +1258,8 @@ const HeadDashboard = () => {
                                     onClick={scrollDocumentsRight}
                                     disabled={documentsScrollIndex >= (importantDocuments.length - ITEMS_PER_VIEW)}
                                     className={`p-1.5 rounded-full border shadow-sm ${documentsScrollIndex >= (importantDocuments.length - ITEMS_PER_VIEW)
-                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                                         }`}
                                     aria-label="Scroll right"
                                 >
@@ -1607,7 +1284,7 @@ const HeadDashboard = () => {
                                                 <DocumentTextIcon className="h-6 w-6" />
                                             </div>
                                             <div className="flex space-x-2">
-                                                <button 
+                                                <button
                                                     type="button"
                                                     onClick={() => window.open(`/file/${doc.f_uuid}`, "_blank", "noopener,noreferrer")}
                                                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md text-xs font-medium flex items-center"
@@ -1615,7 +1292,7 @@ const HeadDashboard = () => {
                                                     <EyeIcon className="h-3 w-3 mr-1" />
                                                     View
                                                 </button>
-                                                <button 
+                                                <button
                                                     className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-xs font-medium flex items-center"
                                                     onClick={() => {
                                                         navigate("/summary", { state: { f_uuid: doc.f_uuid } });
@@ -1655,7 +1332,7 @@ const HeadDashboard = () => {
                     <QuickShareIntegration userProfile={userProfile} />
                 </div>
 
-                
+
             </div>
 
             {/* Upload Modal Component */}

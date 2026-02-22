@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 
 const RoleManagement = () => {
@@ -17,6 +17,43 @@ const RoleManagement = () => {
     name: ''
   });
   const [notification, setNotification] = useState({ show: false, type: '', message: '' });
+
+  // Helper to show notifications
+  const showNotification = useCallback((type, message) => {
+    setNotification({
+      show: true,
+      type,
+      message
+    });
+    
+    // Auto-hide notification after a few seconds
+    setTimeout(() => {
+      setNotification({ show: false, type: '', message: '' });
+    }, type === 'error' ? 5000 : 3000);
+  }, []);
+
+  // Fetch roles for the selected department
+  const fetchRoles = useCallback(async (departmentId) => {
+    if (!departmentId) return;
+    
+    setLoadingRoles(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('role')
+        .select('r_uuid, r_name, d_uuid')
+        .eq('d_uuid', departmentId)
+        .order('r_name', { ascending: true });
+      
+      if (error) throw error;
+      
+      setRoles(data || []);
+    } catch (error) {
+      showNotification('error', `Error fetching roles: ${error.message}`);
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, [showNotification]);
 
   // Fetch departments
   useEffect(() => {
@@ -41,7 +78,6 @@ const RoleManagement = () => {
         }
         
       } catch (error) {
-        console.error('Error fetching departments:', error);
         showNotification('error', `Error fetching departments: ${error.message}`);
       } finally {
         setLoadingDepartments(false);
@@ -49,45 +85,7 @@ const RoleManagement = () => {
     };
     
     fetchDepartments();
-  }, []);
-
-  // Fetch roles for the selected department
-  const fetchRoles = async (departmentId) => {
-    if (!departmentId) return;
-    
-    setLoadingRoles(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('role')
-        .select('r_uuid, r_name, d_uuid')
-        .eq('d_uuid', departmentId)
-        .order('r_name', { ascending: true });
-      
-      if (error) throw error;
-      
-      setRoles(data || []);
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-      showNotification('error', `Error fetching roles: ${error.message}`);
-    } finally {
-      setLoadingRoles(false);
-    }
-  };
-
-  // Helper to show notifications
-  const showNotification = (type, message) => {
-    setNotification({
-      show: true,
-      type,
-      message
-    });
-    
-    // Auto-hide notification after a few seconds
-    setTimeout(() => {
-      setNotification({ show: false, type: '', message: '' });
-    }, type === 'error' ? 5000 : 3000);
-  };
+  }, [fetchRoles, showNotification]);
 
   // Handle department change
   const handleDepartmentChange = (e) => {
@@ -166,7 +164,6 @@ const RoleManagement = () => {
       // Close modal
       setShowAddRoleModal(false);
     } catch (error) {
-      console.error('Error adding role:', error);
       showNotification('error', `Error adding role: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -210,7 +207,6 @@ const RoleManagement = () => {
       // Close modal
       setShowEditRoleModal(false);
     } catch (error) {
-      console.error('Error updating role:', error);
       showNotification('error', `Error updating role: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -239,7 +235,6 @@ const RoleManagement = () => {
       // Close confirmation dialog
       setShowDeleteConfirm(false);
     } catch (error) {
-      console.error('Error deleting role:', error);
       showNotification('error', `Error deleting role: ${error.message}`);
     } finally {
       setIsSubmitting(false);
