@@ -3,7 +3,7 @@ import { useAuth } from './components/context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosition = null }) => {
-  const { user, getUserProfile } = useAuth();
+  const { user, getUserProfile, signOutUser } = useAuth();
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -12,17 +12,26 @@ const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosit
       if (user?.id) {
         try {
           const profile = await getUserProfile(user.id);
-          setUserProfile(profile);
+          if (profile) {
+            setUserProfile(profile);
+            setLoading(false);
+          } else {
+            // Profile missing - stale session
+            console.warn('Profile missing in RoleProtectedRoute. Signing out.');
+            await signOutUser();
+            // The redirection to login will be handled by ProtectedRoute or AuthContext state change
+          }
         } catch (error) {
           console.error('Failed to fetch user profile for role check:', error);
-        } finally {
           setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     };
 
     fetchUserProfile();
-  }, [user, getUserProfile]);
+  }, [user, getUserProfile, signOutUser]);
 
   if (loading) {
     return (
