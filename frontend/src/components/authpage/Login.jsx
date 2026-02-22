@@ -9,7 +9,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [isAdminLogin, setIsAdminLogin] = useState(false);
   const [username, setUsername] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,6 +33,10 @@ const Login = () => {
         if (error) {
           setError('Admin username not found');
         } else if (data && data.a_pass === password) {
+          // ⚠️ SECURITY WARNING: Plain-text password comparison.
+          // In a production environment, 'a_pass' should store a bcrypt/scrypt hash
+          // and comparison should happen using a verification library.
+
           // Store admin session in localStorage
           safeLocalStorage.setItem('adminSession', JSON.stringify({
             isAdmin: true,
@@ -50,7 +54,7 @@ const Login = () => {
         if (signInError) {
           setError(signInError.message);
         } else {
-        
+
           navigate('/'); // Correctly navigate to the root protected route
         }
       }
@@ -69,28 +73,26 @@ const Login = () => {
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
           <p className="mt-1 text-gray-500">Please sign in to access your account</p>
-          
+
           {/* Login Type Toggle */}
           <div className="flex justify-center mt-4 space-x-4">
             <button
               type="button"
               onClick={() => setIsAdminLogin(false)}
-              className={`px-4 py-2 text-sm font-medium rounded-md ${
-                !isAdminLogin
+              className={`px-4 py-2 text-sm font-medium rounded-md ${!isAdminLogin
                   ? 'bg-indigo-600 text-white'
                   : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              }`}
+                }`}
             >
               User Login
             </button>
             <button
               type="button"
               onClick={() => setIsAdminLogin(true)}
-              className={`px-4 py-2 text-sm font-medium rounded-md ${
-                isAdminLogin
+              className={`px-4 py-2 text-sm font-medium rounded-md ${isAdminLogin
                   ? 'bg-indigo-600 text-white'
                   : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              }`}
+                }`}
             >
               Admin Login
             </button>
@@ -99,7 +101,7 @@ const Login = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           {isAdminLogin ? (
             /* Admin Login Fields */
             <>

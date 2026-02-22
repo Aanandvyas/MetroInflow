@@ -4,47 +4,30 @@ import { useNavigate } from "react-router-dom";
 import { UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 
 const Profile = () => {
-    const { user, getUserProfile, signOutUser, loading: authLoading } = useAuth();
+    const { user, userProfile: profile, signOutUser, loading: authLoading } = useAuth();
     const navigate = useNavigate();
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const fetchData = async () => {
-            // Wait for auth to finish loading
-            if (authLoading) return;
+        if (authLoading) return;
 
-            // If no user after auth loading is complete, redirect to login
-            if (!user) {
-                navigate('/login');
-                return;
-            }
+        if (!user) {
+            navigate('/login');
+            return;
+        }
 
-            try {
-                const profileData = await getUserProfile(user.id);
-                if (profileData) {
-                    setProfile(profileData);
-                } else {
-                    // Profile not found in database even though auth session exists
-                    console.warn("Profile not found for session user. Signing out.");
-                    setError("Your profile could not be found. Signing out to refresh session...");
+        if (!profile && !authLoading) {
+            // Profile missing in database even though auth session exists
+            console.warn("Profile not found for session user. Signing out.");
+            setError("Your profile could not be found. Signing out to refresh session...");
 
-                    // Delay signout slightly so user can see the message
-                    setTimeout(async () => {
-                        await signOutUser();
-                        navigate('/login', { replace: true });
-                    }, 2000);
-                }
-            } catch (err) {
-                setError("Failed to load profile data.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [user, getUserProfile, navigate, authLoading]);
+            setTimeout(async () => {
+                await signOutUser();
+                navigate('/login', { replace: true });
+            }, 2000);
+        }
+    }, [user, profile, navigate, authLoading, signOutUser]);
 
     const handleSignOut = async () => {
         await signOutUser();

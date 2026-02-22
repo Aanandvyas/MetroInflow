@@ -3,16 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { FolderIcon, PlusIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "../context/AuthContext";
+import { toDateKey, formatDateLabel, formatTime, isToday } from "../../utils/dateUtils";
 
 const HomePage = () => {
-  const { user } = useAuth();
+  const { user, userProfile: authProfile } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recentFiles, setRecentFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(true);
 
   const [recentNotifications, setRecentNotifications] = useState([]);
-  const [userDeptIds, setUserDeptIds] = useState([]);
   const navigate = useNavigate();
 
 
@@ -66,81 +66,28 @@ const HomePage = () => {
     fetchRecentFiles();
   }, []); // run once; always top 10 latest
 
-  // Fetch departments and initial counts
+  // Fetch departments
   useEffect(() => {
     const fetchDepartments = async () => {
-      if (!user?.id) return;
       setLoading(true);
-
       const { data, error } = await supabase
         .from("department")
         .select("d_uuid, d_name");
       if (error) {
         setDepartments([]);
-        setLoading(false);
-        return;
+      } else {
+        setDepartments(data || []);
       }
-      setDepartments(data || []);
-
-      // Get user's department
-      let userDeptId = null;
-      const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
-      userDeptId = profile?.d_uuid;
-
-      // Count files differently for user's own dept vs other depts
-      const { data: links, error: linksErr } = await supabase
-        .from("file_department")
-        .select(`
-          d_uuid,
-          file:f_uuid(
-            uuid,
-            users:uuid(d_uuid)
-          )
-        `)
-        .eq("is_approved", "approved");
-      if (linksErr) {
-        setLoading(false);
-        return;
-      }
-
-      const counts = {};
-      (links || []).forEach((row) => {
-        const senderDeptId = row.file?.users?.d_uuid;
-        const receiverDeptId = row.d_uuid;
-
-        if (receiverDeptId === userDeptId) {
-          if (senderDeptId === userDeptId) {
-            // Own department files - count under own department
-            counts[userDeptId] = (counts[userDeptId] || 0) + 1;
-          } else {
-            // Files from other departments - count under sender department
-            counts[senderDeptId] = (counts[senderDeptId] || 0) + 1;
-          }
-        }
-      });
       setLoading(false);
     };
     fetchDepartments();
-  }, [user?.id]);
+  }, []);
 
-  // Load user's departments once
-  useEffect(() => {
-    const loadUserDepts = async () => {
-      if (!user?.id) return;
-      const { data: mapRows, error: mapErr } = await supabase
-        .from("user_department")
-        .select("d_uuid")
-        .eq("uuid", user.id);
-      if (!mapErr && mapRows?.length) {
-        setUserDeptIds(mapRows.map((r) => r.d_uuid));
-        return;
-      }
-      const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
-      if (profile?.d_uuid) setUserDeptIds([profile.d_uuid]);
-      else setUserDeptIds([]);
-    };
-    loadUserDepts();
-  }, [user?.id]);
+  const userDeptIds = useMemo(() => {
+    if (!authProfile) return [];
+    if (authProfile.d_uuid) return [authProfile.d_uuid];
+    return [];
+  }, [authProfile]);
 
   // Realtime: new/removed files and file_department links
   useEffect(() => {
@@ -244,25 +191,6 @@ const HomePage = () => {
     };
   }, [user?.id]);
 
-  // Helpers for grouping and formatting
-  const toDateKey = (iso) => {
-    const d = new Date(iso);
-    // normalize to local date key
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-  const formatDateLabel = (key) => {
-    const [y, m, dm] = key.split("-").map(Number);
-    const target = new Date(y, m - 1, dm);
-    const today = new Date();
-    const yday = new Date(today);
-    yday.setDate(today.getDate() - 1);
-    const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-    if (sameDay(target, today)) return "Today";
-    if (sameDay(target, yday)) return "Yesterday";
-    return target.toLocaleDateString();
-  };
-  const formatTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
   const groupedNotifications = useMemo(() => {
     const map = new Map();
     for (const n of recentNotifications) {
@@ -279,13 +207,6 @@ const HomePage = () => {
       items: map.get(key).sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
     }));
   }, [recentNotifications]);
-
-  // Helper: is date today?
-  const isToday = (iso) => {
-    const d = new Date(iso);
-    const t = new Date();
-    return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
-  };
 
   // Today’s notifications for user’s departments (initial + realtime)
   useEffect(() => {
