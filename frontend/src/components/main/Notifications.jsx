@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useNotificationCount } from '../context/NotificationContext';
-import { 
-  DocumentTextIcon, 
-  BellIcon, 
+import {
+  DocumentTextIcon,
+  BellIcon,
   ArrowPathIcon,
   ExclamationCircleIcon,
   CalendarIcon,
@@ -28,14 +28,14 @@ const formatDate = (dateStr) => {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   // Compare dates ignoring time
   const isToday = date.toDateString() === today.toDateString();
   const isYesterday = date.toDateString() === yesterday.toDateString();
-  
+
   if (isToday) return "Today";
   if (isYesterday) return "Yesterday";
-  
+
   // For other dates, return formatted date
   return date.toLocaleDateString();
 };
@@ -74,7 +74,7 @@ const Notifications = () => {
       // Update the file_department record
       const { error: updateError } = await supabase
         .from('file_department')
-        .update({ 
+        .update({
           is_approved: action === 'accept' ? 'approved' : 'rejected'
         })
         .eq('f_uuid', fileId)
@@ -88,7 +88,7 @@ const Notifications = () => {
       // Update the notification to mark it as processed
       const { error: notificationError } = await supabase
         .from('notifications')
-        .update({ 
+        .update({
           is_seen: true,
           is_sent: action === 'accept' ? true : false
         })
@@ -98,28 +98,28 @@ const Notifications = () => {
       }
 
       // If approved, create notifications for all department members
-      if (action === 'accept') {        
+      if (action === 'accept') {
         // Get all users in the department (excluding the head who approved)
         const { data: allDeptUsers, error: usersError } = await supabase
           .from('users')
           .select('uuid, name, position')
           .eq('d_uuid', userDepartmentId);
 
-        
+
         if (!usersError && allDeptUsers && allDeptUsers.length > 0) {
           const staffMembers = allDeptUsers.filter(u => u.uuid !== user.id);
-          
+
           for (const staff of staffMembers) {
-            
+
             // Delete any existing notifications for this file/user combination
             await supabase
               .from('notifications')
               .delete()
               .eq('f_uuid', fileId)
               .eq('uuid', staff.uuid);
-            
+
             // Create fresh notification
-            const { error: createError } = await supabase
+            await supabase
               .from('notifications')
               .insert({
                 uuid: staff.uuid,
@@ -128,31 +128,31 @@ const Notifications = () => {
                 is_sent: true,
                 created_at: new Date().toISOString()
               });
-            
-            
+
+
           }
         }
-        
+
         // Broadcast approval to all connected clients
         const { error: broadcastError } = await supabase
           .channel('file-approvals')
           .send({
             type: 'broadcast',
             event: 'file_approved',
-            payload: { 
-              file_id: fileId, 
-              department_id: userDepartmentId 
+            payload: {
+              file_id: fileId,
+              department_id: userDepartmentId
             }
           });
-        
+
         if (broadcastError) {
         }
-        
+
         // Also trigger ensure function multiple times for broader coverage
         setTimeout(() => {
           ensureTodaysNotifications();
         }, 500);
-        
+
         setTimeout(() => {
           ensureTodaysNotifications();
           fetchNotifications();
@@ -161,7 +161,7 @@ const Notifications = () => {
 
       // Refresh notifications
       fetchNotifications();
-      
+
     } catch (err) {
       setError(`Error ${action}ing file: ${err.message}`);
     } finally {
@@ -175,7 +175,7 @@ const Notifications = () => {
 
   // Function to ensure notifications exist for today's files.
   // Important: Keep side-effects out of the fetch loop to avoid realtime feedback loops.
-  const ensureTodaysNotifications = async () => {
+  const ensureTodaysNotifications = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -248,7 +248,7 @@ const Notifications = () => {
         const fourDaysAgo = new Date();
         fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
         const fourDaysAgoStr = fourDaysAgo.toISOString();
-        
+
         const { data: approvedExternalFiles } = await supabase
           .from('file_department')
           .select(`
@@ -286,7 +286,7 @@ const Notifications = () => {
                 is_sent: true,
                 created_at: new Date().toISOString()
               });
-            
+
             if (insertError) {
             }
           } else {
@@ -297,7 +297,7 @@ const Notifications = () => {
               .eq('uuid', user.id)
               .eq('is_seen', true)
               .eq('is_sent', true);
-            
+
             if (updateError) {
             }
           }
@@ -329,10 +329,10 @@ const Notifications = () => {
       }
     } catch (err) {
     }
-  };
+  }, [user?.id]);
 
   // Fetch notifications function
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!user?.id) {
       setItems([]);
       updateNotificationCount(0);
@@ -350,7 +350,7 @@ const Notifications = () => {
         .select('d_uuid, position')
         .eq('uuid', user.id)
         .single();
-      
+
       if (userError) {
         setError(`User profile error: ${userError.message}`);
         updateNotificationCount(0);
@@ -360,16 +360,16 @@ const Notifications = () => {
 
       const userDepartmentId = userData?.d_uuid;
       const isHead = userData?.position === 'head';
-      
+
       // Calculate date 4 days ago
       const fourDaysAgo = new Date();
       fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
       fourDaysAgo.setHours(0, 0, 0, 0);
       const fourDaysAgoStr = fourDaysAgo.toISOString();
-      
+
       // Different queries based on user role
       let notificationsQuery;
-      
+
       if (isHead) {
         // Department heads see both regular notifications and pending approvals
         notificationsQuery = supabase
@@ -390,17 +390,17 @@ const Notifications = () => {
           .gte('created_at', fourDaysAgoStr)
           .order('created_at', { ascending: false });
       }
-      
+
       const { data, error } = await notificationsQuery;
-      
-      
+
+
       if (error) {
         setError(`Database error: ${error.message}`);
         updateNotificationCount(0);
         setLoading(false);
         return;
       }
-      
+
       if (!data || data.length === 0) {
         setItems([]);
         updateNotificationCount(0);
@@ -425,22 +425,22 @@ const Notifications = () => {
           )
         `)
         .in('f_uuid', fileIds);
-      
+
       if (fileError) {
         setError(`File data error: ${fileError.message}`);
         updateNotificationCount(0);
         setLoading(false);
         return;
       }
-      
+
       // Create a map for quick lookup
       const fileMap = {};
       (fileData || []).forEach(file => {
         fileMap[file.f_uuid] = file;
       });
-      
-     
-      
+
+
+
       // Deduplicate notifications so only the latest per file is shown
       const sortedByNewest = (data || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       const seenFiles = new Set();
@@ -456,41 +456,41 @@ const Notifications = () => {
       const notificationItems = latestPerFile
         .filter(notification => {
           const file = fileMap[notification.f_uuid];
-          
-          
+
+
           if (!file) return false;
-          
+
           // Files from user's own department are always visible
           if (file.d_uuid === userDepartmentId) return true;
-          
+
           // For pending approval notifications (is_sent = null), only show to heads
           if (notification.is_sent === null) {
             return isHead;
           }
-          
+
           // For approved files (is_sent = true), show to all users
           if (notification.is_sent === true) {
             // If it's from same department, always show
             if (file.d_uuid === userDepartmentId) return true;
-            
+
             // If it's from external department, check if it was shared and approved
             if (isHead) return true;
-            
+
             // For staff, check if file was shared with their department and approved
-            const sharedWithDept = file.file_department?.find(fd => 
+            const sharedWithDept = file.file_department?.find(fd =>
               fd.d_uuid === userDepartmentId && fd.is_approved === 'approved'
             );
-            
+
             return !!sharedWithDept;
           }
-          
+
           return false;
         })
         .map(notification => {
           const file = fileMap[notification.f_uuid];
           const isFromSameDept = file.d_uuid === userDepartmentId;
           const isPendingApproval = notification.is_sent === null && !isFromSameDept;
-          
+
           return {
             notif_id: notification.notif_id,
             f_uuid: notification.f_uuid,
@@ -504,7 +504,7 @@ const Notifications = () => {
             is_sent: notification.is_sent
           };
         });
-      
+
       // Group by date for display
       const groups = {};
       notificationItems.forEach(item => {
@@ -512,10 +512,10 @@ const Notifications = () => {
         if (!groups[group]) groups[group] = [];
         groups[group].push(item);
       });
-      
+
       setDateGroups(groups);
       setItems(notificationItems);
-      
+
       // Update the notification count in the context
       updateNotificationCount(notificationItems.length);
     } catch (err) {
@@ -524,27 +524,27 @@ const Notifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, updateNotificationCount]);
 
   useEffect(() => {
     fetchNotifications();
-    
+
     // Set up real-time listeners
     const channel = supabase
       .channel('notifications-changes')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `uuid=eq.${user?.id}` },
         () => {
           fetchNotifications();
         }
       )
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `uuid=eq.${user?.id}` },
         () => {
           fetchNotifications();
         }
       )
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'file_department' },
         (payload) => {
           // When a file is approved, refresh notifications and ensure coverage
@@ -558,7 +558,7 @@ const Notifications = () => {
           }
         }
       )
-      .on('broadcast', 
+      .on('broadcast',
         { event: 'file_approved' },
         (payload) => {
           // When any file is approved, refresh notifications for all users
@@ -569,11 +569,11 @@ const Notifications = () => {
         }
       )
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, fetchNotifications, ensureTodaysNotifications]);
 
   // Initialize notification count when component mounts
   useEffect(() => {
@@ -584,7 +584,7 @@ const Notifications = () => {
   useEffect(() => {
     if (!user?.id) return;
     ensureTodaysNotifications();
-  }, [user?.id]);
+  }, [user?.id, ensureTodaysNotifications]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -593,7 +593,7 @@ const Notifications = () => {
           <BellIcon className="h-6 w-6 text-gray-700" />
           Notifications
         </h1>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
         >
@@ -601,22 +601,22 @@ const Notifications = () => {
           Refresh
         </button>
       </div>
-      
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 flex items-start gap-3">
           <ExclamationCircleIcon className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-medium">Error loading notifications</p>
             <p className="text-sm mt-1">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 underline">
               Try Again
             </button>
           </div>
         </div>
       )}
-      
+
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 bg-white rounded-lg border border-gray-200 shadow-sm">
           <span
@@ -645,8 +645,8 @@ const Notifications = () => {
               </div>
               <ul className="divide-y divide-gray-100">
                 {groupItems.map(file => (
-                  <li 
-                    key={`${file.f_uuid}-${file.created_at}`} 
+                  <li
+                    key={`${file.f_uuid}-${file.created_at}`}
                     className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -689,7 +689,7 @@ const Notifications = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                       {file.isPendingApproval ? (
                         <>

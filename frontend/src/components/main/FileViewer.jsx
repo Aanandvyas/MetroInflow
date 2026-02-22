@@ -11,23 +11,23 @@ const FileViewer = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const location = useLocation();
-  
+
   // Check if this view was initiated from a notification
   const fromNotification = new URLSearchParams(location.search).get('from') === 'notification';
 
   useEffect(() => {
     const fetchAndDownload = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        
+
         // Fetch file info from DB
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('file')
           .select('f_name, file_path')
           .eq('f_uuid', uuid)
           .single();
 
-        if (error || !data) {
+        if (fetchError || !data) {
           setError('File not found in database.');
           return;
         }
@@ -41,10 +41,12 @@ const FileViewer = () => {
               .from('notifications')
               .update({ is_seen: true })
               .match({ f_uuid: uuid, uuid: user.id });
-              
+
             if (markError) {
+              console.error('Failed to mark notification as seen:', markError);
             }
           } catch (err) {
+            console.error('Error marking notification as seen:', err);
           }
         }
 
@@ -67,6 +69,7 @@ const FileViewer = () => {
         link.click();
         document.body.removeChild(link);
       } catch (err) {
+        console.error('FileViewer error:', err);
         setError('An error occurred while processing your request.');
       } finally {
         setLoading(false);
@@ -80,10 +83,15 @@ const FileViewer = () => {
     <div className="p-8 flex flex-col items-center justify-center min-h-[300px]">
       {error ? (
         <div className="text-red-500 font-medium">{error}</div>
-      ) : (
+      ) : loading ? (
         <div>
           <div className="animate-pulse text-lg text-gray-700">Preparing your download...</div>
           <p className="mt-2 text-sm text-gray-500">The file should download automatically.</p>
+        </div>
+      ) : (
+        <div>
+          <div className="text-lg text-green-600 font-medium">Download started!</div>
+          <p className="mt-2 text-sm text-gray-500">If the download didn't start, try refreshing the page.</p>
         </div>
       )}
     </div>
@@ -91,4 +99,3 @@ const FileViewer = () => {
 };
 
 export default FileViewer;
-

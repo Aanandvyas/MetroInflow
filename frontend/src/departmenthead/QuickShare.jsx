@@ -116,7 +116,7 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
             };
             
             // Insert entry into quick_share table
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('quick_share')
                 .insert([
                     {

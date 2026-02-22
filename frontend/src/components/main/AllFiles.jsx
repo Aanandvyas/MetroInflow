@@ -18,7 +18,7 @@ const AllFiles = () => {
   const [languages, setLanguages] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const observer = useRef();
   const lastFileElementRef = useCallback(node => {
     if (loading || loadingMore) return;
@@ -120,13 +120,15 @@ const AllFiles = () => {
     // Check if there are more files to load
     setHasMore(!!(count && count > to + 1));
 
-    // 2. Fetch all favorites for this user
+    // 2. Fetch only favorites matching the current page's files
     let favouriteIds = [];
-    if (user?.id) {
+    const currentFileIds = (files || []).map(f => f.f_uuid);
+    if (user?.id && currentFileIds.length > 0) {
       const { data: favs, error: favError } = await supabase
         .from("favorites")
         .select("f_uuid")
-        .eq("uuid", user.id);
+        .eq("uuid", user.id)
+        .in("f_uuid", currentFileIds);
       if (!favError && favs) {
         favouriteIds = favs.map(f => f.f_uuid);
       }
@@ -146,7 +148,7 @@ const AllFiles = () => {
     } else {
       setAllDepartmentFiles(filesWithFav);
     }
-    
+
     setLoading(false);
     setLoadingMore(false);
   }, [user, selectedDepartment, selectedLanguage, searchTerm, globalSearchTerm, FILES_PER_PAGE]);
@@ -189,13 +191,13 @@ const AllFiles = () => {
     (allDepartmentFiles || []).forEach((file, index) => {
       const date = file.created_at
         ? new Date(file.created_at).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
         : "Unknown Date";
       if (!groups[date]) groups[date] = [];
-      
+
       // Add ref to the last element for infinite scroll
       if (index === allDepartmentFiles.length - 1) {
         groups[date].push({ ...file, isLast: true });
@@ -249,7 +251,7 @@ const AllFiles = () => {
   };
 
 
-  
+
   return (
     <div className="p-8 bg-white min-h-full">
       <div className="flex items-center justify-between">
@@ -357,9 +359,8 @@ const AllFiles = () => {
                             type="button"
                             onClick={() => toggleImportant(file.f_uuid, file.is_favorite)}
                             disabled={!!favBusy[file.f_uuid]}
-                            className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${
-                              file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
-                            } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
+                            className={`inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium ${file.is_favorite ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-500 hover:bg-purple-600"
+                              } text-white ${favBusy[file.f_uuid] ? "opacity-60 cursor-not-allowed" : ""}`}
                             title={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
                             aria-label={file.is_favorite ? "Unmark as Important" : "Mark as Important"}
                           >

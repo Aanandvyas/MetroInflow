@@ -1,0 +1,8 @@
+﻿Creating an optimized production build...
+Failed to compile.
+
+[eslint] 
+src\departmenthead\HeadDashboard.jsx
+Syntax error: Missing catch or finally clause. (655:12) (655:12)
+
+

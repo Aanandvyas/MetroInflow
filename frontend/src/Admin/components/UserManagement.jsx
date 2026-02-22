@@ -229,7 +229,7 @@ const UserManagement = () => {
       }
       
       // Delete the user from the database
-      const { error } = await supabase
+      await supabase
         .from('users')
         .delete()
         .eq('uuid', userToDelete.uuid);

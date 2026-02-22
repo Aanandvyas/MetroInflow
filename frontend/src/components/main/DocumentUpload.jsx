@@ -30,7 +30,7 @@ const DocumentUpload = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user?.id) return;
-      
+
       const { data, error } = await supabase
         .from("users")
         .select(`
@@ -40,7 +40,7 @@ const DocumentUpload = () => {
         `)
         .eq("uuid", user.id)
         .single();
-        
+
       if (error) {
         setStatus({ message: "Could not load user profile.", type: "error" });
       } else {
@@ -48,7 +48,7 @@ const DocumentUpload = () => {
       }
       setLoadingProfile(false);
     };
-    
+
     fetchUserProfile();
   }, [user]);
 
@@ -169,12 +169,14 @@ const DocumentUpload = () => {
           .eq("d_uuid", userProfile.d_uuid);
 
         if (usersError) {
+          console.error('Error fetching department users for notifications:', usersError);
         }
         if (usersInDepartment && usersInDepartment.length > 0) {
           const notificationRows = usersInDepartment.map(u => ({
             uuid: u.uuid,
             f_uuid: insertedFile.f_uuid,
             is_seen: false,
+            is_sent: true,
             created_at: new Date().toISOString(),
           }));
           await supabase.from("notifications").insert(notificationRows);
@@ -187,7 +189,7 @@ const DocumentUpload = () => {
           formData.append("files", f, f.name);
 
           const response = await fetch(
-            process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents",
+            process.env.REACT_APP_SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents",
             {
               method: "POST",
               body: formData,
@@ -195,10 +197,12 @@ const DocumentUpload = () => {
           );
 
           if (!response.ok) {
+            console.error('Backend summary API returned error:', response.status);
           } else {
-            const summaryData = await response.json();
+            await response.json();
           }
         } catch (backendErr) {
+          console.error('Backend summary API request failed:', backendErr);
         }
       }
 
@@ -220,7 +224,7 @@ const DocumentUpload = () => {
       <label className="block text-sm font-medium text-gray-700 mb-2">
         Target Department
       </label>
-      
+
       {loadingProfile ? (
         <div className="p-3 border border-gray-300 rounded-lg bg-gray-50">
           <p className="text-gray-500">Loading department...</p>
@@ -261,9 +265,8 @@ const DocumentUpload = () => {
             onDragLeave={handleDragLeave}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className={`mt-1 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed rounded-md transition-colors ${
-              isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
-            }`}
+            className={`mt-1 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed rounded-md transition-colors ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+              }`}
           >
             <div className="space-y-3 w-full max-w-xl">
               {/* Hidden input used by both "Click to upload" and the + button */}
@@ -351,9 +354,8 @@ const DocumentUpload = () => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={isMultiFile}
-              className={`mt-1 w-full p-3 border border-gray-300 rounded-lg ${
-                isMultiFile ? "bg-gray-100 cursor-not-allowed" : ""
-              }`}
+              className={`mt-1 w-full p-3 border border-gray-300 rounded-lg ${isMultiFile ? "bg-gray-100 cursor-not-allowed" : ""
+                }`}
               placeholder={
                 isMultiFile
                   ? "Using each file name as the document title"
@@ -392,13 +394,12 @@ const DocumentUpload = () => {
           <div className="flex-1 pr-4">
             {status.message && (
               <p
-                className={`text-sm text-left p-3 rounded-lg ${
-                  status.type === "success"
+                className={`text-sm text-left p-3 rounded-lg ${status.type === "success"
                     ? "bg-green-100 text-green-700"
                     : status.type === "error"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-blue-100 text-blue-700"
-                }`}
+                      ? "bg-red-100 text-red-700"
+                      : "bg-blue-100 text-blue-700"
+                  }`}
               >
                 {status.message}
               </p>
