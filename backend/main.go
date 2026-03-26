@@ -27,7 +27,10 @@ import (
 
 func checkDBConnection() {
 	url := os.Getenv("SUPABASE_URL")
-	key := os.Getenv("SUPABASE_SERVICE_KEY")
+	key := os.Getenv("SUPABASE_ANON_KEY")
+	if key == "" {
+		key = os.Getenv("SUPABASE_SERVICE_KEY")
+	}
 
 	if url == "" || key == "" {
 		log.Println("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")

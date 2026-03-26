@@ -26,11 +26,9 @@ const HomePage = () => {
         .select(`
           f_uuid, f_name, language, created_at,
           file_department!inner (
-            f_uuid,
-            is_approved
+            f_uuid
           )
         `)
-        .eq("file_department.is_approved", "approved")
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -96,8 +94,7 @@ const HomePage = () => {
             uuid,
             users:uuid(d_uuid)
           )
-        `)
-        .eq("is_approved", "approved");
+        `);
       if (linksErr) {
         setLoading(false);
         return;
@@ -148,8 +145,7 @@ const HomePage = () => {
       const { data, error } = await supabase
         .from("file_department")
         .select("department:department ( d_uuid, d_name )")
-        .eq("f_uuid", f_uuid)
-        .eq("is_approved", "approved");
+        .eq("f_uuid", f_uuid);
       if (error) return [];
       return (data || []).map((r) => r.department).filter(Boolean);
     };
@@ -184,9 +180,8 @@ const HomePage = () => {
     const fdChannel = supabase
       .channel("home-fd-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "file_department" }, async (payload) => {
-        const { f_uuid, d_uuid, is_approved } = payload.new || {};
-        // Only update counts if the file is approved
-        if (is_approved === "approved") {
+        const { f_uuid, d_uuid } = payload.new || {};
+        {
           // Get file sender's department and current user's department
           const { data: fileData } = await supabase
             .from("file")

@@ -141,9 +141,6 @@ const DepartmentFiles = () => {
                           is_approved
                         )
                     `, { count: 'exact' })
-                    .eq("file_department.d_uuid", userProfile.d_uuid)
-                    .eq("uploader.d_uuid", userProfile.d_uuid)
-                    .eq("file_department.is_approved", "approved")
                     .order("created_at", { ascending: false })
                     .range(from, to);
 
@@ -169,8 +166,7 @@ const DepartmentFiles = () => {
                             users:uuid ( d_uuid )
                         )
                     `)
-                    .eq('d_uuid', userProfile.d_uuid)
-                    .eq('is_approved', 'approved');
+                    .eq('d_uuid', userProfile.d_uuid);
 
                 if (senderError) {
                     filesError = senderError;
@@ -427,13 +423,13 @@ const DepartmentFiles = () => {
                     <p className="text-gray-500 mt-2">
                         {isOwnDepartment
                             ? "There are no files uploaded by your department yet."
-                            : `No approved files have been shared from ${department?.d_name || 'this department'} to your department yet.`
+                            : `No files have been shared from ${department?.d_name || 'this department'} to your department yet.`
                         }
                     </p>
                     <p className="text-gray-400 text-sm mt-1">
                         {isOwnDepartment
                             ? "Files uploaded by your department appear here automatically."
-                            : `When the head of ${department?.d_name || 'this department'} shares files with your department and your department head approves them, they will appear here.`
+                            : `When files are shared from ${department?.d_name || 'this department'} to your department, they will appear here.`
                         }
                     </p>
                 </div>

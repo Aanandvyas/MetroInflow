@@ -308,10 +308,6 @@ const DepartmentGrid = () => {
                 let departmentsWithFiles = filteredDepartments.map((dept, index) => {
                     const deptFiles = filesBySourceDept[dept.d_uuid] || [];
 
-                    // Count by approval status (using the new text-based status)
-                    const pendingCount = deptFiles.filter(f => f.is_approved === 'pending' || f.is_approved === null).length;
-                    const approvedCount = deptFiles.filter(f => f.is_approved === 'approved').length;
-                    const rejectedCount = deptFiles.filter(f => f.is_approved === 'rejected').length;
 
                     return {
                         id: dept.d_uuid,
@@ -319,19 +315,13 @@ const DepartmentGrid = () => {
                         color: getColorForIndex(index),
                         initial: dept.d_name.charAt(0).toUpperCase(),
                         files: deptFiles,
-                        totalFiles: deptFiles.length,
-                        pendingCount,
-                        approvedCount,
-                        rejectedCount
+                        totalFiles: deptFiles.length
                     };
                 });
 
                 // Add Unknown department for files with missing department info if it exists
                 if (filesBySourceDept["unknown"] && filesBySourceDept["unknown"].length > 0) {
                     const unknownFiles = filesBySourceDept["unknown"];
-                    const pendingCount = unknownFiles.filter(f => f.is_approved === 'pending' || f.is_approved === null).length;
-                    const approvedCount = unknownFiles.filter(f => f.is_approved === 'approved').length;
-                    const rejectedCount = unknownFiles.filter(f => f.is_approved === 'rejected').length;
 
                     departmentsWithFiles.push({
                         id: "unknown",
@@ -339,10 +329,7 @@ const DepartmentGrid = () => {
                         color: "bg-gray-100 text-gray-600",
                         initial: "?",
                         files: unknownFiles,
-                        totalFiles: unknownFiles.length,
-                        pendingCount,
-                        approvedCount,
-                        rejectedCount
+                        totalFiles: unknownFiles.length
                     });
 
 
@@ -901,42 +888,11 @@ const HeadDashboard = () => {
                         uuid: u.uuid,
                         f_uuid: insertedFile.f_uuid,
                         is_seen: false,
+                        is_sent: true,
                         created_at: new Date().toISOString(),
                     }));
                     await supabase.from("notifications").insert(notificationRows);
                 }
-            }
-
-            // Send all files to backend for processing in a single request
-            try {
-                const formData = new FormData();
-
-                // Add all files
-                files.forEach((file) => {
-                    formData.append("files", file);
-                });
-
-                // Add metadata
-                formData.append("title", title.trim() || files[0]?.name || "Untitled Document");
-                formData.append("language", language);
-
-                // Add department UUIDs as comma-separated string
-                const departmentUuids = selectedDepartments.map(dept => dept.d_uuid).join(",");
-                if (departmentUuids) {
-                    formData.append("d_uuids", departmentUuids);
-                }
-
-                const response = await fetch(
-                    process.env.SUMMARY_BACKEND_URL || "http://localhost:8080/v1/documents",
-                    {
-                        method: "POST",
-                        body: formData,
-                    }
-                );
-
-                if (!response.ok) {
-                }
-            } catch (backendErr) {
             }
 
             setUploadStatus({

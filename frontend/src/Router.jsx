@@ -72,19 +72,11 @@ export const Router = createBrowserRouter([ // Corrected export name
             // ✅ Department Head Routes - restricted to heads only
             { 
                 path: "/head-dashboard", 
-                element: (
-                    <RoleProtectedRoute requiredPosition="head">
-                        <HeadDashboard />
-                    </RoleProtectedRoute>
-                ) 
+                element: <HeadDashboard />
             },
             { 
                 path: "/shared-files", 
-                element: (
-                    <RoleProtectedRoute requiredPosition="head">
-                        <SharedFiles />
-                    </RoleProtectedRoute>
-                ) 
+                element: <SharedFiles />
             },
             { 
                 path: "/confidential", 
@@ -104,11 +96,7 @@ export const Router = createBrowserRouter([ // Corrected export name
             },
             { 
                 path: "/department-collab/:departmentId", 
-                element: (
-                    <RoleProtectedRoute requiredPosition="head">
-                        <CollabDepartment />
-                    </RoleProtectedRoute>
-                ) 
+                element: <CollabDepartment />
             },
         ],
     },

@@ -61,13 +61,28 @@ var DB *sql.DB
 
 // InitConfig loads Supabase credentials
 func InitConfig() {
+	serviceRoleKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+	// Support both the new SUPABASE_ANON_KEY name and the legacy SUPABASE_SERVICE_KEY name
+	anonKey := os.Getenv("SUPABASE_ANON_KEY")
+	if anonKey == "" {
+		anonKey = os.Getenv("SUPABASE_SERVICE_KEY")
+	}
+
+	// If the dedicated service-role key var is empty, fall back to
+	// SUPABASE_SERVICE_KEY. Many setups store the service-role key there.
+	if serviceRoleKey == "" {
+		serviceRoleKey = anonKey
+		log.Println("WARNING: SUPABASE_SERVICE_ROLE_KEY not set — falling back to SUPABASE_SERVICE_KEY")
+	}
+
 	Supabase = SupabaseClient{
 		URL:            os.Getenv("SUPABASE_URL"),
-		Key:            os.Getenv("SUPABASE_SERVICE_KEY"),
-		ServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		Key:            anonKey,
+		ServiceRoleKey: serviceRoleKey,
 	}
+
 	if Supabase.ServiceRoleKey == "" {
-		log.Println("WARNING: SUPABASE_SERVICE_ROLE_KEY not set — admin auth API operations will fail")
+		log.Println("ERROR: No Supabase service role key found — admin auth API operations will fail")
 	}
 }
 
