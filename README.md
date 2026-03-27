@@ -161,14 +161,3 @@ MetroInflow/
 - Open a PR with clear test notes
 
 If contribution volume increases, add a dedicated `CONTRIBUTING.md`.
-
-## 7. License and Contact
-
-### License
-
-Currently an internal SIH/KMRL prototyping repository. Add a formal license file before public distribution.
-
-### Contact
-
-- Open an issue in this repository for bugs/feature requests
-- Maintainer contact: add project email or team alias here
