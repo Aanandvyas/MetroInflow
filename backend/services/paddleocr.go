@@ -37,8 +37,9 @@ func RunOCR(filePath string) (string, float64, error) {
 
 	ocrURL := strings.TrimSpace(os.Getenv("OCR_SERVICE_URL"))
 	if ocrURL == "" {
-		ocrURL = "http://localhost:8000/ocr"
+		ocrURL = "http://127.0.0.1:8000/ocr"
 	}
+	ocrURL = strings.Replace(ocrURL, "://localhost", "://127.0.0.1", 1)
 	if !strings.HasSuffix(strings.TrimRight(ocrURL, "/"), "/ocr") {
 		ocrURL = strings.TrimRight(ocrURL, "/") + "/ocr"
 	}

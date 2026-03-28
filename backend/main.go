@@ -32,6 +32,9 @@ func main() {
 
 	config.InitConfig()
 	log.Println("Config initialized.")
+	log.Printf("OCR_SERVICE_URL configured: %t", os.Getenv("OCR_SERVICE_URL") != "")
+	log.Printf("LLM_COMPLETION_URL configured: %t", os.Getenv("LLM_COMPLETION_URL") != "")
+	log.Printf("SUMMARY_SERVICE_URL configured: %t", os.Getenv("SUMMARY_SERVICE_URL") != "")
 
 	connStr := os.Getenv("DATABASE_URL")
 	if err := config.InitDB(connStr); err != nil {

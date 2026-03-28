@@ -22,8 +22,9 @@ func RunSummarizer(text string) (string, error) {
 	}
 	summarizerURL := strings.TrimSpace(os.Getenv("SUMMARY_SERVICE_URL"))
 	if summarizerURL == "" {
-		summarizerURL = "http://localhost:9000/summarize"
+		summarizerURL = "http://127.0.0.1:9000/summarize"
 	}
+	summarizerURL = strings.Replace(summarizerURL, "://localhost", "://127.0.0.1", 1)
 	if !strings.HasSuffix(strings.TrimRight(summarizerURL, "/"), "/summarize") {
 		summarizerURL = strings.TrimRight(summarizerURL, "/") + "/summarize"
 	}

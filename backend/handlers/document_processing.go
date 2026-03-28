@@ -54,17 +54,36 @@ var processingJobs sync.Map // map[jobID]asyncJobStatus
 var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
 
 func ocrEndpoint() string {
-	url := os.Getenv("OCR_SERVICE_URL")
+	url := strings.TrimSpace(os.Getenv("OCR_SERVICE_URL"))
 	if url == "" {
-		return "http://localhost:8000/ocr"
+		url = strings.TrimSpace(os.Getenv("OCR_URL"))
+	}
+	url = strings.Trim(url, "\"'")
+	if url == "" {
+		if os.Getenv("RENDER") != "" {
+			return ""
+		}
+		return "http://127.0.0.1:8000/ocr"
+	}
+	url = strings.Replace(url, "://localhost", "://127.0.0.1", 1)
+	if !strings.HasSuffix(strings.TrimRight(url, "/"), "/ocr") {
+		url = strings.TrimRight(url, "/") + "/ocr"
 	}
 	return url
 }
 
 func llmEndpoint() string {
-	url := os.Getenv("LLM_COMPLETION_URL")
+	url := strings.TrimSpace(os.Getenv("LLM_COMPLETION_URL"))
+	url = strings.Trim(url, "\"'")
 	if url == "" {
-		return "http://localhost:8081/completion"
+		if os.Getenv("RENDER") != "" {
+			return ""
+		}
+		return "http://127.0.0.1:8081/completion"
+	}
+	url = strings.Replace(url, "://localhost", "://127.0.0.1", 1)
+	if !strings.HasSuffix(strings.TrimRight(url, "/"), "/completion") {
+		url = strings.TrimRight(url, "/") + "/completion"
 	}
 	return url
 }
@@ -310,6 +329,9 @@ func extractFirst10Pages(pdfBytes []byte) (string, float64, error) {
 
 	// Call OCR service
 	ocrServiceURL := ocrEndpoint()
+	if ocrServiceURL == "" {
+		return "", 0, fmt.Errorf("OCR_SERVICE_URL is not configured")
+	}
 	req, err := http.NewRequest("POST", ocrServiceURL, body)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to create request: %v", err)
@@ -391,6 +413,9 @@ func summarizeExtractedText(extractedText string) (string, error) {
 	}
 
 	llmServiceURL := llmEndpoint()
+	if llmServiceURL == "" {
+		return "", fmt.Errorf("LLM_COMPLETION_URL is not configured")
+	}
 
 	// Use completion endpoint directly
 	llmPayload := map[string]interface{}{
