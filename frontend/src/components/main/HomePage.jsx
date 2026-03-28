@@ -77,26 +77,6 @@ const HomePage = () => {
         return;
       }
       setDepartments(data || []);
-
-      // Get user's department
-      let userDeptId = null;
-      const { data: profile } = await supabase.from("users").select("d_uuid").eq("uuid", user.id).maybeSingle();
-      userDeptId = profile?.d_uuid;
-
-      // Count files differently for user's own dept vs other depts
-      const { data: links, error: linksErr } = await supabase
-        .from("file_department")
-        .select(`
-          d_uuid,
-          file:f_uuid(
-            uuid,
-            users:uuid(d_uuid)
-          )
-        `);
-      if (linksErr) {
-        setLoading(false);
-        return;
-      }
       setLoading(false);
     };
     fetchDepartments();

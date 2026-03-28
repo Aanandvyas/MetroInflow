@@ -178,7 +178,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [getUserProfile]);
 
   // ── Auto-fetch profile when user changes ───────────────
   useEffect(() => {

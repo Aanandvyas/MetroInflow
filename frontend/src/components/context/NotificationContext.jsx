@@ -36,9 +36,6 @@ export const NotificationProvider = ({ children }) => {
         return;
       }
 
-      const userDepartmentId = userData.d_uuid;
-
-
       // Calculate 4 days ago - exact same logic as notifications page
       const fourDaysAgo = new Date();
       fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);

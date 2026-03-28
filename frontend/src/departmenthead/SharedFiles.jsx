@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ClockIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 const SharedFiles = () => {
     const navigate = useNavigate();
-    const { user, userProfile: profile } = useAuth();
+    const { userProfile: profile } = useAuth();
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);

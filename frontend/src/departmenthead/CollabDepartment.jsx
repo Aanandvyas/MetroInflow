@@ -156,14 +156,13 @@ const FileList = ({ title, rows, importantMap, toggleImportant }) => {
 const CollabDepartment = () => {
   const { departmentId } = useParams();
   const navigate = useNavigate();
-  const { user, userProfile: profile } = useAuth();
+  const { userProfile: profile } = useAuth();
   const [department, setDepartment] = useState(null);
   const [received, setReceived] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all'); // 'all' or a specific department UUID
-  const [departmentList, setDepartmentList] = useState([]); // List of all departments for filtering
+  const [departmentList] = useState([]); // List of all departments for filtering
   const [importantMap, setImportantMap] = useState({});
 
   // Load important map from localStorage on component mount
@@ -363,7 +362,7 @@ const CollabDepartment = () => {
 
       return statusMatch && deptMatch;
     });
-  }, [received, filter, deptFilter]);
+  }, [received, deptFilter]);
 
   if (loading && !department) {
     return (
@@ -463,7 +462,6 @@ const CollabDepartment = () => {
                       <div className="mt-3">
                         <button
                           onClick={() => {
-                            setFilter('all');
                             setDeptFilter('all');
                           }}
                           className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"

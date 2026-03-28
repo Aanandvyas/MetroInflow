@@ -8,7 +8,6 @@ import {
   ArrowPathIcon,
   ExclamationCircleIcon,
   CalendarIcon,
-  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 
 // Helper function for time formatting

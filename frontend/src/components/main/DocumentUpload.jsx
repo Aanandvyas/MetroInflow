@@ -76,7 +76,7 @@ const DocumentUpload = () => {
     if (userProfile?.department && selectedDepartments.length === 0) {
       setSelectedDepartments([userProfile.department]);
     }
-  }, [userProfile]);
+  }, [userProfile, selectedDepartments.length]);
 
   // Department selector helpers
   const filteredDepartments = departments.filter(dept =>
