@@ -89,6 +89,28 @@ export const AuthProvider = ({ children }) => {
     if (error) {
       return { success: false, error };
     }
+
+    // Update state immediately to avoid route-guard redirect races right after sign-in.
+    const currentSession = data?.session ?? null;
+    const currentUser = data?.user ?? null;
+    setSession(currentSession);
+    setUser(currentUser);
+
+    if (currentUser?.id) {
+      setProfileLoading(true);
+      try {
+        const profile = await withTimeout(getUserProfile(currentUser.id), 8000, "signIn getUserProfile");
+        setUserProfile(profile);
+      } catch (profileErr) {
+        console.error("signIn profile fetch failed:", profileErr);
+        setUserProfile(null);
+      } finally {
+        setProfileLoading(false);
+      }
+    } else {
+      setUserProfile(null);
+    }
+
     return { success: true, data };
   };
 

@@ -53,10 +53,10 @@ const Login = () => {
         navigate('/admin-dashboard');
       } else {
         // Regular user login
-        const { error: signInError } = await signInUser(email, password);
+        const result = await signInUser(email, password);
 
-        if (signInError) {
-          setError(signInError.message);
+        if (!result?.success) {
+          setError(result?.error?.message || 'Login failed. Please try again.');
         } else {
           navigate('/');
         }
