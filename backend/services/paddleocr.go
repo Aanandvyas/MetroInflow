@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func RunOCR(filePath string) (string, float64, error) {
@@ -34,8 +35,16 @@ func RunOCR(filePath string) (string, float64, error) {
 	}
 	w.Close()
 
+	ocrURL := strings.TrimSpace(os.Getenv("OCR_SERVICE_URL"))
+	if ocrURL == "" {
+		ocrURL = "http://localhost:8000/ocr"
+	}
+	if !strings.HasSuffix(strings.TrimRight(ocrURL, "/"), "/ocr") {
+		ocrURL = strings.TrimRight(ocrURL, "/") + "/ocr"
+	}
+
 	log.Println("[RunOCR] Sending POST request to OCR service")
-	req, err := http.NewRequest("POST", "http://localhost:8000/ocr", &b)
+	req, err := http.NewRequest("POST", ocrURL, &b)
 	if err != nil {
 		log.Println("[RunOCR] Error creating HTTP request:", err)
 		return "", 0, err

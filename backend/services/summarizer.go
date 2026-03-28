@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 func RunSummarizer(text string) (string, error) {
@@ -18,7 +20,15 @@ func RunSummarizer(text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequest("POST", "http://localhost:9000/summarize", bytes.NewBuffer(body))
+	summarizerURL := strings.TrimSpace(os.Getenv("SUMMARY_SERVICE_URL"))
+	if summarizerURL == "" {
+		summarizerURL = "http://localhost:9000/summarize"
+	}
+	if !strings.HasSuffix(strings.TrimRight(summarizerURL, "/"), "/summarize") {
+		summarizerURL = strings.TrimRight(summarizerURL, "/") + "/summarize"
+	}
+
+	req, err := http.NewRequest("POST", summarizerURL, bytes.NewBuffer(body))
 	if err != nil {
 		return "", err
 	}
