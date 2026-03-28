@@ -67,7 +67,7 @@ func processOneSummary(summaryRow *models.Summary) {
 		return
 	}
 
-	if len(fileBytes) < 4 || string(fileBytes[0:4]) != "%PDF" {
+	if !isLikelyPDF(fileBytes) {
 		log.Printf("[WORKER] Invalid PDF format for f_uuid=%s", summaryRow.FUUID)
 		models.MarkSummaryFailed(config.DB, summaryRow.SUUID, "Invalid PDF file format", summaryRow.RetryCount)
 		return

@@ -131,8 +131,8 @@ func ProcessFirst10PagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate file is PDF
-	if len(fileBytes) < 4 || string(fileBytes[0:4]) != "%PDF" {
+	// Validate file is PDF (allow small preamble before header)
+	if !isLikelyPDF(fileBytes) {
 		http.Error(w, "Invalid PDF file format", http.StatusBadRequest)
 		return
 	}
