@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import { getAdminSupabase } from '../../adminSupabaseClient';
 
 const UserRegistrationForm = ({ onUserAdded }) => {
   const [formData, setFormData] = useState({
@@ -107,7 +108,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRegistrationStatus({
         loading: false,
         success: false,
-        error: "Not all fields are filled"
+        error: "Passwords do not match"
       });
       return;
     }
@@ -118,7 +119,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRegistrationStatus({
         loading: false,
         success: false,
-        error: "Not all fields are filled"
+        error: "Please select a role for this department"
       });
       return;
     }
@@ -143,54 +144,46 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         position,
       } = formData;
 
-      // 1. Create account in Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
+      // Use the admin Supabase client to create the user directly
+      // This uses the service_role key to call the Supabase Auth Admin API.
+      // The Postgres trigger (handle_new_user) auto-creates the public.users row from user_metadata.
+      const adminClient = getAdminSupabase();
+      const { error: createError } = await adminClient.auth.admin.createUser({
         email,
         password,
-        options: {
-          emailRedirectTo: process.env.REACT_APP_REDIRECT_URL || "http://localhost:3000/login",
+        email_confirm: false,
+        user_metadata: {
+          name: fullName,
+          phone_number: phoneNumber,
+          dob: dob || null,
+          gender: gender || null,
+          address: address || null,
+          d_uuid: departmentUuid || null,
+          r_uuid: position === "head" ? null : (roleUuid || null),
+          position: position || "regular",
         },
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (createError) {
+        throw createError;
       }
 
-      // Use the stored departmentUuid directly
-      let d_uuid = departmentUuid || null;
-
-      // 3. Insert into "user" table
-      if (data.user) {
-        const { error: userError } = await supabase.from("users").insert([
-          {
-            uuid: data.user.id,
-            email,
-            name: fullName,
-            phone_number: phoneNumber,
-            dob,
-            gender,
-            address,
-            d_uuid,
-            r_uuid: position === "head" ? null : (roleUuid || null),
-            position,
-            age: dob
-              ? (() => {
-                const today = new Date();
-                const birth = new Date(dob);
-                let age = today.getFullYear() - birth.getFullYear();
-                const monthDiff = today.getMonth() - birth.getMonth();
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-                  age--;
-                }
-                return age;
-              })()
-              : null,
+      // Send confirmation email using the regular (anon) supabase client.
+      // supabase.auth.resend() triggers Supabase to send the actual email,
+      // unlike generateLink which only generates a URL without sending.
+      try {
+        const { error: resendError } = await supabase.auth.resend({
+          type: "signup",
+          email,
+          options: {
+            emailRedirectTo: process.env.REACT_APP_REDIRECT_URL || "http://localhost:3000/login",
           },
-        ]);
-
-        if (userError) {
-          throw new Error(userError.message);
+        });
+        if (resendError) {
+          console.warn("Could not send confirmation email:", resendError.message);
         }
+      } catch (emailErr) {
+        console.warn("Could not send confirmation email:", emailErr);
       }
 
       // Success
@@ -225,7 +218,7 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       setRegistrationStatus({
         loading: false,
         success: false,
-        error: "Not all fields are filled"
+        error: err.message || "Registration failed. Please try again."
       });
     }
   };
@@ -249,10 +242,12 @@ const UserRegistrationForm = ({ onUserAdded }) => {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Full Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+          <label htmlFor="reg-fullName" className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
           <input
+            id="reg-fullName"
             type="text"
             name="fullName"
+            autoComplete="name"
             required
             value={formData.fullName}
             onChange={handleChange}
@@ -262,10 +257,12 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
+            id="reg-email"
             type="email"
             name="email"
+            autoComplete="email"
             required
             value={formData.email}
             onChange={handleChange}
@@ -275,10 +272,12 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Phone Number */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+          <label htmlFor="reg-phoneNumber" className="block text-sm font-medium text-gray-700">Phone Number</label>
           <input
+            id="reg-phoneNumber"
             type="tel"
             name="phoneNumber"
+            autoComplete="tel"
             required
             value={formData.phoneNumber}
             onChange={handleChange}
@@ -288,10 +287,12 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Date of Birth */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+          <label htmlFor="reg-dob" className="block text-sm font-medium text-gray-700">Date of Birth</label>
           <input
+            id="reg-dob"
             type="date"
             name="dob"
+            autoComplete="bday"
             required
             value={formData.dob}
             onChange={handleChange}
@@ -301,8 +302,9 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Department */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Department</label>
+          <label htmlFor="reg-departmentName" className="block text-sm font-medium text-gray-700">Department</label>
           <select
+            id="reg-departmentName"
             name="departmentName"
             value={formData.departmentName}
             onChange={handleChange}
@@ -321,8 +323,9 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         {/* Position */}
         {formData.departmentName && (
           <div>
-            <label className="block text-sm font-medium text-gray-700">Position</label>
+            <label htmlFor="reg-position" className="block text-sm font-medium text-gray-700">Position</label>
             <select
+              id="reg-position"
               name="position"
               value={formData.position}
               onChange={handleChange}
@@ -337,8 +340,9 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         {/* Role - Only show if not department head */}
         {formData.departmentName && formData.position !== "head" && (
           <div>
-            <label className="block text-sm font-medium text-gray-700">Role</label>
+            <label htmlFor="reg-roleUuid" className="block text-sm font-medium text-gray-700">Role</label>
             <select
+              id="reg-roleUuid"
               name="roleUuid"
               value={formData.roleUuid}
               onChange={handleChange}
@@ -369,10 +373,12 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Password */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Password</label>
+          <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700">Password</label>
           <input
+            id="reg-password"
             type="password"
             name="password"
+            autoComplete="new-password"
             required
             value={formData.password}
             onChange={handleChange}
@@ -382,10 +388,12 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Confirm Password */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
+          <label htmlFor="reg-confirmPassword" className="block text-sm font-medium text-gray-700">Confirm Password</label>
           <input
+            id="reg-confirmPassword"
             type="password"
             name="confirmPassword"
+            autoComplete="new-password"
             required
             value={formData.confirmPassword}
             onChange={handleChange}
@@ -414,9 +422,11 @@ const UserRegistrationForm = ({ onUserAdded }) => {
 
         {/* Address */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">Address</label>
+          <label htmlFor="reg-address" className="block text-sm font-medium text-gray-700">Address</label>
           <textarea
+            id="reg-address"
             name="address"
+            autoComplete="street-address"
             rows="3"
             value={formData.address}
             onChange={handleChange}

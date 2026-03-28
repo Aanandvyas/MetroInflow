@@ -93,8 +93,7 @@ const AllFiles = () => {
       fileQuery = fileQuery.eq("file_department.d_uuid", selectedDepartment);
     }
 
-    // Only show approved files
-    fileQuery = fileQuery.eq("file_department.is_approved", "approved");
+
 
     // Language
     if (selectedLanguage) {

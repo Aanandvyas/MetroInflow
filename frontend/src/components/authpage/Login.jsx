@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // Ensure this path is correct
-import { supabase } from '../../supabaseClient';
+import { useAuth } from '../context/AuthContext';
+import { adminLogin } from '../../Admin/adminApi';
 import { safeLocalStorage } from '../../utils/localStorage';
 
 const Login = () => {
@@ -12,9 +12,28 @@ const Login = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const { signInUser } = useAuth();
+  const { signInUser, user } = useAuth();
   const navigate = useNavigate();
+
+  // Handle email confirmation redirect — Supabase appends tokens to the URL hash.
+  // The Supabase JS client auto-picks them up; we just need to show feedback.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && (hash.includes('type=signup') || hash.includes('type=email'))) {
+      setSuccessMessage('Email verified successfully! You can now sign in.');
+      // Clean the URL hash so it doesn't persist on refresh
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  // If a user session already exists (e.g. from the confirmation redirect), auto-navigate
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -23,30 +42,15 @@ const Login = () => {
 
     try {
       if (isAdminLogin) {
-        // Admin login
-        const { data, error } = await supabase
-          .from('admin')
-          .select()
-          .eq('a_username', username)
-          .single();
-
-        if (error) {
-          setError('Admin username not found');
-        } else if (data && data.a_pass === password) {
-          // ⚠️ SECURITY WARNING: Plain-text password comparison.
-          // In a production environment, 'a_pass' should store a bcrypt/scrypt hash
-          // and comparison should happen using a verification library.
-
-          // Store admin session in localStorage
-          safeLocalStorage.setItem('adminSession', JSON.stringify({
-            isAdmin: true,
-            username: data.a_username,
-            adminId: data.a_uuid
-          }));
-          navigate('/admin-dashboard');
-        } else {
-          setError('Invalid admin credentials');
-        }
+        // Admin login — verified by the Go backend (no service-role key in the browser)
+        const data = await adminLogin(username, password);
+        safeLocalStorage.setItem('adminSession', JSON.stringify({
+          isAdmin: true,
+          username: data.username,
+          adminId: data.adminId,
+          token: data.token,
+        }));
+        navigate('/admin-dashboard');
       } else {
         // Regular user login
         const { error: signInError } = await signInUser(email, password);
@@ -54,12 +58,11 @@ const Login = () => {
         if (signInError) {
           setError(signInError.message);
         } else {
-
-          navigate('/'); // Correctly navigate to the root protected route
+          navigate('/');
         }
       }
     } catch (e) {
-      setError('An unexpected error occurred. Please try again.');
+      setError(e.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -163,6 +166,13 @@ const Login = () => {
               placeholder="••••••••"
             />
           </div>
+
+          {/* Success Message (e.g. after email verification) */}
+          {successMessage && (
+            <div className="p-3 text-sm text-center text-green-800 bg-green-100 rounded-md">
+              {successMessage}
+            </div>
+          )}
 
           {/* Error Message Display */}
           {error && (

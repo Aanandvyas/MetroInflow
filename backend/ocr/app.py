@@ -7,7 +7,10 @@ from paddleocr import PaddleOCR
 from PIL import Image
 import io
 import numpy as np
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF legacy import path
+except ImportError:
+    import pymupdf as fitz  # PyMuPDF modern import path
 from pydantic import BaseModel
 import tempfile
 import os
@@ -79,7 +82,8 @@ async def ocr_endpoint(file: UploadFile = File(...)):
             pdf_document = fitz.open(stream=content, filetype="pdf")
             pages_output = []
 
-            for page_num in range(len(pdf_document)):
+            max_pages = min(len(pdf_document), 10)
+            for page_num in range(max_pages):
                 page = pdf_document[page_num]
                 pix = page.get_pixmap(dpi=150)  # adjust DPI
                 import tempfile, os
@@ -97,7 +101,7 @@ async def ocr_endpoint(file: UploadFile = File(...)):
                     text, avg_conf = run_ocr_on_image(img)
                     page_result["text"] = text
                     page_result["avg_confidence"] = avg_conf
-                    print(f"[OCR] Processed page {page_num+1}/{len(pdf_document)} (avg_conf={avg_conf:.2f})")
+                    print(f"[OCR] Processed page {page_num+1}/{max_pages} (avg_conf={avg_conf:.2f})")
                 except Exception as page_err:
                     page_result["error"] = str(page_err)
                     print(f"[OCR] Error processing page {page_num+1}: {page_err}")

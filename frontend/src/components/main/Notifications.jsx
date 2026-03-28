@@ -8,8 +8,6 @@ import {
   ArrowPathIcon,
   ExclamationCircleIcon,
   CalendarIcon,
-  CheckIcon,
-  XMarkIcon,
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 
@@ -47,131 +45,8 @@ const Notifications = () => {
   const [items, setItems] = useState([]);
   const [error, setError] = useState(null);
   const [dateGroups, setDateGroups] = useState({});
-  const [processingActions, setProcessingActions] = useState(new Set());
-
-  // Handle approval/rejection actions
-  const handleApprovalAction = async (fileId, action, notificationId) => {
-    const actionKey = `${fileId}-${action}`;
-    if (processingActions.has(actionKey)) return;
-
-    setProcessingActions(prev => new Set(prev).add(actionKey));
-
-    try {
-      // Get user's department to confirm they're a head
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('d_uuid, position')
-        .eq('uuid', user.id)
-        .single();
-
-      if (userError || userData.position !== 'head') {
-        setError('Only department heads can approve or reject files');
-        return;
-      }
-
-      const userDepartmentId = userData.d_uuid;
-
-      // Update the file_department record
-      const { error: updateError } = await supabase
-        .from('file_department')
-        .update({
-          is_approved: action === 'accept' ? 'approved' : 'rejected'
-        })
-        .eq('f_uuid', fileId)
-        .eq('d_uuid', userDepartmentId);
-
-      if (updateError) {
-        setError(`Failed to ${action} file: ${updateError.message}`);
-        return;
-      }
-
-      // Update the notification to mark it as processed
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .update({
-          is_seen: true,
-          is_sent: action === 'accept' ? true : false
-        })
-        .eq('notif_id', notificationId);
-
-      if (notificationError) {
-      }
-
-      // If approved, create notifications for all department members
-      if (action === 'accept') {
-        // Get all users in the department (excluding the head who approved)
-        const { data: allDeptUsers, error: usersError } = await supabase
-          .from('users')
-          .select('uuid, name, position')
-          .eq('d_uuid', userDepartmentId);
 
 
-        if (!usersError && allDeptUsers && allDeptUsers.length > 0) {
-          const staffMembers = allDeptUsers.filter(u => u.uuid !== user.id);
-
-          for (const staff of staffMembers) {
-
-            // Delete any existing notifications for this file/user combination
-            await supabase
-              .from('notifications')
-              .delete()
-              .eq('f_uuid', fileId)
-              .eq('uuid', staff.uuid);
-
-            // Create fresh notification
-            await supabase
-              .from('notifications')
-              .insert({
-                uuid: staff.uuid,
-                f_uuid: fileId,
-                is_seen: false,
-                is_sent: true,
-                created_at: new Date().toISOString()
-              });
-
-
-          }
-        }
-
-        // Broadcast approval to all connected clients
-        const { error: broadcastError } = await supabase
-          .channel('file-approvals')
-          .send({
-            type: 'broadcast',
-            event: 'file_approved',
-            payload: {
-              file_id: fileId,
-              department_id: userDepartmentId
-            }
-          });
-
-        if (broadcastError) {
-        }
-
-        // Also trigger ensure function multiple times for broader coverage
-        setTimeout(() => {
-          ensureTodaysNotifications();
-        }, 500);
-
-        setTimeout(() => {
-          ensureTodaysNotifications();
-          fetchNotifications();
-        }, 2000);
-      }
-
-      // Refresh notifications
-      fetchNotifications();
-
-    } catch (err) {
-      setError(`Error ${action}ing file: ${err.message}`);
-    } finally {
-      setProcessingActions(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(actionKey);
-        return newSet;
-      });
-    }
-  };
 
   // Function to ensure notifications exist for today's files.
   // Important: Keep side-effects out of the fetch loop to avoid realtime feedback loops.
@@ -179,152 +54,63 @@ const Notifications = () => {
     if (!user?.id) return;
 
     try {
-      // Get user's department and position
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('d_uuid, position')
+        .select('d_uuid')
         .eq('uuid', user.id)
-        .single();
+        .maybeSingle();
 
       if (userError || !userData?.d_uuid) return;
 
       const userDepartmentId = userData.d_uuid;
-      const isHead = userData.position === 'head';
 
-      // Get today's start in ISO format
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayStr = today.toISOString();
 
-      // Get files from user's department created today
-      // These are always visible to department members
+      // Get internal files from user's department created today
       const { data: todayInternalFiles } = await supabase
         .from('file')
-        .select(`
-          f_uuid, 
-          created_at
-        `)
+        .select('f_uuid, created_at')
         .eq('d_uuid', userDepartmentId)
         .gte('created_at', todayStr);
 
-      // For department heads: Get pending approval notifications for files from other departments
-      if (isHead) {
-        const { data: pendingFiles } = await supabase
-          .from('file_department')
-          .select(`
-            f_uuid,
-            is_approved,
-            file:f_uuid(f_uuid, d_uuid, f_name)
-          `)
-          .eq('d_uuid', userDepartmentId)
-          .is('is_approved', null)
-          .gte('created_at', todayStr);
+      // Get shared files from other departments (last 4 days)
+      const fourDaysAgo = new Date();
+      fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+      const fourDaysAgoStr = fourDaysAgo.toISOString();
 
-        // Create approval notifications for department head
-        for (const fileRel of pendingFiles || []) {
-          const { count } = await supabase
+      const { data: sharedExternalFiles } = await supabase
+        .from('file_department')
+        .select('f_uuid, created_at')
+        .eq('d_uuid', userDepartmentId)
+        .gte('created_at', fourDaysAgoStr);
+
+      // Combine all visible files
+      const allVisibleFiles = [
+        ...(todayInternalFiles || []).map(f => ({ f_uuid: f.f_uuid })),
+        ...(sharedExternalFiles || []).map(f => ({ f_uuid: f.f_uuid }))
+      ];
+
+      // Create notifications for visible files
+      for (const file of allVisibleFiles) {
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('f_uuid', file.f_uuid)
+          .eq('uuid', user.id)
+          .eq('is_sent', true);
+
+        if (count === 0) {
+          await supabase
             .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('f_uuid', fileRel.f_uuid)
-            .eq('uuid', user.id)
-            .is('is_sent', null);
-
-          if (count === 0) {
-            await supabase
-              .from('notifications')
-              .insert({
-                uuid: user.id,
-                f_uuid: fileRel.f_uuid,
-                is_seen: false,
-                is_sent: null,
-                created_at: new Date().toISOString()
-              });
-          }
-        }
-      }
-
-      // For regular staff: Get approved files from other departments (last 4 days to catch recent approvals)
-      if (!isHead) {
-        const fourDaysAgo = new Date();
-        fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-        const fourDaysAgoStr = fourDaysAgo.toISOString();
-
-        const { data: approvedExternalFiles } = await supabase
-          .from('file_department')
-          .select(`
-            f_uuid,
-            created_at
-          `)
-          .eq('d_uuid', userDepartmentId)
-          .eq('is_approved', 'approved')
-          .gte('created_at', fourDaysAgoStr);
-
-
-        // Combine with internal files
-        const allVisibleFiles = [
-          ...(todayInternalFiles || []).map(f => ({ f_uuid: f.f_uuid })),
-          ...(approvedExternalFiles || []).map(f => ({ f_uuid: f.f_uuid }))
-        ];
-
-
-        // Create notifications for visible files
-        for (const file of allVisibleFiles) {
-          const { count } = await supabase
-            .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('f_uuid', file.f_uuid)
-            .eq('uuid', user.id)
-            .eq('is_sent', true);
-
-          if (count === 0) {
-            const { error: insertError } = await supabase
-              .from('notifications')
-              .insert({
-                uuid: user.id,
-                f_uuid: file.f_uuid,
-                is_seen: false,
-                is_sent: true,
-                created_at: new Date().toISOString()
-              });
-
-            if (insertError) {
-            }
-          } else {
-            const { error: updateError } = await supabase
-              .from('notifications')
-              .update({ is_seen: false })
-              .eq('f_uuid', file.f_uuid)
-              .eq('uuid', user.id)
-              .eq('is_seen', true)
-              .eq('is_sent', true);
-
-            if (updateError) {
-            }
-          }
-        }
-      }
-
-      // For department heads: Also handle internal files
-      if (isHead) {
-        for (const file of todayInternalFiles || []) {
-          const { count } = await supabase
-            .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('f_uuid', file.f_uuid)
-            .eq('uuid', user.id)
-            .eq('is_sent', true);
-
-          if (count === 0) {
-            await supabase
-              .from('notifications')
-              .insert({
-                uuid: user.id,
-                f_uuid: file.f_uuid,
-                is_seen: false,
-                is_sent: true,
-                created_at: new Date().toISOString()
-              });
-          }
+            .insert({
+              uuid: user.id,
+              f_uuid: file.f_uuid,
+              is_seen: false,
+              is_sent: true,
+              created_at: new Date().toISOString()
+            });
         }
       }
     } catch (err) {
@@ -349,17 +135,18 @@ const Notifications = () => {
         .from('users')
         .select('d_uuid, position')
         .eq('uuid', user.id)
-        .single();
+        .maybeSingle();
 
-      if (userError) {
-        setError(`User profile error: ${userError.message}`);
+      if (userError || !userData) {
+        setError(userError ? `User profile error: ${userError.message}` : 'Profile not found');
         updateNotificationCount(0);
         setLoading(false);
         return;
       }
 
+
       const userDepartmentId = userData?.d_uuid;
-      const isHead = userData?.position === 'head';
+
 
       // Calculate date 4 days ago
       const fourDaysAgo = new Date();
@@ -367,29 +154,15 @@ const Notifications = () => {
       fourDaysAgo.setHours(0, 0, 0, 0);
       const fourDaysAgoStr = fourDaysAgo.toISOString();
 
-      // Different queries based on user role
-      let notificationsQuery;
-
-      if (isHead) {
-        // Department heads see both regular notifications and pending approvals
-        notificationsQuery = supabase
-          .from('notifications')
-          .select('notif_id, f_uuid, is_seen, is_sent, created_at')
-          .eq('uuid', user.id)
-          .eq('is_seen', false)
-          .gte('created_at', fourDaysAgoStr)
-          .order('created_at', { ascending: false });
-      } else {
-        // Regular staff only see approved notifications
-        notificationsQuery = supabase
-          .from('notifications')
-          .select('notif_id, f_uuid, is_seen, is_sent, created_at')
-          .eq('uuid', user.id)
-          .eq('is_seen', false)
-          .eq('is_sent', true)
-          .gte('created_at', fourDaysAgoStr)
-          .order('created_at', { ascending: false });
-      }
+      // All users see the same notifications
+      let notificationsQuery = supabase
+        .from('notifications')
+        .select('notif_id, f_uuid, is_seen, is_sent, created_at')
+        .eq('uuid', user.id)
+        .eq('is_seen', false)
+        .eq('is_sent', true)
+        .gte('created_at', fourDaysAgoStr)
+        .order('created_at', { ascending: false });
 
       const { data, error } = await notificationsQuery;
 
@@ -452,44 +225,15 @@ const Notifications = () => {
         }
       }
 
-      // Map notifications to include file details and approval status
       const notificationItems = latestPerFile
         .filter(notification => {
           const file = fileMap[notification.f_uuid];
-
-
           if (!file) return false;
-
-          // Files from user's own department are always visible
-          if (file.d_uuid === userDepartmentId) return true;
-
-          // For pending approval notifications (is_sent = null), only show to heads
-          if (notification.is_sent === null) {
-            return isHead;
-          }
-
-          // For approved files (is_sent = true), show to all users
-          if (notification.is_sent === true) {
-            // If it's from same department, always show
-            if (file.d_uuid === userDepartmentId) return true;
-
-            // If it's from external department, check if it was shared and approved
-            if (isHead) return true;
-
-            // For staff, check if file was shared with their department and approved
-            const sharedWithDept = file.file_department?.find(fd =>
-              fd.d_uuid === userDepartmentId && fd.is_approved === 'approved'
-            );
-
-            return !!sharedWithDept;
-          }
-
-          return false;
+          return true;
         })
         .map(notification => {
           const file = fileMap[notification.f_uuid];
           const isFromSameDept = file.d_uuid === userDepartmentId;
-          const isPendingApproval = notification.is_sent === null && !isFromSameDept;
 
           return {
             notif_id: notification.notif_id,
@@ -499,7 +243,7 @@ const Notifications = () => {
             file_created_at: file.created_at,
             dateGroup: formatDate(notification.created_at),
             fromSameDept: isFromSameDept,
-            isPendingApproval: isPendingApproval,
+            isPendingApproval: false,
             sourceDepartment: file.department?.d_name || 'Unknown Department',
             is_sent: notification.is_sent
           };
@@ -546,28 +290,11 @@ const Notifications = () => {
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'file_department' },
-        (payload) => {
-          // When a file is approved, refresh notifications and ensure coverage
-          if (payload.new?.is_approved === 'approved') {
-            setTimeout(() => {
-              ensureTodaysNotifications();
-              fetchNotifications();
-            }, 500);
-          } else {
-            fetchNotifications();
-          }
+        () => {
+          fetchNotifications();
         }
       )
-      .on('broadcast',
-        { event: 'file_approved' },
-        (payload) => {
-          // When any file is approved, refresh notifications for all users
-          setTimeout(() => {
-            ensureTodaysNotifications();
-            fetchNotifications();
-          }, 1000);
-        }
-      )
+
       .subscribe();
 
     return () => {
@@ -594,7 +321,7 @@ const Notifications = () => {
           Notifications
         </h1>
         <button
-          onClick={() => window.location.reload()}
+          onClick={fetchNotifications}
           className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
         >
           <ArrowPathIcon className="h-4 w-4" />
@@ -609,7 +336,7 @@ const Notifications = () => {
             <p className="font-medium">Error loading notifications</p>
             <p className="text-sm mt-1">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => { setError(null); fetchNotifications(); }}
               className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 underline">
               Try Again
             </button>
@@ -650,29 +377,21 @@ const Notifications = () => {
                     className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`${file.isPendingApproval ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'} rounded-lg p-2.5 flex-shrink-0`}>
-                        {file.isPendingApproval ? (
-                          <BuildingOfficeIcon className="h-5 w-5" />
-                        ) : (
-                          <DocumentTextIcon className="h-5 w-5" />
-                        )}
+                      <div className={`bg-blue-100 text-blue-600 rounded-lg p-2.5 flex-shrink-0`}>
+                        <DocumentTextIcon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm text-gray-900 font-medium truncate">
                             {file.f_name || "Unnamed File"}
                           </p>
-                          {file.isPendingApproval ? (
-                            <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                              Pending Approval
-                            </span>
-                          ) : file.fromSameDept ? (
+                          {file.fromSameDept ? (
                             <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">
                               Internal
                             </span>
                           ) : (
                             <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-                              External (Approved)
+                              External
                             </span>
                           )}
                         </div>
@@ -680,7 +399,7 @@ const Notifications = () => {
                           <span>
                             Added at {formatTime(file.file_created_at || file.created_at)}
                           </span>
-                          {file.isPendingApproval && (
+                          {!file.fromSameDept && (
                             <>
                               <span>•</span>
                               <span>From {file.sourceDepartment}</span>
@@ -691,43 +410,14 @@ const Notifications = () => {
                     </div>
 
                     <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                      {file.isPendingApproval ? (
-                        <>
-                          <button
-                            onClick={() => handleApprovalAction(file.f_uuid, 'accept', file.notif_id)}
-                            disabled={processingActions.has(`${file.f_uuid}-accept`)}
-                            className="inline-flex items-center justify-center px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded-md text-sm font-medium transition-colors"
-                          >
-                            {processingActions.has(`${file.f_uuid}-accept`) ? (
-                              <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <CheckIcon className="h-4 w-4" />
-                            )}
-                            <span className="ml-1">Accept</span>
-                          </button>
-                          <button
-                            onClick={() => handleApprovalAction(file.f_uuid, 'reject', file.notif_id)}
-                            disabled={processingActions.has(`${file.f_uuid}-reject`)}
-                            className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white rounded-md text-sm font-medium transition-colors"
-                          >
-                            {processingActions.has(`${file.f_uuid}-reject`) ? (
-                              <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <XMarkIcon className="h-4 w-4" />
-                            )}
-                            <span className="ml-1">Reject</span>
-                          </button>
-                        </>
-                      ) : (
-                        <a
-                          href={`/file/${file.f_uuid}?from=notification`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center px-3.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-medium transition-colors"
-                        >
-                          View
-                        </a>
-                      )}
+                      <a
+                        href={`/file/${file.f_uuid}?from=notification`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-3.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-medium transition-colors"
+                      >
+                        View
+                      </a>
                     </div>
                   </li>
                 ))}

@@ -10,7 +10,7 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
     const refreshTimerRef = useRef(null);
 
     const fetchMessages = useCallback(async () => {
-        if (!userProfile || !userProfile.id) {
+        if (!userProfile || !userProfile.uuid) {
             setError("User profile not available. Please refresh the page.");
             setLoading(false);
             return;
@@ -33,17 +33,11 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
                     uuid,
                     users!uuid(name)
                 `)
-                .eq('uuid', userProfile.id) // Using id field from the profile which contains the UUID
+                .eq('uuid', userProfile.uuid)
                 .order('created_at', { ascending: false })
                 .limit(7);
 
             if (sentError) {
-                throw sentError;
-            }
-            
-            
-            if (sentError) {
-                // Provide more specific error messages based on common issues
                 if (sentError.code === "42P01") {
                     setError("Database table 'quick_share' not found. Please contact an administrator.");
                 } else if (sentError.code === "42703") {
@@ -70,7 +64,7 @@ const QuickShareBoard = forwardRef(({ userProfile }, ref) => {
 
     useEffect(() => {
         // Only fetch if we have a user profile
-        if (userProfile?.id) {
+        if (userProfile?.uuid) {
             fetchMessages();
             
             // Set up refresh timer to check for new messages every minute

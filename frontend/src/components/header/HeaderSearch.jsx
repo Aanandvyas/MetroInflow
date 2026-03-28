@@ -40,7 +40,7 @@ const HeaderSearch = () => {
     }
     setLoading(true);
     const fetchResults = async () => {
-      let { data, error } = await supabase
+      let queryBuilder = supabase
         .from("file")
         .select(`
           f_uuid,
@@ -55,6 +55,13 @@ const HeaderSearch = () => {
           )
         `)
         .order("created_at", { ascending: false });
+
+      // Apply server-side name filter to avoid fetching all rows
+      if (query.trim()) {
+        queryBuilder = queryBuilder.ilike("f_name", `%${query.trim()}%`);
+      }
+
+      let { data, error } = await queryBuilder;
 
       if (!error && data) {
         let filtered = data;

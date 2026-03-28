@@ -79,10 +79,10 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Error opening file:", err)
 			continue
 		}
-		defer file.Close()
 
 		buf := new(bytes.Buffer)
 		_, err = io.Copy(buf, file)
+		file.Close() // close immediately after read; do not defer inside a loop
 		if err != nil {
 			log.Println("Error reading file to buffer:", err)
 			continue

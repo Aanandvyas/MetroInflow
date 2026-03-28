@@ -1,18 +1,18 @@
 fastapi
 uvicorn[standard]
-pillow
-paddleocr
-paddlepaddle
-python-multipart
 pydantic
+python-multipart
 
-gunicorn
-requests
-python-dotenv
-nltk
-gevent
-#check if needed or not
-jinja2
-fitz
+pillow
 numpy
 PyMuPDF
+
+paddleocr
+paddlepaddle
+
+torch
+transformers
+nest-asyncio
+
+supabase
+requests

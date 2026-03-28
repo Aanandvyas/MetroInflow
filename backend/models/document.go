@@ -29,20 +29,131 @@ func InsertNotification(db *sql.DB, notif Notification) error {
 }
 
 type Summary struct {
-	SUUID     string `json:"s_uuid"`
-	FUUID     string `json:"f_uuid"`
-	Summary   string `json:"summary"`
-	CreatedAt string `json:"created_at,omitempty"`
+	SUUID               string  `json:"s_uuid"`
+	FUUID               string  `json:"f_uuid"`
+	Summary             string  `json:"summary"`
+	OCRConfidence       float64 `json:"ocr_confidence,omitempty"`
+	ExtractedTextLength int     `json:"extracted_text_length,omitempty"`
+	ExtractionTimeMs    int     `json:"extraction_time_ms,omitempty"`
+	SummarizationTimeMs int     `json:"summarization_time_ms,omitempty"`
+	TotalTimeMs         int     `json:"total_time_ms,omitempty"`
+	Status              bool    `json:"status"`
+	State               string  `json:"state"`
+	ErrorMessage        string  `json:"error_message,omitempty"`
+	RetryCount          int     `json:"retry_count"`
+	CreatedAt           string  `json:"created_at,omitempty"`
+	UpdatedAt           string  `json:"updated_at,omitempty"`
 }
 
+// InsertSummary creates a new summary request that has not started yet.
 func InsertSummary(db *sql.DB, summary Summary) error {
 	query := `
-			INSERT INTO summary (f_uuid, summary, created_at)
-			VALUES ($1, $2, NOW())
+		INSERT INTO summary (f_uuid, summary, status, state, created_at, updated_at)
+		VALUES ($1, $2, false, 'pending', NOW(), NOW())
 		`
 	_, err := db.Exec(query, summary.FUUID, summary.Summary)
 	if err != nil {
 		log.Println("InsertSummary DB error:", err)
+	}
+	return err
+}
+
+// GetPendingSummary fetches one summary row that has not started yet.
+func GetPendingSummary(db *sql.DB) (*Summary, error) {
+	query := `
+		SELECT s_uuid, f_uuid, summary, status, state, retry_count, created_at, updated_at
+		FROM summary
+		WHERE status = false
+		ORDER BY created_at ASC
+		LIMIT 1
+	`
+	row := db.QueryRowContext(context.Background(), query)
+	summary := &Summary{}
+	err := row.Scan(
+		&summary.SUUID, &summary.FUUID, &summary.Summary,
+		&summary.Status, &summary.State, &summary.RetryCount,
+		&summary.CreatedAt, &summary.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		log.Println("[DB] GetPendingSummary error:", err)
+		return nil, err
+	}
+	return summary, nil
+}
+
+// MarkSummaryInProgress marks that workflow has started for this row.
+func MarkSummaryInProgress(db *sql.DB, suuid string) error {
+	query := `
+		UPDATE summary
+		SET status = true, state = 'processing', updated_at = NOW()
+		WHERE s_uuid = $1
+	`
+	_, err := db.Exec(query, suuid)
+	if err != nil {
+		log.Println("[DB] MarkSummaryInProgress error:", err)
+	}
+	return err
+}
+
+// UpdateSummaryState tracks current worker progress.
+func UpdateSummaryState(db *sql.DB, suuid string, state string) error {
+	query := `
+		UPDATE summary
+		SET state = $1, updated_at = NOW()
+		WHERE s_uuid = $2
+	`
+	_, err := db.Exec(query, state, suuid)
+	if err != nil {
+		log.Println("[DB] UpdateSummaryState error:", err)
+	}
+	return err
+}
+
+// UpdateSummaryResult stores final summary and marks completion.
+func UpdateSummaryResult(db *sql.DB, suuid string, summary Summary) error {
+	query := `
+		UPDATE summary
+		SET summary = $1,
+		    ocr_confidence = $2,
+		    extracted_text_length = $3,
+		    extraction_time_ms = $4,
+		    summarization_time_ms = $5,
+		    total_time_ms = $6,
+		    status = true,
+		    state = 'completed',
+		    error_message = $7,
+		    updated_at = NOW()
+		WHERE s_uuid = $8
+	`
+	_, err := db.Exec(query,
+		summary.Summary,
+		summary.OCRConfidence,
+		summary.ExtractedTextLength,
+		summary.ExtractionTimeMs,
+		summary.SummarizationTimeMs,
+		summary.TotalTimeMs,
+		summary.ErrorMessage,
+		suuid,
+	)
+	if err != nil {
+		log.Println("[DB] UpdateSummaryResult error:", err)
+	}
+	return err
+}
+
+// MarkSummaryFailed marks summary as failed with error details.
+func MarkSummaryFailed(db *sql.DB, suuid string, errMsg string, retryCount int) error {
+	query := `
+		UPDATE summary
+		SET status = true, state = 'failed', error_message = $1, retry_count = $2, updated_at = NOW()
+		WHERE s_uuid = $3
+	`
+	_, err := db.Exec(query, errMsg, retryCount, suuid)
+	if err != nil {
+		log.Println("[DB] MarkSummaryFailed error:", err)
 	}
 	return err
 }
@@ -109,7 +220,7 @@ func InsertFileDepartment(db *sql.DB, f_uuid, d_uuid string) error {
 }
 
 func GetAllFiles(db *sql.DB) ([]Document, error) {
-	rows, err := db.QueryContext(context.Background(), "SELECT f_uuid, f_name, language, file_path, d_uuid, status, uploaded_at FROM file")
+	rows, err := db.QueryContext(context.Background(), "SELECT f_uuid, f_name, language, COALESCE(uuid::text, ''), file_path, COALESCE(d_uuid::text, ''), COALESCE(status, ''), COALESCE(uploaded_at::text, '') FROM file")
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +229,7 @@ func GetAllFiles(db *sql.DB) ([]Document, error) {
 	var files []Document
 	for rows.Next() {
 		var doc Document
-		err := rows.Scan(&doc.FUUID, &doc.FileName, &doc.Language, &doc.FilePath, &doc.DUUID, &doc.Status, &doc.UploadedAt)
+		err := rows.Scan(&doc.FUUID, &doc.FileName, &doc.Language, &doc.UUID, &doc.FilePath, &doc.DUUID, &doc.Status, &doc.UploadedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -128,10 +239,10 @@ func GetAllFiles(db *sql.DB) ([]Document, error) {
 }
 
 func GetFileByUUID(db *sql.DB, fuuid string) (*Document, error) {
-	query := "SELECT f_uuid, f_name, language, file_path, d_uuid, status, uploaded_at FROM file WHERE f_uuid = $1"
+	query := "SELECT f_uuid, f_name, language, COALESCE(uuid::text, ''), file_path, COALESCE(d_uuid::text, ''), COALESCE(status, ''), COALESCE(uploaded_at::text, '') FROM file WHERE f_uuid = $1"
 	row := db.QueryRowContext(context.Background(), query, fuuid)
 	var doc Document
-	err := row.Scan(&doc.FUUID, &doc.FileName, &doc.Language, &doc.FilePath, &doc.DUUID, &doc.Status, &doc.UploadedAt)
+	err := row.Scan(&doc.FUUID, &doc.FileName, &doc.Language, &doc.UUID, &doc.FilePath, &doc.DUUID, &doc.Status, &doc.UploadedAt)
 	if err != nil {
 		return nil, err
 	}

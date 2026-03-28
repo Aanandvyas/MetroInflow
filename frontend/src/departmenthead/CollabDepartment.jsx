@@ -4,8 +4,6 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../components/context/AuthContext';
 import { safeLocalStorage } from '../utils/localStorage';
 import {
-  CheckCircleIcon,
-  XCircleIcon,
   DocumentTextIcon,
   StarIcon as StarOutline,
   BuildingOfficeIcon,
@@ -14,35 +12,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 
-// Status pill component
-const StatusPill = ({ value }) => {
-  const meta = value === 'approved'
-    ? {
-      label: 'Approved',
-      cls: 'text-green-700 bg-green-50 border-green-200',
-      icon: <CheckCircleIcon className="w-3 h-3 mr-1" />
-    }
-    : value === 'rejected'
-      ? {
-        label: 'Rejected',
-        cls: 'text-red-700 bg-red-50 border-red-200',
-        icon: <XCircleIcon className="w-3 h-3 mr-1" />
-      }
-      : {
-        label: 'Pending',
-        cls: 'text-amber-700 bg-amber-50 border-amber-200',
-        icon: <div className="w-3 h-3 mr-1 rounded-full bg-amber-400"></div>
-      };
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded border inline-flex items-center ${meta.cls}`}>
-      {meta.icon}
-      {meta.label}
-    </span>
-  );
-};
+
 
 // File list component
-const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, toggleImportant }) => {
+const FileList = ({ title, rows, importantMap, toggleImportant }) => {
   const navigate = useNavigate();
   const [departmentNames, setDepartmentNames] = useState({});
 
@@ -105,7 +78,7 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
                     <a href={`/file/${r.f_uuid}`} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 hover:underline truncate">
                       {r.f_name}
                     </a>
-                    <StatusPill value={r.is_approved} />
+
 
                     {/* Sender's department badge - this is the most important info */}
                     {r.senderDeptId && departmentNames[r.senderDeptId] && (
@@ -134,7 +107,7 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
                   <div className="text-xs text-gray-500 mt-0.5">
                     <span className="font-medium">{r.senderName}</span>
                     <span className="inline-flex ml-1 items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      Department Head
+                      {r.senderPosition === 'head' ? 'Department Head' : 'Staff'}
                     </span>
                     {departmentNames[r.senderDeptId] && (
                       <span className="ml-1">
@@ -171,23 +144,6 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
                   </svg> Summary
                 </button>
 
-                {/* Approval buttons only shown for files that are still pending and can be decided */}
-                {isHead && r.canDecide && r.is_approved !== 'approved' && r.is_approved !== 'rejected' && (
-                  <>
-                    <button
-                      onClick={() => onApprove(r.fd_uuid)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-green-600 text-green-700 hover:bg-green-50"
-                    >
-                      <CheckCircleIcon className="h-4 w-4" /> Approve
-                    </button>
-                    <button
-                      onClick={() => onReject(r.fd_uuid)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-red-600 text-red-700 hover:bg-red-50"
-                    >
-                      <XCircleIcon className="h-4 w-4" /> Reject
-                    </button>
-                  </>
-                )}
               </div>
             </li>
           ))}
@@ -200,13 +156,12 @@ const FileList = ({ title, rows, isHead, onApprove, onReject, importantMap, togg
 const CollabDepartment = () => {
   const { departmentId } = useParams();
   const navigate = useNavigate();
-  const { user, getUserProfile } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const { user, userProfile: profile } = useAuth();
   const [department, setDepartment] = useState(null);
   const [received, setReceived] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
+  const [filter, setFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all'); // 'all' or a specific department UUID
   const [departmentList, setDepartmentList] = useState([]); // List of all departments for filtering
   const [importantMap, setImportantMap] = useState({});
@@ -223,21 +178,7 @@ const CollabDepartment = () => {
     }
   }, []);
 
-  const isHead = useMemo(() => profile?.position === 'head', [profile]);
 
-  // Load user profile
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (!user?.id) return;
-      try {
-        const data = await getUserProfile(user.id);
-        setProfile(data);
-      } catch (e) {
-        setError('Failed to load user profile');
-      }
-    };
-    loadProfile();
-  }, [user?.id, getUserProfile]);
 
   // Load department details
   useEffect(() => {
@@ -352,41 +293,8 @@ const CollabDepartment = () => {
           });
 
 
-        // Show a helpful message when there are no files from this department
-        if (recData && recData.length > 0 && recMapped.length === 0) {
-          setError(`No files from ${department?.d_name || 'this department'} have been shared with your department yet. Check with the department head if you're expecting files.`);
-        } else if (recMapped.length === 0) {
-          // If we're not showing any files
-          setError(`No files from ${department?.d_name || 'this department'} have been shared with your department yet.`);
-
-          // If we're showing other departments, gather a list of unique departments from both sender and file departments
-          // This ensures we include both the departments where files were created AND departments that shared them
-          const fileDeptIds = new Set(recMapped.filter(f => f.fileDeptId).map(f => f.fileDeptId));
-          const senderDeptIds = new Set(recMapped.filter(f => f.senderDeptId).map(f => f.senderDeptId));
-          const allDeptIds = new Set([...Array.from(fileDeptIds), ...Array.from(senderDeptIds)]);
-
-          if (allDeptIds.size > 0) {
-
-            // Fetch department names for all relevant departments
-            const fetchDeptNames = async () => {
-              const { data } = await supabase
-                .from('department')
-                .select('d_uuid, d_name')
-                .in('d_uuid', Array.from(allDeptIds));
-
-              if (data) {
-
-                // Store department list for filtering
-                setDepartmentList(data);
-              }
-            };
-
-            fetchDeptNames();
-          }
-        } else {
-          // Clear any previous error if we have files to show
-          setError(null);
-        }
+        // Clear any previous error
+        setError(null);
 
         setReceived(recMapped);
       } catch (e) {
@@ -418,7 +326,8 @@ const CollabDepartment = () => {
 
       return () => { supabase.removeChannel(channel); };
     }
-  }, [profile?.d_uuid, departmentId, department?.d_name]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.d_uuid, departmentId]);
 
   // Handle important marking
   const persistImportant = (next) => {
@@ -433,42 +342,7 @@ const CollabDepartment = () => {
     });
   };
 
-  // Approval functions
-  const approve = async (fd_uuid) => {
-    try {
-      const { error } = await supabase
-        .from('file_department')
-        .update({ is_approved: 'approved' })
-        .eq('fd_uuid', fd_uuid);
 
-      if (error) throw error;
-
-      // Update UI optimistically
-      setReceived(prev => prev.map(r =>
-        r.fd_uuid === fd_uuid ? { ...r, is_approved: 'approved' } : r
-      ));
-    } catch (e) {
-      setError(e.message || 'Approve failed');
-    }
-  };
-
-  const reject = async (fd_uuid) => {
-    try {
-      const { error } = await supabase
-        .from('file_department')
-        .update({ is_approved: 'rejected' })
-        .eq('fd_uuid', fd_uuid);
-
-      if (error) throw error;
-
-      // Update UI optimistically
-      setReceived(prev => prev.map(r =>
-        r.fd_uuid === fd_uuid ? { ...r, is_approved: 'rejected' } : r
-      ));
-    } catch (e) {
-      setError(e.message || 'Reject failed');
-    }
-  };
 
   // Go back to dashboard
   const handleBackClick = () => {
@@ -479,12 +353,7 @@ const CollabDepartment = () => {
   const filteredFiles = useMemo(() => {
     return received.filter(file => {
       // Apply status filter
-      const statusMatch =
-        filter === 'all' ? true :
-          filter === 'pending' ? file.is_approved === 'pending' || file.is_approved === null :
-            filter === 'approved' ? file.is_approved === 'approved' :
-              filter === 'rejected' ? file.is_approved === 'rejected' :
-                true;
+      const statusMatch = true;
 
       // Apply department filter - match either sender department or file department
       // This makes sure we can filter by either "who sent it" or "where it was created"
@@ -520,24 +389,18 @@ const CollabDepartment = () => {
 
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Files from {department?.d_name || 'Department'} Head
+            Files from {department?.d_name || 'Department'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Review and manage files received from the department head of {department?.d_name || 'this department'}
+            Files shared from {department?.d_name || 'this department'}
           </p>
         </div>
       </div>
 
-      {/* Error message if any */}
-      {error && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 p-4 rounded-md">
-          <div className="flex">
-            <InformationCircleIcon className="h-5 w-5 mr-2" />
-            <div>
-              <p className="font-medium">Note</p>
-              <p>{error}</p>
-            </div>
-          </div>
+      {/* Error message - only show actual errors, not empty states */}
+      {error && received.length === 0 && !loading && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 p-3 rounded-md text-sm">
+          {error}
         </div>
       )}
 
@@ -579,52 +442,14 @@ const CollabDepartment = () => {
                     </div>
                   )}
 
-                  {/* Status filter */}
-                  <div className="flex items-center space-x-2">
-                    <label htmlFor="status-filter" className="text-sm text-gray-600">Status:</label>
-                    <select
-                      id="status-filter"
-                      value={filter}
-                      onChange={(e) => setFilter(e.target.value)}
-                      className="text-sm border rounded p-1"
-                    >
-                      <option value="all">All Files</option>
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
+
                 </div>
               </div>
 
               {received.length === 0 ? (
-                <div className="border rounded bg-yellow-50 p-4">
-                  <div className="flex items-start">
-                    <InformationCircleIcon className="h-6 w-6 text-yellow-700 mr-3" />
-                    <div>
-                      <h4 className="font-medium text-yellow-800">No files available</h4>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        No files have been shared from {department?.d_name || 'this department'} that match the current filters.
-                      </p>
-                      <div className="text-xs text-yellow-800 mt-2 bg-yellow-100 p-2 rounded">
-                        <p className="font-medium">Troubleshooting tips:</p>
-                        <ul className="list-disc list-inside mt-1">
-                          <li>Check if {department?.d_name || 'this department'} has shared any files</li>
-                          <li>Ask the department head to share files with your department</li>
-                          <li>Try selecting a different filter option above</li>
-                          <li>Check the browser console for detailed logs (F12)</li>
-                        </ul>
-                      </div>
-                      <div className="mt-4">
-                        <button
-                          onClick={() => window.history.back()}
-                          className="px-3 py-1.5 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
-                        >
-                          Go back to department selection
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="text-center py-12">
+                  <DocumentTextIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">No files found from this department.</p>
                 </div>
               ) : filteredFiles.length === 0 ? (
                 <div className="border rounded bg-gray-50 p-4">
@@ -652,9 +477,6 @@ const CollabDepartment = () => {
               ) : (
                 <FileList
                   rows={filteredFiles}
-                  isHead={isHead}
-                  onApprove={approve}
-                  onReject={reject}
                   importantMap={importantMap}
                   toggleImportant={toggleImportant}
                 />

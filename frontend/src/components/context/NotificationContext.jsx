@@ -29,7 +29,7 @@ export const NotificationProvider = ({ children }) => {
         .from('users')
         .select('d_uuid, position')
         .eq('uuid', user.id)
-        .single();
+        .maybeSingle();
 
       if (userError || !userData?.d_uuid) {
         setNotificationCount(0);
@@ -37,7 +37,7 @@ export const NotificationProvider = ({ children }) => {
       }
 
       const userDepartmentId = userData.d_uuid;
-      const isHead = userData.position === 'head';
+
 
       // Calculate 4 days ago - exact same logic as notifications page
       const fourDaysAgo = new Date();
@@ -45,26 +45,15 @@ export const NotificationProvider = ({ children }) => {
       fourDaysAgo.setHours(0, 0, 0, 0);
       const fourDaysAgoStr = fourDaysAgo.toISOString();
 
-      // Query notifications - exact same as notifications page
-      let notificationsQuery;
-      if (isHead) {
-        notificationsQuery = supabase
-          .from('notifications')
-          .select('notif_id, f_uuid, is_seen, is_sent, created_at')
-          .eq('uuid', user.id)
-          .eq('is_seen', false)
-          .gte('created_at', fourDaysAgoStr)
-          .order('created_at', { ascending: false });
-      } else {
-        notificationsQuery = supabase
-          .from('notifications')
-          .select('notif_id, f_uuid, is_seen, is_sent, created_at')
-          .eq('uuid', user.id)
-          .eq('is_seen', false)
-          .eq('is_sent', true)
-          .gte('created_at', fourDaysAgoStr)
-          .order('created_at', { ascending: false });
-      }
+      // All users see the same notifications
+      let notificationsQuery = supabase
+        .from('notifications')
+        .select('notif_id, f_uuid, is_seen, is_sent, created_at')
+        .eq('uuid', user.id)
+        .eq('is_seen', false)
+        .eq('is_sent', true)
+        .gte('created_at', fourDaysAgoStr)
+        .order('created_at', { ascending: false });
 
       const { data, error } = await notificationsQuery;
 
@@ -118,26 +107,10 @@ export const NotificationProvider = ({ children }) => {
         }
       }
 
-      // Filter notifications - exact same logic as notifications page
+      // Filter notifications - show all files
       const visibleNotifications = latestPerFile.filter(notification => {
         const file = fileMap[notification.f_uuid];
-        
-        if (!file) return false;
-        
-        // Files from user's own department are always visible
-        if (file.d_uuid === userDepartmentId) return true;
-        
-        // For pending approval notifications (is_sent = null), only show to heads
-        if (notification.is_sent === null) {
-          return isHead;
-        }
-
-        // For files from other departments, check if approved for user's department
-        const hasApprovedRelation = file.file_department?.some(fd => 
-          fd.d_uuid === userDepartmentId && fd.is_approved === 'approved'
-        );
-
-        return hasApprovedRelation;
+        return !!file;
       });
 
       setNotificationCount(visibleNotifications.length);

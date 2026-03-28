@@ -32,7 +32,6 @@ export default function Important() {
         )
       `)
       .eq("uuid", user.id)
-      .eq("file.file_department.is_approved", "approved")
       .order("created_at", { ascending: false });
 
     if (error) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../supabaseClient';
-import { supabaseAdmin } from '../../supabaseAdmin';
+import { listUsers as apiListUsers, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from '../adminApi';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -28,28 +28,18 @@ const UserManagement = () => {
     fetchUsers();
   }, []);
   
-  // Fetch users list
+  // Fetch users list (via backend admin API — no service-role key in the browser)
   const fetchUsers = async () => {
     setLoadingUsers(true);
-    const { data, error } = await supabase
-      .from("users")
-      .select(`
-        uuid, 
-        name, 
-        email, 
-        phone_number, 
-        department(d_name, d_uuid),
-        role(r_name, r_uuid),
-        position,
-        address
-      `);
-    
-    if (error) {
-      setUsers([]);
-    } else {
+    try {
+      const data = await apiListUsers();
       setUsers(data || []);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
     }
-    setLoadingUsers(false);
   };
   
   // Fetch roles for a department
@@ -111,7 +101,7 @@ const UserManagement = () => {
     setIsSubmitting(true);
     
     try {
-      // Update the user in the database
+      // Update the users table directly for relational fields (role)
       const { error } = await supabase
         .from('users')
         .update({
@@ -123,6 +113,18 @@ const UserManagement = () => {
         .eq('uuid', editingUser.uuid);
       
       if (error) throw error;
+      
+      // Also sync basic fields to Supabase Auth user_metadata via backend API
+      try {
+        await apiUpdateUser(editingUser.uuid, {
+          name: editFormData.name,
+          phone_number: editFormData.phone_number,
+          address: editFormData.address,
+          r_uuid: editFormData.r_uuid || null,
+        });
+      } catch (authErr) {
+        console.warn('Auth metadata sync failed (non-critical):', authErr);
+      }
       
       // Get the updated role name for display
       let updatedRoleName = '';
@@ -188,53 +190,8 @@ const UserManagement = () => {
     setIsSubmitting(true);
     
     try {
-      let authError = null;
-      
-      // First, try to delete the user from Supabase Auth
-      if (supabaseAdmin) {
-       
-        
-        // First, try to get the user to see if it exists
-        const { error: getUserError } = await supabaseAdmin.auth.admin.getUserById(
-          userToDelete.uuid
-        );
-        
-        if (getUserError) {
-          
-          // Try to list users by email to find the correct auth user
-          const { data: userList, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-          
-          if (!listError && userList?.users) {
-            const authUserByEmail = userList.users.find(u => u.email === userToDelete.email);
-            if (authUserByEmail) {
-              // Delete using the auth user's ID
-              const result = await supabaseAdmin.auth.admin.deleteUser(authUserByEmail.id);
-              authError = result.error;
-            } else {
-              authError = new Error('User not found in authentication system');
-            }
-          } else {
-            authError = getUserError;
-          }
-        } else {
-          // User exists, proceed with deletion using the UUID
-          const result = await supabaseAdmin.auth.admin.deleteUser(userToDelete.uuid);
-          authError = result.error;
-        }
-        
-        
-      } else {
-        console.warn('Supabase admin client not available, skipping auth deletion');
-        authError = new Error('Admin client not initialized');
-      }
-      
-      // Delete the user from the database
-      await supabase
-        .from('users')
-        .delete()
-        .eq('uuid', userToDelete.uuid);
-      
-      
+      // Delete user via backend admin API (handles both auth + DB deletion)
+      const result = await apiDeleteUser(userToDelete.uuid);
       
       // Update local state to remove the deleted user
       setUsers(users.filter(user => user.uuid !== userToDelete.uuid));
@@ -242,9 +199,9 @@ const UserManagement = () => {
       setNotification({
         show: true,
         type: 'success',
-        message: authError 
-          ? 'User deleted from database (auth deletion failed - may require manual cleanup)'
-          : 'User deleted successfully from both database and authentication!'
+        message: result.auth_deleted
+          ? 'User deleted successfully from both database and authentication!'
+          : 'User deleted from database (auth deletion may require manual cleanup)'
       });
       
       // Close the confirmation dialog
@@ -306,6 +263,7 @@ const UserManagement = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verified</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
@@ -315,7 +273,7 @@ const UserManagement = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
                     {searchTerm ? "No users matching your search" : "No users found"}
                   </td>
                 </tr>
@@ -334,6 +292,17 @@ const UserManagement = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {user.email_confirmed_at ? (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                          Unverified
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.department?.d_name || 'N/A'}
                     </td>

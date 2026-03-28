@@ -35,7 +35,7 @@ const AssignToMe = () => {
         .from("users")
         .select("d_uuid, department(d_name)")
         .eq("uuid", user.id)
-        .single();
+        .maybeSingle();
       if (!error) setUserDepartment(data);
     };
     run();
@@ -59,7 +59,6 @@ const AssignToMe = () => {
           )
         `)
         .eq("file_department.d_uuid", userDepartment.d_uuid)
-        .eq("file_department.is_approved", "approved")
         .order("created_at", { ascending: false })
         .limit(20); // Limit to only last 20 files
 

@@ -23,7 +23,7 @@ const UploadedDocsContainer = () => {
           .from("users")
           .select("d_uuid, department(d_name)")
           .eq("uuid", user.id)
-          .single();
+          .maybeSingle();
         if (userError) throw userError;
         if (!userData?.d_uuid) {
           setError("Your profile has no department.");
@@ -46,7 +46,6 @@ const UploadedDocsContainer = () => {
             )
           `)
           .eq("file_department.d_uuid", userData.d_uuid)
-          .eq("file_department.is_approved", "approved")
           .order("created_at", { ascending: false });
 
         if (filesError) throw filesError;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { safeLocalStorage } from '../utils/localStorage';
+import { adminLogout } from './adminApi';
 
 // Icons
 import { 
@@ -76,6 +77,7 @@ const AdminDashboard = () => {
   
   // Handle admin logout
   const handleLogout = () => {
+    adminLogout(); // invalidate backend session
     safeLocalStorage.removeItem('adminSession');
     navigate('/login');
   };

@@ -4,6 +4,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -29,7 +30,7 @@ func RunSummarizer(text string) (string, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		log.Println("[RunSummarizer] Non-200 response:", resp.Status)
-		return "", err
+		return "", fmt.Errorf("summarizer returned non-200 status: %s", resp.Status)
 	}
 	var result struct {
 		Summary string `json:"summary"`

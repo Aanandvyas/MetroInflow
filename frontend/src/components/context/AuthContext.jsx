@@ -6,10 +6,18 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);    // cached DB profile (with department/role joins)
+  const [profileLoading, setProfileLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Sign up a new user
+  // ── helpers ──────────────────────────────────────────────
+
+  /** Whether the current user's email is verified */
+  const isEmailVerified = !!user?.email_confirmed_at;
+
+  // ── Sign up (used by admin registration form) ──────────
+  // Profile fields are passed via options.data → stored in auth.users.raw_user_meta_data
+  // The Postgres trigger `handle_new_user` auto-creates the public.users row
   const signUpNewUser = async (formData) => {
     const {
       email,
@@ -19,15 +27,26 @@ export const AuthProvider = ({ children }) => {
       dob,
       gender,
       address,
-      departmentName,
+      departmentUuid,  // d_uuid resolved by caller
+      roleUuid,        // r_uuid resolved by caller
+      position,        // 'regular' | 'head'
     } = formData;
 
-    // 1. Create account in Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: process.env.REACT_APP_REDIRECT_URL || "http://localhost:3000/login",
+        data: {
+          name: fullName,
+          phone_number: phoneNumber,
+          dob: dob || null,
+          gender: gender || null,
+          address: address || null,
+          d_uuid: departmentUuid || null,
+          r_uuid: roleUuid || null,
+          position: position || "regular",
+        },
       },
     });
 
@@ -35,60 +54,10 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     }
 
-    let d_uuid = null;
-
-    // 2. Get department uuid from department table
-    if (departmentName) {
-      const { data: deptData, error: deptError } = await supabase
-        .from("department")
-        .select("d_uuid")
-        .ilike("d_name", departmentName)
-        .single();
-
-      if (deptError) {
-        return { success: false, error: deptError };
-      }
-
-      d_uuid = deptData?.d_uuid || null;
-    }
-
-    // 3. Insert into your "user" table
-    if (data.user) {
-      const { error: userError } = await supabase.from("users").insert([
-        {
-          uuid: data.user.id,   // <-- FIXED
-          email,
-          name: fullName,
-          phone_number: phoneNumber,
-          dob,
-          gender,
-          address,
-          d_uuid,
-          age: dob
-            ? (() => {
-              const today = new Date();
-              const birth = new Date(dob);
-              let age = today.getFullYear() - birth.getFullYear();
-              const monthDiff = today.getMonth() - birth.getMonth();
-              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-                age--;
-              }
-              return age;
-            })()
-            : null,
-        },
-      ]);
-
-
-      if (userError) {
-        return { success: false, error: userError };
-      }
-    }
-
     return { success: true, data };
   };
 
-  // ✅ Sign in
+  // ── Sign in ────────────────────────────────────────────
   const signInUser = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -101,12 +70,13 @@ export const AuthProvider = ({ children }) => {
     return { success: true, data };
   };
 
-  // ✅ Sign out
+  // ── Sign out ───────────────────────────────────────────
   const signOutUser = async () => {
+    setUserProfile(null);
     await supabase.auth.signOut();
   };
 
-  // ✅ Get profile from user table (memoized to avoid re-render loops)
+  // ── Profile fetching (DB: users + department + role joins) ──
   const getUserProfile = useCallback(async (uuid) => {
     try {
       const { data, error } = await supabase
@@ -120,32 +90,40 @@ export const AuthProvider = ({ children }) => {
         .maybeSingle();
 
       if (error) {
-        console.error('getUserProfile error:', error);
+        console.error("getUserProfile error:", error);
         return null;
       }
       return data;
     } catch (err) {
-      console.error('getUserProfile exception:', err);
+      console.error("getUserProfile exception:", err);
       return null;
     }
   }, []);
 
-  // ✅ Update user role
+  /** Force-refresh the cached userProfile from the DB */
+  const refreshUserProfile = useCallback(async () => {
+    if (!user?.id) return null;
+    setProfileLoading(true);
+    const profile = await getUserProfile(user.id);
+    setUserProfile(profile);
+    setProfileLoading(false);
+    return profile;
+  }, [user?.id, getUserProfile]);
+
+  // ── Update user role ───────────────────────────────────
   const updateUserRole = async (uuid, r_uuid) => {
     const { error } = await supabase
       .from("users")
       .update({ r_uuid })
-      .eq("uuid", uuid);   // <-- also here
+      .eq("uuid", uuid);
 
     if (error) {
       return { success: false, error };
     }
-
     return { success: true };
   };
 
-
-  // ✅ Fetch available roles
+  // ── Fetch available roles ──────────────────────────────
   const getRoles = async () => {
     const { data, error } = await supabase
       .from("role")
@@ -157,7 +135,7 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  // ✅ Session management
+  // ── Session management ─────────────────────────────────
   useEffect(() => {
     setLoading(true);
 
@@ -202,15 +180,28 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  // ── Auto-fetch profile when user changes ───────────────
+  useEffect(() => {
+    if (user?.id) {
+      refreshUserProfile();
+    } else {
+      setUserProfile(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const value = {
     session,
     user,
-    userProfile,
+    userProfile,       // cached profile with department/role
+    profileLoading,
+    isEmailVerified,
     loading,
     signUpNewUser,
     signInUser,
     signOutUser,
-    getUserProfile,
+    getUserProfile,    // still available for one-off lookups of other users
+    refreshUserProfile,
     updateUserRole,
     getRoles,
   };

@@ -96,7 +96,7 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
             return;
         }
         
-        if (!userProfile || !userProfile.id) {
+        if (!userProfile || !userProfile.uuid) {
             setSubmitStatus({ 
                 type: 'error', 
                 message: 'Unable to identify current user' 
@@ -122,7 +122,7 @@ const QuickShare = ({ userProfile, onMessageSent }) => {
                     {
                         data: jsonData,
                         d_uuid: selectedDepartment.d_uuid, // Using the correct d_uuid field from schema
-                        uuid: userProfile.id, // Using the id field from profile which contains the UUID
+                        uuid: userProfile.uuid,
                         created_at: new Date().toISOString()
                     }
                 ]);

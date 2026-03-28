@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
@@ -35,32 +35,12 @@ const headNavItems = [
 
 const Sidebar = () => {
   const location = useLocation(); // ✅ Hook to get the current URL path
-  const { user, getUserProfile } = useAuth();
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch user profile to determine position
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (user?.id) {
-        try {
-          const profile = await getUserProfile(user.id);
-          setUserProfile(profile);
-        } catch (error) {
-          console.error('Failed to fetch user profile:', error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchUserProfile();
-  }, [user, getUserProfile]);
+  const { userProfile, profileLoading } = useAuth();
 
   // Determine which navigation items to show based on user position
   const navItems = userProfile?.position === 'head' ? headNavItems : regularNavItems;
 
-  if (loading) {
+  if (profileLoading) {
     return (
       <aside className="w-64 bg-white p-5 border-r border-gray-200 overflow-y-auto">
         <div className="animate-pulse">

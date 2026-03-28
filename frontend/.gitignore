@@ -1,3 +1,4 @@
+supabase_auth_trigger.sql
 # dependencies
 /frontend/node_modules
 /node_modules

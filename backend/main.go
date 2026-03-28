@@ -27,7 +27,10 @@ import (
 
 func checkDBConnection() {
 	url := os.Getenv("SUPABASE_URL")
-	key := os.Getenv("SUPABASE_SERVICE_KEY")
+	key := os.Getenv("SUPABASE_ANON_KEY")
+	if key == "" {
+		key = os.Getenv("SUPABASE_SERVICE_KEY")
+	}
 
 	if url == "" || key == "" {
 		log.Println("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
@@ -103,6 +106,54 @@ func main() {
 	// http.HandleFunc("/v1/files/", handlers.GetFileHandler)
 	// http.HandleFunc("/v1/departments", handlers.ListDepartmentsHandler)
 
+	// OCR + LLM first-10-pages processing APIs
+	http.HandleFunc("/v1/documents/process-first-10-pages", handlers.ProcessFirst10PagesHandler)
+	http.HandleFunc("/v1/documents/process-first-10-pages/status", handlers.ProcessFirst10PagesStatusHandler)
+
+	// Summary queue/status APIs
+	http.HandleFunc("/v1/summary/generate", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		handlers.RequestSummaryHandler(w, r)
+	})
+	http.HandleFunc("/v1/summary/status", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		handlers.GetSummaryStatusHandler(w, r)
+	})
+
+	// Direct LLM APIs (proxy to llama completion server)
+	http.HandleFunc("/v1/llm/generate", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		handlers.LLMGenerateHandler(w, r)
+	})
+	http.HandleFunc("/v1/llm/summarize", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		handlers.LLMSummarizeHandler(w, r)
+	})
+
 	//CORS Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -115,10 +166,19 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
+	// Start summary worker goroutine (polls every 3 seconds)
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			handlers.ProcessSummaryWorkerTask()
+		}
+	}()
+
 	//Start notification polling goroutine
 	go func() {
 		for {
-			rows, err := config.DB.Query(`SELECT notif_id, uuid, f_uuid FROM notifications WHERE is_sent = false`)
+			rows, err := config.DB.Query(`SELECT notif_id, uuid, f_uuid FROM notifications WHERE is_sent IS NOT TRUE`)
 			if err != nil {
 				log.Println("[NOTIF] DB query error:", err)
 				time.Sleep(10 * time.Second)
@@ -229,6 +289,24 @@ func main() {
 			time.Sleep(10 * time.Second)
 		}
 	}()
+
+	// ── Admin API routes (protected by admin session token) ──
+	http.HandleFunc("/v1/admin/login", handlers.AdminLoginHandler)
+	http.HandleFunc("/v1/admin/logout", handlers.AdminAuthMiddleware(handlers.AdminLogoutHandler))
+	http.HandleFunc("/v1/admin/users", handlers.AdminAuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handlers.AdminListUsersHandler(w, r)
+		case http.MethodPost:
+			handlers.AdminCreateUserHandler(w, r)
+		case http.MethodPut:
+			handlers.AdminUpdateUserHandler(w, r)
+		case http.MethodDelete:
+			handlers.AdminDeleteUserHandler(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
 
 	//Start HTTP server
 	port := os.Getenv("PORT")

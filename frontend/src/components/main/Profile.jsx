@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { UserCircleIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
+import { UserCircleIcon, ArrowRightOnRectangleIcon, CheckBadgeIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 const Profile = () => {
-    const { user, userProfile: profile, signOutUser, loading: authLoading } = useAuth();
+    const { user, userProfile, profileLoading, isEmailVerified, signOutUser, refreshUserProfile, loading: authLoading } = useAuth();
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
@@ -17,29 +16,29 @@ const Profile = () => {
             return;
         }
 
-        if (!profile && !authLoading) {
-            // Profile missing in database even though auth session exists
-            console.warn("Profile not found for session user. Signing out.");
-            setError("Your profile could not be found. Signing out to refresh session...");
-
-            setTimeout(async () => {
-                await signOutUser();
-                navigate('/login', { replace: true });
-            }, 2000);
+        // If profile was not loaded yet (edge case), try to refresh
+        if (!userProfile && !profileLoading) {
+            refreshUserProfile().then(profile => {
+                if (!profile) {
+                    setError("Your profile could not be found. Signing out to refresh session...");
+                    setTimeout(async () => {
+                        await signOutUser();
+                        navigate('/login', { replace: true });
+                    }, 2000);
+                }
+            });
         }
-    }, [user, profile, navigate, authLoading, signOutUser]);
+    }, [user, userProfile, profileLoading, refreshUserProfile, navigate, authLoading, signOutUser]);
 
     const handleSignOut = async () => {
         await signOutUser();
         navigate('/login');
     };
 
-    // Show loading while auth is loading
-    if (authLoading || loading) {
+    if (authLoading || profileLoading) {
         return <p className="text-center p-10">Loading profile...</p>;
     }
 
-    // Show error if there's an error
     if (error) {
         return (
             <div className="text-center p-10">
@@ -54,7 +53,7 @@ const Profile = () => {
         );
     }
 
-    if (!profile) {
+    if (!userProfile) {
         return <p className="text-center p-10">Could not load profile data.</p>;
     }
 
@@ -65,8 +64,22 @@ const Profile = () => {
                 <div className="flex items-center gap-4">
                     <UserCircleIcon className="h-16 w-16 text-gray-400" />
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-800">{profile.name}</h1>
-                        <p className="text-gray-500">{profile.email}</p>
+                        <h1 className="text-2xl font-bold text-gray-800">{userProfile.name}</h1>
+                        <p className="text-gray-500">{userProfile.email}</p>
+                        {/* Verification badge */}
+                        <div className="flex items-center gap-1 mt-1">
+                            {isEmailVerified ? (
+                                <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                                    <CheckBadgeIcon className="h-4 w-4" />
+                                    Email verified
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                                    <ExclamationTriangleIcon className="h-4 w-4" />
+                                    Email not verified
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -77,19 +90,19 @@ const Profile = () => {
                     {/* Full Name */}
                     <div className="col-span-1">
                         <label className="block text-sm font-medium text-gray-600">Full Name</label>
-                        <input type="text" value={profile.name} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                        <input type="text" value={userProfile.name} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
                     </div>
 
                     {/* Department */}
                     <div className="col-span-1">
                         <label className="block text-sm font-medium text-gray-600">Department</label>
-                        <input type="text" value={profile.department?.d_name || 'N/A'} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                        <input type="text" value={userProfile.department?.d_name || 'N/A'} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
                     </div>
 
                     {/* Phone Number */}
                     <div className="col-span-1">
                         <label className="block text-sm font-medium text-gray-600">Phone Number</label>
-                        <input type="text" value={profile.phone_number} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                        <input type="text" value={userProfile.phone_number || ''} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
                     </div>
 
                     {/* Role */}
@@ -97,16 +110,29 @@ const Profile = () => {
                         <label className="block text-sm font-medium text-gray-600">Role</label>
                         <input
                             type="text"
-                            value={profile.position === 'head'
-                                ? `Head of ${profile.department?.d_name || 'Department'}`
-                                : (profile.role?.r_name || 'N/A')}
+                            value={userProfile.position === 'head'
+                                ? `Head of ${userProfile.department?.d_name || 'Department'}`
+                                : (userProfile.role?.r_name || 'N/A')}
                             disabled
                             className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed"
                         />
                     </div>
-                </div>
 
-                {/* No action buttons needed as editing is removed */}
+                    {/* Account info from Supabase Auth */}
+                    {user?.last_sign_in_at && (
+                        <div className="col-span-1">
+                            <label className="block text-sm font-medium text-gray-600">Last Sign In</label>
+                            <input type="text" value={new Date(user.last_sign_in_at).toLocaleString()} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                        </div>
+                    )}
+
+                    {user?.created_at && (
+                        <div className="col-span-1">
+                            <label className="block text-sm font-medium text-gray-600">Account Created</label>
+                            <input type="text" value={new Date(user.created_at).toLocaleString()} disabled className="mt-1 w-full p-3 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed" />
+                        </div>
+                    )}
+                </div>
             </div>
             {/* Logout Button */}
             <div className="mt-10 flex justify-center">

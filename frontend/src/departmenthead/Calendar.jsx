@@ -780,7 +780,8 @@ const Calendar = () => {
 
     // Simple line graph component
     const LineGraph = () => {
-        const maxValue = Math.max(...monthlyStats.map(stat => stat.total));
+        const rawMax = Math.max(...monthlyStats.map(stat => stat.total), 0);
+        const maxValue = rawMax > 0 ? rawMax : 1; // Avoid division by zero
         const graphHeight = 200;
         const graphWidth = 600;
 

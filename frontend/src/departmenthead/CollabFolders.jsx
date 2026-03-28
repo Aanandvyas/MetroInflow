@@ -3,7 +3,7 @@ import { useAuth } from '../components/context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { safeLocalStorage } from '../utils/localStorage';
-import { CheckCircleIcon, XCircleIcon, DocumentTextIcon, StarIcon as StarOutline, BuildingOfficeIcon, EyeIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, StarIcon as StarOutline, BuildingOfficeIcon, EyeIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 
 // Error boundary component to catch rendering errors
@@ -39,16 +39,9 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const StatusPill = ({ value }) => {
-  const meta = value === true
-    ? { label: 'Approved', cls: 'text-green-700 bg-green-50 border-green-200' }
-    : value === false
-    ? { label: 'Rejected', cls: 'text-red-700 bg-red-50 border-red-200' }
-    : { label: 'Pending', cls: 'text-amber-700 bg-amber-50 border-amber-200' };
-  return <span className={`text-xs px-2 py-0.5 rounded border ${meta.cls}`}>{meta.label}</span>;
-};
 
-const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, toggleImportant }) => {
+
+const CollabList = ({ title, rows, importantMap, toggleImportant }) => {
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'list'
   
   // Use horizontal scrolling when there are more than 4 cards
@@ -94,7 +87,7 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
                     <a href={`/file/${r.f_uuid}`} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 hover:underline truncate">
                       {r.f_name}
                     </a>
-                    <StatusPill value={r.is_approved} />
+
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     Shared on {new Date(r.shared_at).toLocaleString()}
@@ -121,16 +114,7 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
                 >
                   <DocumentChartBarIcon className="h-4 w-4" /> Summary
                 </button>
-                {isHead && r.canDecide && (
-                  <>
-                    <button onClick={() => onApprove(r.fd_uuid)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-green-600 text-green-700 hover:bg-green-50" disabled={r.is_approved === true}>
-                      <CheckCircleIcon className="h-4 w-4" /> Approve
-                    </button>
-                    <button onClick={() => onReject(r.fd_uuid)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-red-600 text-red-700 hover:bg-red-50" disabled={r.is_approved === false}>
-                      <XCircleIcon className="h-4 w-4" /> Reject
-                    </button>
-                  </>
-                )}
+
               </div>
             </li>
           ))}
@@ -146,7 +130,7 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
                   <button onClick={() => toggleImportant(r.fd_uuid)} className="p-1 rounded hover:bg-gray-100" title={importantMap[r.fd_uuid] ? 'Unmark' : 'Mark Important'}>
                     {importantMap[r.fd_uuid] ? <StarSolid className="h-5 w-5 text-yellow-500" /> : <StarOutline className="h-5 w-5 text-gray-400" />}
                   </button>
-                  <StatusPill value={r.is_approved} />
+
                 </div>
               </div>
               
@@ -180,16 +164,7 @@ const CollabList = ({ title, rows, isHead, onApprove, onReject, importantMap, to
                 >
                   <DocumentChartBarIcon className="h-4 w-4" /> Summary
                 </button>
-                {isHead && r.canDecide && (
-                  <div className="flex gap-2 w-full mt-2">
-                    <button onClick={() => onApprove(r.fd_uuid)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-green-600 text-green-700 hover:bg-green-50 flex-grow justify-center" disabled={r.is_approved === true}>
-                      <CheckCircleIcon className="h-4 w-4" /> Approve
-                    </button>
-                    <button onClick={() => onReject(r.fd_uuid)} className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded border border-red-600 text-red-700 hover:bg-red-50 flex-grow justify-center" disabled={r.is_approved === false}>
-                      <XCircleIcon className="h-4 w-4" /> Reject
-                    </button>
-                  </div>
-                )}
+
               </div>
             </div>
           ))}
@@ -203,14 +178,13 @@ const CollabFolders = () => {
   const navigate = useNavigate();
 
   
-  const { user, getUserProfile } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const { user, userProfile: profile, getUserProfile } = useAuth();
   const [received, setReceived] = useState([]);
   const [sent, setSent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
+  const [filterStatus, setFilterStatus] = useState('all');
   const [deptMap, setDeptMap] = useState({});
   const [importantMap, setImportantMap] = useState({});
 
@@ -236,7 +210,7 @@ const CollabFolders = () => {
     setSummaryVisible(!summaryVisible);
   };
 
-  const isHead = useMemo(() => profile?.position === 'head', [profile]);
+
   
   // Original comprehensive database test function
   const runDatabaseTest = async () => {
@@ -411,42 +385,6 @@ const CollabFolders = () => {
   };
 
   useEffect(() => {
-    const load = async () => {
-      
-      if (!user?.id) {
-        return;
-      }
-      
-      try {
-        const data = await getUserProfile(user.id);
-        setProfile(data);
-      } catch (e) {
-        setError('Failed to load profile: ' + e.message);
-      }
-    };
-    
-    // Network diagnostics
-    
-    // Test basic network connectivity
-    fetch('https://www.google.com/favicon.ico')
-      .then(res => {
-        // Connectivity successful
-      })
-      .catch(err => {
-        // Connection failed
-      });
-      
-    // Check if Supabase is defined and configured
-    if (supabase) {
-      // Supabase client exists
-    } else {
-      // Supabase client is not properly initialized
-    }
-    
-    load();
-  }, [user?.id, getUserProfile]);
-
-  useEffect(() => {
     const fetchData = async () => {
       
       if (!profile?.d_uuid) { 
@@ -608,9 +546,9 @@ const CollabFolders = () => {
             sourceDeptName = 'Unknown Department';
           }
           
-          // Log all files instead of skipping them
+          // Skip files from our own department — they shouldn't count as "received"
           if (sourceDeptId === profile.d_uuid) {
-            // Don't return null here, include the file
+            return null;
           }
           
           // Get user info
@@ -921,24 +859,7 @@ const CollabFolders = () => {
       setTestResults(`Test ERROR: ${e.message}`);
     }
   };
-  const approve = async (fd_uuid) => {
-    try {
-      const { error } = await supabase.from('file_department').update({ is_approved: true }).eq('fd_uuid', fd_uuid);
-      if (error) throw error;
-      setReceived(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: true } : r));
-    } catch (e) {
-      setError(e.message || 'Approve failed');
-    }
-  };
-  const reject = async (fd_uuid) => {
-    try {
-      const { error } = await supabase.from('file_department').update({ is_approved: false }).eq('fd_uuid', fd_uuid);
-      if (error) throw error;
-      setReceived(prev => prev.map(r => r.fd_uuid === fd_uuid ? { ...r, is_approved: false } : r));
-    } catch (e) {
-      setError(e.message || 'Reject failed');
-    }
-  };
+
 
   // Build department cards: group by other department id
   const deptIds = useMemo(() => {
@@ -950,20 +871,24 @@ const CollabFolders = () => {
 
   // We're now fetching department names directly in the main fetch function
   // This useEffect is kept for backward compatibility
+  // Fetch department names only when new department IDs appear
+  // NOTE: deptMap is intentionally NOT in the dependency array to avoid infinite loops
   useEffect(() => {
-    if (Object.keys(deptMap).length === 0 && deptIds.length > 0) {
-      const fetchDeptNames = async () => {
-        const { data, error } = await supabase.from('department').select('d_uuid, d_name').in('d_uuid', deptIds);
-        if (error) { 
-          return; 
-        }
-        const map = {};
-        (data || []).forEach(d => { map[d.d_uuid] = d.d_name; });
-        setDeptMap(prevMap => ({...prevMap, ...map}));
-      };
-      fetchDeptNames();
-    }
-  }, [deptIds, deptMap]);
+    if (deptIds.length === 0) return;
+    // Only fetch names for departments we don't already have
+    const missingIds = deptIds.filter(id => !deptMap[id]);
+    if (missingIds.length === 0) return;
+
+    const fetchDeptNames = async () => {
+      const { data, error } = await supabase.from('department').select('d_uuid, d_name').in('d_uuid', missingIds);
+      if (error) return;
+      const map = {};
+      (data || []).forEach(d => { map[d.d_uuid] = d.d_name; });
+      setDeptMap(prevMap => ({...prevMap, ...map}));
+    };
+    fetchDeptNames();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deptIds]);
 
   const cards = useMemo(() => {
     const recByDept = {};
@@ -1026,12 +951,7 @@ const CollabFolders = () => {
     
     // Apply search and filters
     const filterFn = (file) => {
-      // Status filter
-      if (filterStatus !== 'all') {
-        if (filterStatus === 'pending' && file.is_approved !== null) return false;
-        if (filterStatus === 'approved' && file.is_approved !== true) return false;
-        if (filterStatus === 'rejected' && file.is_approved !== false) return false;
-      }
+
       
       // Text search
       if (searchQuery) {
@@ -1061,11 +981,7 @@ const CollabFolders = () => {
       // Show loading state
       setLoading(true);
       
-      if (action === 'approve') {
-        await approve(fd_uuid);
-      } else if (action === 'reject') {
-        await reject(fd_uuid);
-      } else if (action === 'view') {
+      if (action === 'view') {
         // Navigate to file viewer
         window.open(`/file/${fd_uuid}`, '_blank');
       } else if (action === 'summary') {
@@ -1083,15 +999,6 @@ const CollabFolders = () => {
     <div>
       {error && <div className="mb-3 border border-red-200 bg-red-50 text-red-700 p-2 rounded">{error}</div>}
       
-      {/* Debug controls (only visible for debugging) */}
-      <div className="mb-4 bg-gray-100 p-3 rounded border">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-md font-medium">Collaboration Files Diagnostics</h3>
-
-        </div>
-        
-
-      </div>
       
       {loading ? (
         <div className="flex items-center justify-center h-64">
@@ -1103,68 +1010,12 @@ const CollabFolders = () => {
             <div>Loading collaboration folders…</div>
           </div>
         </div>
-      ) : cards.length === 0 && (received.length > 0 || sent.length > 0) ? (
-        <div className="border rounded bg-white p-8 text-center">
-          <BuildingOfficeIcon className="h-12 w-12 mx-auto text-amber-400 mb-4" />
-          <h3 className="text-lg font-medium text-amber-900 mb-2">Files Found But Not Categorized</h3>
-          <p className="text-amber-800 mb-4">
-            We found {received.length + sent.length} files in the database, but could not categorize them by department.
-            This could be because the source department information is missing.
-          </p>
-          <div className="flex justify-center space-x-2">
-            <button
-              onClick={() => {
-                setTestResults(JSON.stringify({
-                  receivedSample: received.slice(0, 3),
-                  sentSample: sent.slice(0, 3),
-                  totalReceived: received.length,
-                  totalSent: sent.length
-                }, null, 2));
-              }}
-              className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
-            >
-              Show First 3 Files
-            </button>
-            <button
-              onClick={runDatabaseTest}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Run Detailed Test
-            </button>
-          </div>
-        </div>
       ) : cards.length === 0 ? (
-        <div className="border rounded bg-white p-8 text-center">
-          <BuildingOfficeIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No collaboration data found</h3>
-          <p className="text-gray-600 mb-4">
-            There are no files shared between departments yet. Files will appear here when they are shared with your department or 
-            when your department shares files with others.
-          </p>
-          <div className="text-left mx-auto max-w-xl bg-yellow-50 p-3 rounded border border-yellow-200 text-xs text-yellow-800">
-            <p className="font-semibold mb-1">Troubleshooting tips:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Make sure your user account is correctly assigned to a department</li>
-              <li>Share files with other departments from the file view screen</li>
-              <li>Ask other departments to share files with your department</li>
-              <li>Check the diagnostic information for detailed debugging</li>
-              <li>Current user position: {profile?.position || 'Unknown'}</li>
-              <li>Current department ID: {profile?.d_uuid || 'None'}</li>
-              <li>Total files fetched: {received.length + sent.length}</li>
-              <li>Files received: {received.length} / Files sent: {sent.length}</li>
-            </ul>
-          </div>
-          <div className="mt-4 flex gap-3 justify-center">
-
-          </div>
-          
-
-          <div className="mt-4">
-            <p className="text-sm text-gray-500 mt-2">
-              Department d_uuid: {profile?.d_uuid || 'not set'}
-            </p>
-          </div>
+        <div className="border rounded bg-white p-12 text-center">
+          <BuildingOfficeIcon className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm">No collaboration files found.</p>
         </div>
+
       ) : (
         <div>
           {/* Horizontal department strip */}
@@ -1230,24 +1081,12 @@ const CollabFolders = () => {
                     />
                   </div>
                   
-                  {/* Status Filter */}
-                  <div className="flex-shrink-0">
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="block w-full pl-3 pr-10 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
+
                   
                   {/* Clear Filters */}
-                  {(searchQuery || filterStatus !== 'all') && (
+                  {searchQuery && (
                     <button
-                      onClick={() => { setSearchQuery(''); setFilterStatus('all'); }}
+                      onClick={() => { setSearchQuery(''); }}
                       className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       Clear Filters
@@ -1279,9 +1118,6 @@ const CollabFolders = () => {
                   <CollabList
                     title={`Files from ${filteredCard.name} (${filteredCard.received.length})`}
                     rows={filteredCard.received}
-                    isHead={isHead}
-                    onApprove={approve}
-                    onReject={reject}
                     importantMap={importantMap}
                     toggleImportant={toggleImportant}
                   />
