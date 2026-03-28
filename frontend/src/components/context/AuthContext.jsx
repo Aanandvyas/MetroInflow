@@ -9,7 +9,6 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);    // cached DB profile (with department/role joins)
   const [profileLoading, setProfileLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const SESSION_TIMEOUT_MS = 15000;
   const PROFILE_TIMEOUT_MS = 15000;
 
   const withTimeout = (promise, ms, label) =>
@@ -19,20 +18,6 @@ export const AuthProvider = ({ children }) => {
         setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
       ),
     ]);
-
-  const clearLikelyCorruptedAuthStorage = () => {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return;
-      const keys = Object.keys(window.localStorage);
-      keys.forEach((key) => {
-        if (key.startsWith("sb-")) {
-          window.localStorage.removeItem(key);
-        }
-      });
-    } catch {
-      // Ignore storage cleanup errors; we still proceed with a signed-out state.
-    }
-  };
 
   // ── helpers ──────────────────────────────────────────────
 
@@ -157,18 +142,27 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const getUserProfileWithRetry = useCallback(async (uuid) => {
-    const first = await withTimeout(
-      getUserProfile(uuid),
-      PROFILE_TIMEOUT_MS,
-      "getUserProfile (attempt 1)"
-    );
-    if (first) return first;
+    try {
+      const first = await withTimeout(
+        getUserProfile(uuid),
+        PROFILE_TIMEOUT_MS,
+        "getUserProfile (attempt 1)"
+      );
+      if (first) return first;
+    } catch (err) {
+      console.error("getUserProfile attempt 1 failed:", err);
+    }
 
-    return withTimeout(
-      getUserProfile(uuid),
-      PROFILE_TIMEOUT_MS,
-      "getUserProfile (attempt 2)"
-    );
+    try {
+      return await withTimeout(
+        getUserProfile(uuid),
+        PROFILE_TIMEOUT_MS,
+        "getUserProfile (attempt 2)"
+      );
+    } catch (err) {
+      console.error("getUserProfile attempt 2 failed:", err);
+      return null;
+    }
   }, [getUserProfile]);
 
   /** Force-refresh the cached userProfile from the DB */
@@ -216,34 +210,46 @@ export const AuthProvider = ({ children }) => {
   // ── Session management ─────────────────────────────────
   useEffect(() => {
     setLoading(true);
+    let isMounted = true;
+
+    const applySession = async (nextSession) => {
+      if (!isMounted) return;
+
+      setSession(nextSession);
+      const currentUser = nextSession?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        setProfileLoading(true);
+        try {
+          const profile = await getUserProfileWithRetry(currentUser.id);
+          if (isMounted) {
+            setUserProfile(profile);
+          }
+        } catch (err) {
+          console.error("applySession profile fetch failed:", err);
+        } finally {
+          if (isMounted) {
+            setProfileLoading(false);
+          }
+        }
+      } else {
+        setUserProfile(null);
+      }
+    };
 
     const getSession = async () => {
       try {
-        const sessionResult = await withTimeout(
-          supabase.auth.getSession(),
-          SESSION_TIMEOUT_MS,
-          "supabase.auth.getSession"
-        );
-        const session = sessionResult?.data?.session ?? null;
-
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const profile = await getUserProfileWithRetry(currentUser.id);
-          setUserProfile(profile);
-        } else {
-          setUserProfile(null);
-        }
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
+        await applySession(currentSession ?? null);
       } catch (err) {
         console.error("Auth bootstrap failed:", err);
-        clearLikelyCorruptedAuthStorage();
-        setSession(null);
-        setUser(null);
-        setUserProfile(null);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -253,38 +259,21 @@ export const AuthProvider = ({ children }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const profile = await getUserProfileWithRetry(currentUser.id);
-          setUserProfile(profile);
-        } else {
-          setUserProfile(null);
-        }
+        await applySession(session ?? null);
       } catch (err) {
         console.error("Auth state change handling failed:", err);
-        setSession(null);
-        setUser(null);
-        setUserProfile(null);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
+      isMounted = false;
       subscription?.unsubscribe();
     };
   }, [getUserProfileWithRetry]);
-
-  // ── Auto-fetch profile when user changes ───────────────
-  useEffect(() => {
-    if (user?.id) {
-      refreshUserProfile();
-    } else {
-      setUserProfile(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
 
   const value = {
     session,
