@@ -9,6 +9,8 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);    // cached DB profile (with department/role joins)
   const [profileLoading, setProfileLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const SESSION_TIMEOUT_MS = 15000;
+  const PROFILE_TIMEOUT_MS = 15000;
 
   const withTimeout = (promise, ms, label) =>
     Promise.race([
@@ -99,7 +101,7 @@ export const AuthProvider = ({ children }) => {
     if (currentUser?.id) {
       setProfileLoading(true);
       try {
-        const profile = await withTimeout(getUserProfile(currentUser.id), 8000, "signIn getUserProfile");
+        const profile = await getUserProfileWithRetry(currentUser.id);
         setUserProfile(profile);
       } catch (profileErr) {
         console.error("signIn profile fetch failed:", profileErr);
@@ -154,12 +156,27 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const getUserProfileWithRetry = useCallback(async (uuid) => {
+    const first = await withTimeout(
+      getUserProfile(uuid),
+      PROFILE_TIMEOUT_MS,
+      "getUserProfile (attempt 1)"
+    );
+    if (first) return first;
+
+    return withTimeout(
+      getUserProfile(uuid),
+      PROFILE_TIMEOUT_MS,
+      "getUserProfile (attempt 2)"
+    );
+  }, [getUserProfile]);
+
   /** Force-refresh the cached userProfile from the DB */
   const refreshUserProfile = useCallback(async () => {
     if (!user?.id) return null;
     setProfileLoading(true);
     try {
-      const profile = await withTimeout(getUserProfile(user.id), 8000, "refreshUserProfile");
+      const profile = await getUserProfileWithRetry(user.id);
       setUserProfile(profile);
       return profile;
     } catch (err) {
@@ -169,7 +186,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setProfileLoading(false);
     }
-  }, [user?.id, getUserProfile]);
+  }, [user?.id, getUserProfileWithRetry]);
 
   // ── Update user role ───────────────────────────────────
   const updateUserRole = async (uuid, r_uuid) => {
@@ -204,7 +221,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const sessionResult = await withTimeout(
           supabase.auth.getSession(),
-          8000,
+          SESSION_TIMEOUT_MS,
           "supabase.auth.getSession"
         );
         const session = sessionResult?.data?.session ?? null;
@@ -214,11 +231,7 @@ export const AuthProvider = ({ children }) => {
         setUser(currentUser);
 
         if (currentUser) {
-          const profile = await withTimeout(
-            getUserProfile(currentUser.id),
-            8000,
-            "initial getUserProfile"
-          );
+          const profile = await getUserProfileWithRetry(currentUser.id);
           setUserProfile(profile);
         } else {
           setUserProfile(null);
@@ -245,7 +258,7 @@ export const AuthProvider = ({ children }) => {
         setUser(currentUser);
 
         if (currentUser) {
-          const profile = await getUserProfile(currentUser.id);
+          const profile = await getUserProfileWithRetry(currentUser.id);
           setUserProfile(profile);
         } else {
           setUserProfile(null);
@@ -261,7 +274,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [getUserProfile]);
+  }, [getUserProfileWithRetry]);
 
   // ── Auto-fetch profile when user changes ───────────────
   useEffect(() => {

@@ -1,20 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from './components/context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosition = null }) => {
-  const { user, userProfile, profileLoading, signOutUser } = useAuth();
+  const { user, userProfile, profileLoading, refreshUserProfile } = useAuth();
+  const [retriedProfile, setRetriedProfile] = useState(false);
 
-  // If user is logged in but profile is missing, sign out (stale session)
-  // useEffect to avoid calling setState during render of another component
+  // If profile is temporarily unavailable, retry once instead of forcing logout.
   useEffect(() => {
-    if (user && !userProfile && !profileLoading) {
-      signOutUser();
+    if (user && !userProfile && !profileLoading && !retriedProfile) {
+      setRetriedProfile(true);
+      refreshUserProfile();
     }
-  }, [user, userProfile, profileLoading, signOutUser]);
+  }, [user, userProfile, profileLoading, retriedProfile, refreshUserProfile]);
 
-  // If still loading, show spinner
-  if (profileLoading) {
+  // If still loading, or after first retry attempt, show spinner.
+  if (profileLoading || (user && !userProfile && !retriedProfile)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
@@ -22,9 +23,13 @@ const RoleProtectedRoute = ({ children, requiredPosition = null, restrictToPosit
     );
   }
 
-  // If user is logged in but profile is missing, show loading while signOut happens
+  // If profile is still unavailable after retry, do not force logout.
+  // Allow general routes, but block role-specific routes that cannot be verified.
   if (user && !userProfile) {
-    return null;
+    if (requiredPosition) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
   }
 
   // If requiredPosition is specified, only allow users WITH that position
