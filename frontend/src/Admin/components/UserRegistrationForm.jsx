@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { createUser } from '../adminApi';
+import { getAdminSupabase } from '../../adminSupabaseClient';
 
 const getEmailRedirectURL = () => {
   const configured = (process.env.REACT_APP_REDIRECT_URL || '').trim();
@@ -155,11 +155,15 @@ const UserRegistrationForm = ({ onUserAdded }) => {
         position,
       } = formData;
 
-      // Create user through backend admin API to keep service-role secrets server-side.
-      await createUser({
+      // Use the admin Supabase client to create the user directly
+      // This uses the service_role key to call the Supabase Auth Admin API.
+      // The Postgres trigger (handle_new_user) auto-creates the public.users row from user_metadata.
+      const adminClient = getAdminSupabase();
+      const { error: createError } = await adminClient.auth.admin.createUser({
         email,
         password,
-        userMetadata: {
+        email_confirm: false,
+        user_metadata: {
           name: fullName,
           phone_number: phoneNumber,
           dob: dob || null,
@@ -170,6 +174,10 @@ const UserRegistrationForm = ({ onUserAdded }) => {
           position: position || "regular",
         },
       });
+
+      if (createError) {
+        throw createError;
+      }
 
       // Send confirmation email using the regular (anon) supabase client.
       // supabase.auth.resend() triggers Supabase to send the actual email,
