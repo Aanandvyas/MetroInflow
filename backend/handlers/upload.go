@@ -24,6 +24,10 @@ import (
 
 // UploadDocumentsHandler handles multiple file uploads
 func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
+	userUUID, authErr := AuthenticatedUserIDFromRequest(r)
+	if authErr != nil {
+		log.Printf("[DEBUG] Upload without authenticated user: %v", authErr)
+	}
 
 	//below is the size 50mb
 	err := r.ParseMultipartForm(50 << 20)
@@ -102,6 +106,7 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 		doc := models.Document{
 			FileName: title, // use title if provided, else f.Filename
 			Language: language,
+			UUID:     userUUID,
 			FilePath: storagePath,
 			DUUID:    d_uuids_raw, // store all department UUIDs (optional, for reference)
 			Status:   "uploaded",
@@ -122,48 +127,53 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 		uploaded = append(uploaded, doc)
 
 		// Asynchronous OCR, summary, and notification trigger
-		go func(filePath, fuuid string) {
+		go func(filePath, fuuid, ownerUUID, fileName, departmentsRaw string) {
 			log.Println("[DEBUG] Triggering OCR for:", filePath)
+			summaryText := ""
 			tmpPath := filepath.Join(os.TempDir(), filepath.Base(filePath))
 			err := config.Supabase.DownloadFile("file_storage", filePath, tmpPath)
 			if err != nil {
 				log.Println("[DEBUG] Download error:", err)
-				return
-			}
-			defer func() { _ = os.Remove(tmpPath) }()
-			ocrText, avgConf, err := services.RunOCR(tmpPath)
-			if err != nil {
-				log.Println("[DEBUG] OCR error:", err)
-				return
-			}
-			log.Println("[DEBUG] OCR extracted text:", ocrText)
-			log.Println("[DEBUG] OCR avg confidence:", avgConf)
-			ocrResult := models.OCRResult{
-				FUUID:         fuuid,
-				Data:          ocrText,
-				AvgConfidence: avgConf,
-			}
-			if err := models.InsertOCRResult(config.DB, ocrResult); err != nil {
-				log.Println("[DEBUG] Failed to insert OCR result:", err)
+			} else {
+				defer func() { _ = os.Remove(tmpPath) }()
+				ocrText, avgConf, err := services.RunOCR(tmpPath)
+				if err != nil {
+					log.Println("[DEBUG] OCR error:", err)
+				} else {
+					log.Println("[DEBUG] OCR extracted text:", ocrText)
+					log.Println("[DEBUG] OCR avg confidence:", avgConf)
+					ocrResult := models.OCRResult{
+						FUUID:         fuuid,
+						Data:          ocrText,
+						AvgConfidence: avgConf,
+					}
+					if err := models.InsertOCRResult(config.DB, ocrResult); err != nil {
+						log.Println("[DEBUG] Failed to insert OCR result:", err)
+					}
+
+					summaryText, err = services.RunSummarizer(ocrText)
+					if err != nil {
+						log.Println("[DEBUG] Summary error:", err)
+					} else {
+						log.Println("[DEBUG] Summary generated:", summaryText)
+						summary := models.Summary{
+							FUUID:   fuuid,
+							Summary: summaryText,
+						}
+						if err := models.InsertSummary(config.DB, summary); err != nil {
+							log.Println("[DEBUG] Failed to insert summary:", err)
+						}
+					}
+				}
 			}
 
-			// log.Println("[DEBUG] Triggering summary for:", fuuid) // summary trigger removed
-			summaryText, err := services.RunSummarizer(ocrText)
-			if err != nil {
-				// log.Println("[DEBUG] Summary error:", err) // summary error logging removed
+			if ownerUUID == "" {
+				log.Println("[DEBUG] Skipping notification: owner UUID missing")
 				return
-			}
-			log.Println("[DEBUG] Summary generated:", summaryText)
-			summary := models.Summary{
-				FUUID:   fuuid,
-				Summary: summaryText,
-			}
-			if err := models.InsertSummary(config.DB, summary); err != nil {
-				log.Println("[DEBUG] Failed to insert summary:", err)
 			}
 
 			notif := models.Notification{
-				UUID:   doc.UUID,
+				UUID:   ownerUUID,
 				FUUID:  fuuid,
 				IsSeen: false,
 			}
@@ -171,22 +181,21 @@ func UploadDocumentsHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println("[DEBUG] Failed to insert notification:", err)
 			} else {
 				userEmail := ""
-				fileName := doc.FileName
-				row := config.DB.QueryRow("SELECT email FROM users WHERE uuid = $1", doc.UUID)
+				row := config.DB.QueryRow("SELECT email FROM users WHERE uuid = $1", ownerUUID)
 				_ = row.Scan(&userEmail)
 				if userEmail != "" {
 					subject := "New file uploaded: " + fileName
-					body := "A new file has been added to your account.\n\nFile: " + fileName + "\nDepartments: " + d_uuids_raw + "\nSummary: " + summaryText
+					body := "A new file has been added to your account.\n\nFile: " + fileName + "\nDepartments: " + departmentsRaw + "\nSummary: " + summaryText
 					if err := utils.SendGmailNotification(userEmail, subject, body); err != nil {
 						log.Println("[DEBUG] Failed to send email notification:", err)
 					} else {
 						log.Println("[DEBUG] Email notification sent to:", userEmail)
 					}
 				} else {
-					log.Println("[DEBUG] No email found for user:", doc.UUID)
+					log.Println("[DEBUG] No email found for user:", ownerUUID)
 				}
 			}
-		}(storagePath, fuuid)
+		}(storagePath, fuuid, doc.UUID, doc.FileName, d_uuids_raw)
 	}
 
 	if len(uploaded) == 0 {
