@@ -209,7 +209,8 @@ func main() {
 					log.Printf("[QUICK_SHARE] User lookup error for d_uuid %s: %v", dUUID, err)
 					continue
 				}
-				sent := false
+				headEmails := make([]string, 0)
+				regularEmails := make([]string, 0)
 				for rows2.Next() {
 					var position, email string
 					if err := rows2.Scan(&position, &email); err != nil {
@@ -217,19 +218,43 @@ func main() {
 						continue
 					}
 					log.Printf("[QUICK_SHARE] User position: %s, email: %s", position, email)
-					if position == "head" && email != "" {
-						subject := "Quick Share Notification"
-						body := formatted
-						log.Printf("[QUICK_SHARE] Sending email to %s...", email)
-						if err := utils.SendGmailNotification(email, subject, body); err != nil {
-							log.Println("[QUICK_SHARE] Failed to send email:", err)
-						} else {
-							log.Printf("[QUICK_SHARE] Email sent to: %s", email)
-							sent = true
-						}
+					if email == "" {
+						continue
+					}
+					if position == "head" {
+						headEmails = append(headEmails, email)
+					} else {
+						regularEmails = append(regularEmails, email)
 					}
 				}
 				rows2.Close()
+
+				recipients := headEmails
+				if len(recipients) == 0 {
+					recipients = regularEmails
+					if len(recipients) > 0 {
+						log.Printf("[QUICK_SHARE] No head users found for d_uuid %s; falling back to regular users", dUUID)
+					}
+				}
+
+				sent := false
+				subject := "Quick Share Notification"
+				body := formatted
+				for _, email := range recipients {
+					log.Printf("[QUICK_SHARE] Sending email to %s...", email)
+					if err := utils.SendGmailNotification(email, subject, body); err != nil {
+						log.Println("[QUICK_SHARE] Failed to send email:", err)
+					} else {
+						log.Printf("[QUICK_SHARE] Email sent to: %s", email)
+						sent = true
+					}
+				}
+
+				if len(recipients) == 0 {
+					log.Printf("[QUICK_SHARE] No recipients found for d_uuid %s; marking as sent to avoid infinite retries", dUUID)
+					sent = true
+				}
+
 				if sent {
 					_, err := config.DB.Exec("UPDATE quick_share SET is_sent = true WHERE qs_uuid = $1", qsUUID)
 					if err != nil {
