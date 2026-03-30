@@ -299,7 +299,7 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Printf("🚀 Server started at http://localhost:%s\n", port)
+	log.Printf("Server started at http://localhost:%s\n", port)
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
